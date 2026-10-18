@@ -163,7 +163,18 @@ function ProfileScreen() {
     </div>
   );
 }
-
+{/* Under Stats / below matches count */}
+<div style={{ marginTop: 12 }}>
+  <h4>Matches</h4>
+  <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+    {matches.map(m => (
+      <button key={m._id} onClick={() => /* navigate to chat and open conversation with m */ window.location.hash = `#/messages?open=${m._id}`} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}>
+        <img src={m.photos?.[0]?.url || 'https://via.placeholder.com/64'} style={{ width: 64, height: 64, borderRadius: 8 }} alt='' />
+        <div style={{ fontSize: 12, textAlign: 'center' }}>{m.name}</div>
+      </button>
+    ))}
+  </div>
+</div>
 const buttonStyle = {
   background: '#5b72f2',
   color: '#fff',
