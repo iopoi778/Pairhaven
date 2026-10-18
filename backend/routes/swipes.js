@@ -16,7 +16,46 @@ router.post('/', auth, async (req, res) => {
     if (!['like', 'pass'].includes(action)) {
       return res.status(400).json({ message: 'action must be like or pass' });
     }
+const Notification = require('../models/Notification');
+await Notification.create({
+  recipient: toUserId,
+  sender: req.user.userId,
+  type: 'like',
+  message: `${me.name} liked you`,
+  metadata: { from: req.user.userId }
+});
 
+// if reciprocal -> create match (you already have this) — ensure notifications for both:
+if (reciprocal) {
+  if (!existingMatch) {
+    const match = new Match({ user1: me._id, user2: target._id, status: 'accepted' });
+    await match.save();
+
+    if (!me.matches.includes(target._id)) me.matches.push(target._id);
+    if (!target.matches.includes(me._id)) target.matches.push(me._id);
+
+    await me.save();
+    await target.save();
+
+    await Notification.create({
+      recipient: target._id,
+      sender: me._id,
+      type: 'match',
+      message: `You matched with ${me.name}`,
+      metadata: { matchId: match._id, userId: me._id }
+    });
+
+    await Notification.create({
+      recipient: me._id,
+      sender: target._id,
+      type: 'match',
+      message: `You matched with ${target.name}`,
+      metadata: { matchId: match._id, userId: target._id }
+    });
+    // return match response...
+  }
+}
+    
     const me = await User.findById(req.user.userId);
     const target = await User.findById(toUserId);
 
