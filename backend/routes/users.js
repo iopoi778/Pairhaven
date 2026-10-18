@@ -4,13 +4,10 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
 
-// GET USER PROFILE - Handles both /me and /:id
+// GET USER PROFILE
 router.get('/profile/:id', auth, async (req, res) => {
   try {
-    // Resolve 'me' to current user's ID
-    const targetId = req.params.id === 'me' ? req.user.userId : req.params.id;
-    
-    const user = await User.findById(targetId)
+    const user = await User.findById(req.params.id)
       .select('-password')
       .populate('followers', 'name photos')
       .populate('following', 'name photos');
@@ -18,12 +15,6 @@ router.get('/profile/:id', auth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    // Safe length checks to prevent 500 errors
-    const followers = user.followers || [];
-    const following = user.following || [];
-    const likesReceived = user.likesReceived || [];
-    const matches = user.matches || [];
 
     res.json({
       id: user._id,
@@ -37,16 +28,15 @@ router.get('/profile/:id', auth, async (req, res) => {
       bio: user.bio,
       interests: user.interests,
       verificationStatus: user.verificationStatus,
-      followersCount: followers.length,
-      followingCount: following.length,
-      likesReceivedCount: likesReceived.length,
-      matchesCount: matches.length,
-      isFollowing: req.params.id === 'me' ? false : followers.some(f => f._id.toString() === req.user.userId),
-      followers,
-      following
+      followersCount: user.followers.length,
+      followingCount: user.following.length,
+      likesReceivedCount: user.likesReceived.length,
+      matchesCount: user.matches.length,
+      isFollowing: user.followers.includes(req.user.userId),
+      followers: user.followers,
+      following: user.following
     });
   } catch (error) {
-    console.error('Profile fetch error:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -57,11 +47,11 @@ router.post('/follow/:userId', auth, async (req, res) => {
     const userToFollow = await User.findById(req.params.userId);
     const currentUser = await User.findById(req.user.userId);
 
-    if (!userToFollow || !currentUser) {
+    if (!userToFollow) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    if (currentUser.following?.includes(req.params.userId)) {
+    if (currentUser.following.includes(req.params.userId)) {
       return res.status(400).json({ message: 'Already following' });
     }
 
@@ -83,7 +73,6 @@ router.post('/follow/:userId', auth, async (req, res) => {
       followersCount: userToFollow.followers.length 
     });
   } catch (error) {
-    console.error('Follow error:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -94,14 +83,10 @@ router.delete('/unfollow/:userId', auth, async (req, res) => {
     const currentUser = await User.findById(req.user.userId);
     const userToUnfollow = await User.findById(req.params.userId);
 
-    if (!currentUser || !userToUnfollow) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    currentUser.following = (currentUser.following || []).filter(
+    currentUser.following = currentUser.following.filter(
       id => id.toString() !== req.params.userId
     );
-    userToUnfollow.followers = (userToUnfollow.followers || []).filter(
+    userToUnfollow.followers = userToUnfollow.followers.filter(
       id => id.toString() !== req.user.userId
     );
 
@@ -110,7 +95,6 @@ router.delete('/unfollow/:userId', auth, async (req, res) => {
 
     res.json({ message: 'Successfully unfollowed' });
   } catch (error) {
-    console.error('Unfollow error:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -121,13 +105,13 @@ router.post('/like/:userId', auth, async (req, res) => {
     const userToLike = await User.findById(req.params.userId);
     const currentUser = await User.findById(req.user.userId);
     
-    if (!userToLike || !currentUser) {
+    if (!userToLike) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     // Check if already liked
-    const alreadyLiked = (userToLike.likesReceived || []).find(
-      like => like.from?.toString() === req.user.userId
+    const alreadyLiked = userToLike.likesReceived.find(
+      like => like.from.toString() === req.user.userId
     );
 
     if (alreadyLiked) {
@@ -135,7 +119,6 @@ router.post('/like/:userId', auth, async (req, res) => {
     }
 
     // Add like
-    userToLike.likesReceived = userToLike.likesReceived || [];
     userToLike.likesReceived.push({ from: req.user.userId });
     await userToLike.save();
 
@@ -148,15 +131,11 @@ router.post('/like/:userId', auth, async (req, res) => {
     });
 
     // CHECK FOR MUTUAL LIKE → CREATE MATCH
-    const mutualLike = (currentUser.likesReceived || []).find(
-      like => like.from?.toString() === req.params.userId
+    const mutualLike = currentUser.likesReceived.find(
+      like => like.from.toString() === req.params.userId
     );
 
     if (mutualLike) {
-      // Initialize arrays if missing
-      currentUser.matches = currentUser.matches || [];
-      userToLike.matches = userToLike.matches || [];
-
       // Add to BOTH users' matches arrays
       if (!currentUser.matches.includes(req.params.userId)) {
         currentUser.matches.push(req.params.userId);
@@ -188,7 +167,6 @@ router.post('/like/:userId', auth, async (req, res) => {
       likesCount: userToLike.likesReceived.length 
     });
   } catch (error) {
-    console.error('Like error:', error);
     res.status(500).json({ message: error.message });
   }
 });
