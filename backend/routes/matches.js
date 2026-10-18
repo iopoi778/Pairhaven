@@ -84,23 +84,23 @@ router.post('/match/filter', auth, async (req, res) => {
 
     const distKm = parseFloat(distance || currentUser.preferences?.distance || 50);
     if (distKm && currentUser.location && Array.isArray(currentUser.location.coordinates)) {
-      query.location = {
-        $near: {
-          $geometry: { type: 'Point', coordinates: currentUser.location.coordinates.map(Number) },
-          $maxDistance: Math.round(distKm * 1000)
-        }
-      };
+    const distanceKm = parseFloat(req.query.distance || 50);
+    const hasValidLocation = currentUser.location && 
+                         Array.isArray(currentUser.location.coordinates) && 
+                         currentUser.location.coordinates.length === 2 &&
+                         currentUser.location.coordinates[0] !== 0; // Exclude [0,0] fallback
+
+if (hasValidLocation && !isNaN(distanceKm) && distanceKm > 0) {
+  query.location = {
+    $near: {
+      $geometry: { 
+        type: 'Point', 
+        coordinates: currentUser.location.coordinates.map(Number) 
+      },
+      $maxDistance: Math.round(distanceKm * 1000)
     }
-
-    const matches = await User.find(query)
-      .select('name photos age location bio interests verificationStatus')
-      .limit(50);
-
-    res.json(matches);
-  } catch (error) {
-    console.error('Match filter error:', error);
-    res.status(500).json({ message: error.message });
-  }
+  };
+} 
 });
 // BEFORE (Crashes or excludes users without location)
 if (shouldApplyGeo) {
