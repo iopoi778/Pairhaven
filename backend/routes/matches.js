@@ -5,31 +5,49 @@ const Match = require('../models/match');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
 
-// GET RANDOM PROFILES FOR HOME TAB
+ // GET RANDOM PROFILES FOR HOME TAB
 router.get('/random', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.userId);
-    
     const excludedIds = [
       req.user.userId,
-      ...currentUser.following,
-      ...currentUser.matches
-    ];
+      ...(currentUser.following || []),
+      ...(currentUser.matches || [])
+    ].map(String);
 
-    const users = await User.find({
-      _id: { $nin: excludedIds },
-      verificationStatus: 'verified'
-    })
-    .select('name photos age location bio interests')
-    .limit(20)
-    .sort({ createdAt: -1 });
+    const query = { _id: { $nin: excludedIds } };
+
+    // In production, maybe require verified true; for dev allow everyone
+    if (process.env.NODE_ENV === 'production') {
+      query.verificationStatus = 'verified';
+    }
+
+    // optional distance filter (use query param distance in km)
+    const distanceKm = parseFloat(req.query.distance || req.body.distance || currentUser.preferences?.distance || 50);
+    if (distanceKm && currentUser.location && Array.isArray(currentUser.location.coordinates) && currentUser.location.coordinates.length === 2) {
+      query.location = {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: currentUser.location.coordinates
+          },
+          $maxDistance: Math.round(distanceKm * 1000)
+        }
+      };
+    }
+
+    const users = await User.find(query)
+      .select('name photos age location bio interests verificationStatus')
+      .limit(30)
+      .sort({ createdAt: -1 });
 
     res.json(users);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 });
-
+   
 // MATCH WITH FILTERS
 router.post('/match/filter', auth, async (req, res) => {
   try {
