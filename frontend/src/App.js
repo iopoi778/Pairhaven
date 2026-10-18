@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import ProfileScreen from './pages/ProfileScreen';
 import MatchingScreen from './pages/MatchingScreen';
 import ChatScreen from './pages/chat';
