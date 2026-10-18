@@ -5,7 +5,7 @@ const Match = require('../models/match');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
 
-// GET /api/matches/random - Unified working version
+// GET /api/matches/random - TEMPORARILY DISABLED GEO & VERIFICATION FOR TESTING
 router.get('/random', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.userId);
@@ -18,32 +18,31 @@ router.get('/random', auth, async (req, res) => {
       ...(currentUser.likesSent || [])
     ];
 
-    // Base query
+    // Base query - ONLY excludes already interacted users
     const query = { _id: { $nin: excludedIds } };
 
-    // Only enforce verification in production
-    if (process.env.NODE_ENV === 'production') {
-      query.verificationStatus = 'verified';
-    }
+    // TEMPORARILY DISABLED: Verification filter
+    // if (process.env.NODE_ENV === 'production') {
+    //   query.verificationStatus = 'verified';
+    // }
 
-    // Geospatial filter (optional, based on user location)
-    const distanceKm = parseFloat(req.query.distance || 50);
-    const hasValidLocation = currentUser.location && 
-                             Array.isArray(currentUser.location.coordinates) && 
-                             currentUser.location.coordinates.length === 2 &&
-                             currentUser.location.coordinates[0] !== 0;
-
-    if (hasValidLocation && !isNaN(distanceKm) && distanceKm > 0) {
-      query.location = {
-        $near: {
-          $geometry: { 
-            type: 'Point', 
-            coordinates: currentUser.location.coordinates.map(Number) 
-          },
-          $maxDistance: Math.round(distanceKm * 1000)
-        }
-      };
-    }
+    // TEMPORARILY DISABLED: Geospatial filter
+    // const distanceKm = parseFloat(req.query.distance || 50);
+    // const hasValidLocation = currentUser.location && 
+    //                          Array.isArray(currentUser.location.coordinates) && 
+    //                          currentUser.location.coordinates.length === 2 &&
+    //                          currentUser.location.coordinates[0] !== 0;
+    // if (hasValidLocation && !isNaN(distanceKm) && distanceKm > 0) {
+    //   query.location = {
+    //     $near: {
+    //       $geometry: { 
+    //         type: 'Point', 
+    //         coordinates: currentUser.location.coordinates.map(Number) 
+    //       },
+    //       $maxDistance: Math.round(distanceKm * 1000)
+    //     }
+    //   };
+    // }
 
     const potentialMatches = await User.find(query)
       .select('name photos age location bio gender interests verificationStatus')
@@ -57,7 +56,7 @@ router.get('/random', auth, async (req, res) => {
   }
 });
 
-// POST /api/matches/match/filter - Filtered matching
+// POST /api/matches/match/filter - Filtered matching (ALSO DISABLED FOR TESTING)
 router.post('/match/filter', auth, async (req, res) => {
   try {
     const { ageMin, ageMax, distance, gender } = req.body;
@@ -80,19 +79,21 @@ router.post('/match/filter', auth, async (req, res) => {
 
     if (gender) query.gender = gender;
 
-    if (process.env.NODE_ENV === 'production') {
-      query.verificationStatus = 'verified';
-    }
+    // TEMPORARILY DISABLED: Verification filter
+    // if (process.env.NODE_ENV === 'production') {
+    //   query.verificationStatus = 'verified';
+    // }
 
-    const distKm = parseFloat(distance || currentUser.preferences?.distance || 50);
-    if (distKm && currentUser.location && Array.isArray(currentUser.location.coordinates)) {
-      query.location = {
-        $near: {
-          $geometry: { type: 'Point', coordinates: currentUser.location.coordinates.map(Number) },
-          $maxDistance: Math.round(distKm * 1000)
-        }
-      };
-    }
+    // TEMPORARILY DISABLED: Distance filter
+    // const distKm = parseFloat(distance || currentUser.preferences?.distance || 50);
+    // if (distKm && currentUser.location && Array.isArray(currentUser.location.coordinates)) {
+    //   query.location = {
+    //     $near: {
+    //       $geometry: { type: 'Point', coordinates: currentUser.location.coordinates.map(Number) },
+    //       $maxDistance: Math.round(distKm * 1000)
+    //     }
+    //   };
+    // }
 
     const matches = await User.find(query)
       .select('name photos age location bio interests verificationStatus')
