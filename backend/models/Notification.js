@@ -1,4 +1,3 @@
-
 // backend/models/Notification.js
 const mongoose = require('mongoose');
 
