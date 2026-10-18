@@ -7,7 +7,8 @@ const auth = require('../middleware/auth');
 // GET USER PROFILE
 router.get('/profile/:id', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
+      const targetId = req.params.id === 'me' ? req.user.userId : req.params.id;
+      const user = await User.findById(targetId)
       .select('-password')
       .populate('followers', 'name photos')
       .populate('following', 'name photos');
