@@ -1,51 +1,61 @@
-
-import React, { useEffect, useState } from 'react';
+// frontend/src/pages/NotificationsScreen.js
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
-export default function NotificationsScreen() {
-  const [notes, setNotes] = useState([]);
-  const [loading, setLoading] = useState(true);
+function NotificationsScreen() {
+  const [notifications, setNotifications] = useState([]);
+  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
+  const token = localStorage.getItem('token');
 
   useEffect(() => {
-    let mounted = true;
-    const token = localStorage.getItem('token');
-    axios.get(`${API_URL}/api/notifications`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => { if (mounted) setNotes(res.data); })
-      .catch(err => console.error('Failed to fetch notifications', err))
-      .finally(() => { if (mounted) setLoading(false); });
-    return () => mounted = false;
-  }, []);
+    const fetchData = async () => {
+      try {
+        // Fetch Notifications
+        const notifRes = await axios.get(`${API_URL}/api/notifications`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setNotifications(notifRes.data || []);
 
-  const markRead = async (id) => {
-    const token = localStorage.getItem('token');
-    try {
-      await axios.put(`${API_URL}/api/notifications/${id}/read`, {}, { headers: { Authorization: `Bearer ${token}` } });
-      setNotes(n => n.map(x => x._id === id ? { ...x, read: true } : x));
-    } catch (err) { console.error(err); }
-  };
+        // Fetch Unread Message Count
+        const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const totalUnread = (msgRes.data || []).reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
+        setUnreadMsgCount(totalUnread);
 
-  if (loading) return <div style={{ padding: 20, textAlign: 'center' }}>Loading...</div>;
-  if (!notes.length) return <div style={{ padding: 20, textAlign: 'center' }}>You have no notifications.</div>;
+      } catch (err) {
+        console.error("Failed to fetch data", err);
+      }
+    };
+
+    if (token) fetchData();
+  }, [token]);
 
   return (
-    <div style={{ padding: 16 }}>
-      <h2>Notifications</h2>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {notes.map(n => (
-          <li key={n._id} style={{ background: n.read ? '#fff' : '#eef6ff', padding: 12, borderRadius: 8, marginBottom: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div>
-                <strong>{n.type}</strong> — {n.message}
-                <div style={{ fontSize: 12, color: '#666' }}>{new Date(n.createdAt).toLocaleString()}</div>
-              </div>
-              <div>
-                {!n.read && <button onClick={() => markRead(n._id)} style={{ marginLeft: 8 }}>Mark read</button>}
-              </div>
+    <div style={{ padding: '1rem' }}>
+      <h2>Alerts {unreadMsgCount > 0 && <span style={{background:'#e53e3e', color:'#fff', borderRadius:'50%', padding:'2px 8px', fontSize:'0.8rem'}}>{unreadMsgCount}</span>}</h2>
+      
+      {notifications.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#666', marginTop: '2rem' }}>No new notifications.</div>
+      ) : (
+        notifications.map(note => (
+          <div key={note._id} style={{ background: '#fff', padding: '1rem', borderRadius: '8px', marginBottom: '0.8rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '0.3rem' }}>
+              {note.type === 'like' && '❤️ New Like'}
+              {note.type === 'follow' && '👤 New Follower'}
+              {note.type === 'match' && '💖 It\'s a Match!'}
             </div>
-          </li>
-        ))}
-      </ul>
+            <div style={{ color: '#444' }}>{note.message}</div>
+            <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
+              {new Date(note.createdAt).toLocaleString()}
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
+
+export default NotificationsScreen;
