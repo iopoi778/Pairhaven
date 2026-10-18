@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react'; // ← ADDED useEffect import
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ProfileScreen from './pages/ProfileScreen';
 import MatchingScreen from './pages/MatchingScreen';
 import ChatScreen from './pages/chat';
+import NotificationsScreen from './pages/NotificationsScreen';
+import PostComposer from './components/PostComposer';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
-// Set axios defaults from stored token at app startup
 const tokenAtStart = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 if (tokenAtStart) {
   axios.defaults.headers.common['Authorization'] = `Bearer ${tokenAtStart}`;
@@ -25,11 +26,14 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/" element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          } />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </Router>
@@ -42,12 +46,18 @@ function DashboardLayout() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home': return <HomeFeed />;
-      case 'matching': return <MatchingScreen />;
-      case 'messages': return <ChatScreen />;
-      case 'notifications': return <NotificationsScreen />;
-      case 'profile': return <ProfileScreen />;
-      default: return <HomeFeed />;
+      case 'home':
+        return <HomeFeed />;
+      case 'matching':
+        return <MatchingScreen />;
+      case 'messages':
+        return <ChatScreen />;
+      case 'notifications':
+        return <NotificationsScreen />;
+      case 'profile':
+        return <ProfileScreen />;
+      default:
+        return <HomeFeed />;
     }
   };
 
@@ -62,7 +72,9 @@ function DashboardLayout() {
     <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
         <h2 style={{ margin: 0, color: '#5b72f2', fontWeight: 700 }}>PairHaven</h2>
-        <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}>Logout</button>
+        <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}>
+          Logout
+        </button>
       </header>
 
       <main style={{ padding: '1rem', minHeight: 'calc(100vh - 120px)', background: '#f6f6f6' }}>
@@ -77,12 +89,20 @@ function DashboardLayout() {
           { id: 'notifications', label: 'Alerts', icon: '🔔' },
           { id: 'profile', label: 'Profile', icon: '👤' }
         ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-            border: activeTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent',
-            background: activeTab === tab.id ? '#eef2ff' : 'transparent',
-            borderRadius: '10px', padding: '0.5rem 0.8rem', minWidth: '70px',
-            textAlign: 'center', color: activeTab === tab.id ? '#5b72f2' : '#666', cursor: 'pointer'
-          }}>
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              border: activeTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent',
+              background: activeTab === tab.id ? '#eef2ff' : 'transparent',
+              borderRadius: '10px',
+              padding: '0.5rem 0.8rem',
+              minWidth: '70px',
+              textAlign: 'center',
+              color: activeTab === tab.id ? '#5b72f2' : '#666',
+              cursor: 'pointer'
+            }}
+          >
             <div style={{ fontSize: '1.3rem' }}>{tab.icon}</div>
             <div style={{ fontSize: '0.72rem', marginTop: '0.15rem' }}>{tab.label}</div>
           </button>
@@ -93,49 +113,64 @@ function DashboardLayout() {
 }
 
 function HomeFeed() {
-  return (
-    <div style={{ textAlign: 'center', paddingTop: '3rem' }}>
-      <h2 style={{ marginBottom: '1rem' }}>Your Feed</h2>
-      <p style={{ fontSize: '1.05rem', color: '#555' }}>Posts from people you follow will appear here.</p>
-      <div style={{ marginTop: '2rem', background: '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-        <h3 style={{ margin: 0, marginBottom: '0.7rem' }}>Sample Post</h3>
-        <p style={{ margin: 0 }}>Hello world! This is a sample feed item.</p>
-      </div>
-    </div>
-  );
-}
+  const [posts, setPosts] = useState([]);
 
-function NotificationsScreen() {
-  const [notes, setNotes] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => { // ← Now properly imported
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    axios.get(`${API_URL}/api/notifications`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => setNotes(res.data || []))
-      .catch(err => console.error('Failed to fetch notifications', err))
-      .finally(() => setLoading(false));
+  useEffect(() => {
+    const fetchPosts = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      try {
+        const res = await axios.get(`${API_URL}/api/posts`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setPosts(res.data || []);
+      } catch (err) {
+        console.warn('Failed to load feed posts', err);
+      }
+    };
+    fetchPosts();
   }, []);
 
-  if (loading) return <div style={{ padding: 20, textAlign: 'center' }}>Loading alerts...</div>;
-  if (!notes.length) return <div style={{ padding: 20, textAlign: 'center' }}>No alerts yet.</div>;
+  const handleNewPost = (newPost) => {
+    setPosts(prev => [newPost, ...prev]);
+  };
 
   return (
-    <div style={{ padding: 16 }}>
-      <h2>Alerts</h2>
-      {notes.map(note => (
-        <div key={note._id} style={{ background: '#fff', padding: 12, borderRadius: 8, marginBottom: 8 }}>
-          <div><strong>{note.type}</strong></div>
-          <div>{note.message}</div>
-          <div style={{ fontSize: 12, color: '#666' }}>{new Date(note.createdAt).toLocaleString()}</div>
+    <div style={{ padding: '0.5rem 0 3rem' }}>
+      <h2 style={{ margin: '0 0 1rem' }}>Your Feed</h2>
+      <PostComposer onPosted={handleNewPost} />
+      {posts.length === 0 ? (
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '1.2rem', textAlign: 'center', color: '#666' }}>
+          No posts yet.
         </div>
-      ))}
+      ) : (
+        posts.map(post => (
+          <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#5b72f2', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                {(post.author?.name || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div style={{ fontWeight: 700 }}>{post.author?.name || 'User'}</div>
+                <div style={{ fontSize: 12, color: '#666' }}>{new Date(post.createdAt).toLocaleString()}</div>
+              </div>
+            </div>
+
+            {post.text ? <div style={{ marginBottom: 8 }}>{post.text}</div> : null}
+
+            {post.mediaType === 'video' && post.mediaUrl ? (
+              <video src={post.mediaUrl} controls style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} />
+            ) : post.mediaUrl ? (
+              <img src={post.mediaUrl} alt="" style={{ width: '100%', borderRadius: 10 }} />
+            ) : null}
+          </div>
+        ))
+      )}
     </div>
   );
 }
 
+// Login screen
 function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -143,21 +178,31 @@ function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: e.target.email.value, password: e.target.password.value })
+        body: JSON.stringify({ email, password })
       });
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Login failed');
-      
+
+      if (!res.ok) {
+        alert(data.message || 'Login failed');
+        return;
+      }
+
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       navigate('/', { replace: true });
     } catch (err) {
-      alert(err.message || 'Server error. Please try again later.');
+      console.error(err);
+      alert('Server error. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -173,14 +218,18 @@ function LoginPage() {
           {loading ? 'Logging in...' : 'Log In'}
         </button>
       </form>
+
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         New here?{' '}
-        <span onClick={() => navigate('/register')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Create Account</span>
+        <a href="/register" onClick={(e) => { e.preventDefault(); navigate('/register'); }} style={{ color: '#5b72f2' }}>
+          Create Account
+        </a>
       </p>
     </div>
   );
 }
 
+// Register screen
 function RegisterPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -188,8 +237,8 @@ function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const form = e.target;
-    const formData = new FormData(form);
+
+    const formData = new FormData(e.target);
 
     try {
       if (navigator.geolocation) {
@@ -197,28 +246,41 @@ function RegisterPage() {
           const pos = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
           });
+
           const { latitude, longitude } = pos.coords;
-          formData.append('location', JSON.stringify({ 
-            type: 'Point', 
-            coordinates: [longitude, latitude] 
+          formData.append('location', JSON.stringify({
+            type: 'Point',
+            coordinates: [longitude, latitude]
           }));
         } catch (geoErr) {
           console.warn('Geolocation not available or denied', geoErr);
         }
       }
 
-      const res = await fetch(`${API_URL}/api/auth/register`, { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Registration failed');
+      const res = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        body: formData
+      });
 
-      // Auto-login after successful registration
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || 'Registration failed');
+        return;
+      }
+
       try {
         const loginRes = await fetch(`${API_URL}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.get('email'), password: formData.get('password') })
+          body: JSON.stringify({
+            email: formData.get('email'),
+            password: formData.get('password')
+          })
         });
+
         const loginData = await loginRes.json();
+
         if (loginRes.ok) {
           localStorage.setItem('token', loginData.token);
           localStorage.setItem('user', JSON.stringify(loginData.user));
@@ -233,7 +295,8 @@ function RegisterPage() {
       alert('Registered! Please log in.');
       navigate('/login', { replace: true });
     } catch (err) {
-      alert(err.message || 'Server error. Please try again later.');
+      console.error(err);
+      alert('Server error. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -264,19 +327,33 @@ function RegisterPage() {
       </form>
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         Already have an account?{' '}
-        <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
+        <a href="/login" onClick={(e) => { e.preventDefault(); navigate('/login'); }} style={{ color: '#5b72f2' }}>
+          Log In
+        </a>
       </p>
     </div>
   );
 }
 
 const inputStyle = {
-  width: '100%', boxSizing: 'border-box', padding: '0.8rem', borderRadius: '8px',
-  border: '1px solid #dfe3ea', marginBottom: '1rem', fontSize: '1rem'
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '0.8rem',
+  borderRadius: '8px',
+  border: '1px solid #dfe3ea',
+  marginBottom: '1rem',
+  fontSize: '1rem'
 };
+
 const primaryButtonStyle = {
-  width: '100%', padding: '0.9rem', border: 'none', borderRadius: '8px',
-  background: '#5b72f2', color: '#fff', fontWeight: 700, cursor: 'pointer'
+  width: '100%',
+  padding: '0.9rem',
+  border: 'none',
+  borderRadius: '8px',
+  background: '#5b72f2',
+  color: '#fff',
+  fontWeight: 700,
+  cursor: 'pointer'
 };
 
 export default App;
