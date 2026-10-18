@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // ← ADDED useEffect import
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ProfileScreen from './pages/ProfileScreen';
@@ -7,6 +7,7 @@ import ChatScreen from './pages/chat';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
+// Set axios defaults from stored token at app startup
 const tokenAtStart = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 if (tokenAtStart) {
   axios.defaults.headers.common['Authorization'] = `Bearer ${tokenAtStart}`;
@@ -24,14 +25,11 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/" element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          } />
         </Routes>
       </div>
     </Router>
@@ -44,18 +42,12 @@ function DashboardLayout() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home':
-        return <HomeFeed />;
-      case 'matching':
-        return <MatchingScreen />;
-      case 'messages':
-        return <ChatScreen />;
-      case 'notifications':
-        return <NotificationsScreen />;
-      case 'profile':
-        return <ProfileScreen />;
-      default:
-        return <HomeFeed />;
+      case 'home': return <HomeFeed />;
+      case 'matching': return <MatchingScreen />;
+      case 'messages': return <ChatScreen />;
+      case 'notifications': return <NotificationsScreen />;
+      case 'profile': return <ProfileScreen />;
+      default: return <HomeFeed />;
     }
   };
 
@@ -70,9 +62,7 @@ function DashboardLayout() {
     <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
         <h2 style={{ margin: 0, color: '#5b72f2', fontWeight: 700 }}>PairHaven</h2>
-        <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}>
-          Logout
-        </button>
+        <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}>Logout</button>
       </header>
 
       <main style={{ padding: '1rem', minHeight: 'calc(100vh - 120px)', background: '#f6f6f6' }}>
@@ -87,20 +77,12 @@ function DashboardLayout() {
           { id: 'notifications', label: 'Alerts', icon: '🔔' },
           { id: 'profile', label: 'Profile', icon: '👤' }
         ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              border: activeTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent',
-              background: activeTab === tab.id ? '#eef2ff' : 'transparent',
-              borderRadius: '10px',
-              padding: '0.5rem 0.8rem',
-              minWidth: '70px',
-              textAlign: 'center',
-              color: activeTab === tab.id ? '#5b72f2' : '#666',
-              cursor: 'pointer'
-            }}
-          >
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+            border: activeTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent',
+            background: activeTab === tab.id ? '#eef2ff' : 'transparent',
+            borderRadius: '10px', padding: '0.5rem 0.8rem', minWidth: '70px',
+            textAlign: 'center', color: activeTab === tab.id ? '#5b72f2' : '#666', cursor: 'pointer'
+          }}>
             <div style={{ fontSize: '1.3rem' }}>{tab.icon}</div>
             <div style={{ fontSize: '0.72rem', marginTop: '0.15rem' }}>{tab.label}</div>
           </button>
@@ -115,7 +97,6 @@ function HomeFeed() {
     <div style={{ textAlign: 'center', paddingTop: '3rem' }}>
       <h2 style={{ marginBottom: '1rem' }}>Your Feed</h2>
       <p style={{ fontSize: '1.05rem', color: '#555' }}>Posts from people you follow will appear here.</p>
-
       <div style={{ marginTop: '2rem', background: '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
         <h3 style={{ margin: 0, marginBottom: '0.7rem' }}>Sample Post</h3>
         <p style={{ margin: 0 }}>Hello world! This is a sample feed item.</p>
@@ -128,7 +109,7 @@ function NotificationsScreen() {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  useEffect(() => { // ← Now properly imported
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -155,7 +136,6 @@ function NotificationsScreen() {
   );
 }
 
-// Login screen
 function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -163,31 +143,21 @@ function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
-    const email = e.target.email.value;
-    const password = e.target.password.value;
-
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: e.target.email.value, password: e.target.password.value })
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.message || 'Login failed');
-        return;
-      }
-
+      if (!res.ok) throw new Error(data.message || 'Login failed');
+      
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       navigate('/', { replace: true });
     } catch (err) {
-      console.error(err);
-      alert('Server error. Please try again later.');
+      alert(err.message || 'Server error. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -205,15 +175,12 @@ function LoginPage() {
       </form>
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         New here?{' '}
-        <a href="/register" onClick={(e) => { e.preventDefault(); navigate('/register'); }} style={{ color: '#5b72f2' }}>
-          Create Account
-        </a>
+        <span onClick={() => navigate('/register')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Create Account</span>
       </p>
     </div>
   );
 }
 
-// Register screen
 function RegisterPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -221,7 +188,6 @@ function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     const form = e.target;
     const formData = new FormData(form);
 
@@ -232,36 +198,27 @@ function RegisterPage() {
             navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
           });
           const { latitude, longitude } = pos.coords;
-          formData.append('location', JSON.stringify({ type: 'Point', coordinates: [longitude, latitude] }));
+          formData.append('location', JSON.stringify({ 
+            type: 'Point', 
+            coordinates: [longitude, latitude] 
+          }));
         } catch (geoErr) {
           console.warn('Geolocation not available or denied', geoErr);
         }
       }
 
-      const res = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST',
-        body: formData
-      });
-
+      const res = await fetch(`${API_URL}/api/auth/register`, { method: 'POST', body: formData });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Registration failed');
 
-      if (!res.ok) {
-        alert(data.message || 'Registration failed');
-        return;
-      }
-
+      // Auto-login after successful registration
       try {
         const loginRes = await fetch(`${API_URL}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.get('email'),
-            password: formData.get('password')
-          })
+          body: JSON.stringify({ email: formData.get('email'), password: formData.get('password') })
         });
-
         const loginData = await loginRes.json();
-
         if (loginRes.ok) {
           localStorage.setItem('token', loginData.token);
           localStorage.setItem('user', JSON.stringify(loginData.user));
@@ -276,8 +233,7 @@ function RegisterPage() {
       alert('Registered! Please log in.');
       navigate('/login', { replace: true });
     } catch (err) {
-      console.error(err);
-      alert('Server error. Please try again later.');
+      alert(err.message || 'Server error. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -308,33 +264,19 @@ function RegisterPage() {
       </form>
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         Already have an account?{' '}
-        <a href="/login" onClick={(e) => { e.preventDefault(); navigate('/login'); }} style={{ color: '#5b72f2' }}>
-          Log In
-        </a>
+        <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
       </p>
     </div>
   );
 }
 
 const inputStyle = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '0.8rem',
-  borderRadius: '8px',
-  border: '1px solid #dfe3ea',
-  marginBottom: '1rem',
-  fontSize: '1rem'
+  width: '100%', boxSizing: 'border-box', padding: '0.8rem', borderRadius: '8px',
+  border: '1px solid #dfe3ea', marginBottom: '1rem', fontSize: '1rem'
 };
-
 const primaryButtonStyle = {
-  width: '100%',
-  padding: '0.9rem',
-  border: 'none',
-  borderRadius: '8px',
-  background: '#5b72f2',
-  color: '#fff',
-  fontWeight: 700,
-  cursor: 'pointer'
+  width: '100%', padding: '0.9rem', border: 'none', borderRadius: '8px',
+  background: '#5b72f2', color: '#fff', fontWeight: 700, cursor: 'pointer'
 };
 
 export default App;
