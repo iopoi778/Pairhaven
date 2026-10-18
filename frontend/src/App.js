@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import ProfileScreen from './pages/ProfileScreen';
 import MatchingScreen from './pages/MatchingScreen';
 import ChatScreen from './pages/chat';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
+
+// Set axios defaults from stored token at app startup
+const tokenAtStart = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+if (tokenAtStart) axios.defaults.headers.common['Authorization'] = `Bearer ${tokenAtStart}`;
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -56,6 +61,8 @@ function DashboardLayout() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // clear axios default header
+    delete axios.defaults.headers.common['Authorization'];
     navigate('/login', { replace: true });
   };
 
@@ -132,9 +139,12 @@ function NotificationsScreen() {
 // Auth screens
 function LoginPage() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    console.time('login');
 
     const email = e.target.email.value;
     const password = e.target.password.value;
@@ -155,10 +165,14 @@ function LoginPage() {
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       navigate('/', { replace: true });
     } catch (err) {
       console.error(err);
       alert('Server error. Please try again later.');
+    } finally {
+      console.timeEnd('login');
+      setLoading(false);
     }
   };
 
@@ -166,9 +180,9 @@ function LoginPage() {
     <div style={{ maxWidth: 400, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
       <h2 style={{ textAlign: 'center', color: '#5b72f2' }}>Welcome Back</h2>
       <form onSubmit={handleSubmit}>
-        <input name="email" type="email" placeholder="Email" required style={inputStyle} />
-        <input name="password" type="password" placeholder="Password" required style={inputStyle} />
-        <button type="submit" style={primaryButtonStyle}>Log In</button>
+        <input name="email" type="email" placeholder="Email" required autoComplete="email" style={inputStyle} />
+        <input name="password" type="password" placeholder="Password" required autoComplete="current-password" style={inputStyle} />
+        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>{loading ? 'Logging in...' : 'Log In'}</button>
       </form>
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         New here?{' '}
@@ -182,13 +196,30 @@ function LoginPage() {
 
 function RegisterPage() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    console.time('register');
 
-    const formData = new FormData(e.target);
+    const form = e.target;
+    const formData = new FormData(form);
 
     try {
+      // attempt to capture geolocation and append
+      if (navigator.geolocation) {
+        try {
+          const pos = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
+          });
+          const { latitude, longitude } = pos.coords;
+          formData.append('location', JSON.stringify({ type: 'Point', coordinates: [longitude, latitude] }));
+        } catch (geoErr) {
+          console.warn('Geolocation not available or denied', geoErr);
+        }
+      }
+
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         body: formData
@@ -201,11 +232,33 @@ function RegisterPage() {
         return;
       }
 
+      // Auto-login after successful registration
+      try {
+        const loginRes = await fetch(`${API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.get('email'), password: formData.get('password') })
+        });
+        const loginData = await loginRes.json();
+        if (loginRes.ok) {
+          localStorage.setItem('token', loginData.token);
+          localStorage.setItem('user', JSON.stringify(loginData.user));
+          axios.defaults.headers.common['Authorization'] = `Bearer ${loginData.token}`;
+          navigate('/', { replace: true });
+          return;
+        }
+      } catch (loginErr) {
+        console.warn('Auto-login failed', loginErr);
+      }
+
       alert('Registered! Please log in.');
       navigate('/login', { replace: true });
     } catch (err) {
       console.error(err);
       alert('Server error. Please try again later.');
+    } finally {
+      console.timeEnd('register');
+      setLoading(false);
     }
   };
 
@@ -213,10 +266,10 @@ function RegisterPage() {
     <div style={{ maxWidth: 420, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
       <h2 style={{ textAlign: 'center', color: '#5b72f2' }}>Join PairHaven</h2>
       <form onSubmit={handleSubmit}>
-        <input name="name" placeholder="Full Name" required style={inputStyle} />
-        <input name="email" type="email" placeholder="Email" required style={inputStyle} />
-        <input name="phone" placeholder="Phone" required style={inputStyle} />
-        <input name="password" type="password" placeholder="Password" required style={inputStyle} />
+        <input name="name" placeholder="Full Name" required autoComplete="name" style={inputStyle} />
+        <input name="email" type="email" placeholder="Email" required autoComplete="email" style={inputStyle} />
+        <input name="phone" placeholder="Phone" required autoComplete="tel" style={inputStyle} />
+        <input name="password" type="password" placeholder="Password" required autoComplete="new-password" style={inputStyle} />
         <div style={{ display: 'flex', gap: '1rem' }}>
           <input name="age" type="number" placeholder="Age" required style={{ ...inputStyle, flex: 1 }} />
           <select name="gender" required style={{ ...inputStyle, flex: 1 }}>
@@ -228,7 +281,7 @@ function RegisterPage() {
         </div>
         <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
         <input name="photos" type="file" multiple accept="image/*" required style={{ marginBottom: '1rem', width: '100%' }} />
-        <button type="submit" style={primaryButtonStyle}>Sign Up</button>
+        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>{loading ? 'Signing up...' : 'Sign Up'}</button>
       </form>
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         Already have an account?{' '}
