@@ -1,48 +1,59 @@
-
+// backend/routes/posts.js
 const express = require('express');
 const router = express.Router();
+const Post = require('../models/Post'); // Ensure you have a Post model
 const auth = require('../middleware/auth');
-const { v2: cloudinary } = require('cloudinary');
-const Post = require('../models/Post'); // create simple Post model
 
-// multer-like: rely on memory buffer via multer in upload middleware or use upload.single in this route
-const multer = require('multer');
-const upload = multer(); // memory storage
-
-router.post('/', auth, upload.single('media'), async (req, res) => {
+// GET all posts
+router.get('/', auth, async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-
-    // Upload to Cloudinary as video
-const base64 = req.file.buffer.toString('base64');
-const dataUri = `data:${req.file.mimetype};base64,${base64}`;
-
-const result = await cloudinary.uploader.upload(dataUri, {
-  resource_type: 'video',
-  folder: 'pairhaven/posts'
-});
-
-    const post = await Post.create({
-      author: req.user.userId,
-      text: req.body.text || '',
-      mediaUrl: result.secure_url,
-      mediaPublicId: result.public_id,
-      mediaType: 'video',
-      createdAt: new Date()
-    });
-
-    return res.status(201).json({ post });
+    const posts = await Post.find()
+      .populate('author', 'name photos')
+      .sort({ createdAt: -1 });
+    res.json(posts);
   } catch (err) {
-    console.error('post upload error', err);
-    return res.status(500).json({ message: 'Upload failed', error: err.message });
+    res.status(500).json({ message: err.message });
   }
 });
 
-// GET feed
-router.get('/', auth, async (req, res) => {
+// POST create new post
+router.post('/', auth, async (req, res) => {
   try {
-    const posts = await Post.find().populate('author', 'name photos').sort({ createdAt: -1 }).limit(50);
-    res.json(posts);
+    const { text, mediaUrl, mediaType } = req.body;
+    const newPost = new Post({
+      author: req.user.userId,
+      text,
+      mediaUrl,
+      mediaType,
+      likes: []
+    });
+    await newPost.save();
+    const populated = await Post.findById(newPost._id).populate('author', 'name photos');
+    res.status(201).json(populated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ✅ ADD THIS: Toggle Like on Post
+router.post('/:postId/like', auth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+
+    const userId = req.user.userId;
+    const likeIndex = post.likes.indexOf(userId);
+
+    if (likeIndex === -1) {
+      // Like the post
+      post.likes.push(userId);
+    } else {
+      // Unlike the post
+      post.likes.splice(likeIndex, 1);
+    }
+
+    await post.save();
+    res.json({ likesCount: post.likes.length });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
