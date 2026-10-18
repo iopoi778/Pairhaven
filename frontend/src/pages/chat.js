@@ -1,85 +1,86 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
-import { API_BASE_URL } from '../config';
 
-const socket = io(API_BASE_URL);
+const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'https://pairhaven.onrender.com';
 
-function Chat({ matchId, currentUserId }) {
-  const [messages, setMessages] = useState([]);
-  const [newMsg, setNewMsg] = useState('');
-  const messagesEndRef = useRef(null);
-
-  const roomId = [currentUserId, matchId].sort().join('_');
+function ChatScreen() {
+  const [messages, setMessages] = useState([
+    { senderId: 'system', receiverId: 'me', content: 'Start a new conversation by matching with someone.' }
+  ]);
+  const [text, setText] = useState('');
+  const socketRef = useRef(null);
 
   useEffect(() => {
-    // Join room and load history
-    socket.emit('joinChat', roomId);
-    socket.emit('loadHistory', roomId);
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userId = user.id || user._id;
 
-    // Listen for new messages and history
-    socket.on('receiveMessage', (msg) => {
+    if (!userId) return;
+
+    const socket = io(SOCKET_URL, { transports: ['websocket'] });
+    socketRef.current = socket;
+
+    socket.emit('join', userId);
+
+    socket.on('newMessage', (msg) => {
       setMessages(prev => [...prev, msg]);
     });
-    
-    socket.on('chatHistory', (history) => {
-      setMessages(history);
-    });
 
-    return () => {
-      socket.off('receiveMessage');
-      socket.off('chatHistory');
+    return () => socket.disconnect();
+  }, []);
+
+  const sendMessage = () => {
+    if (!text.trim()) return;
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const senderId = user.id || user._id;
+    const receiverId = 'demo-match-user';
+
+    if (!senderId) return;
+
+    const payload = {
+      senderId,
+      receiverId,
+      content: text
     };
-  }, [roomId]);
 
-  // Auto-scroll to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const sendMessage = (e) => {
-    e.preventDefault();
-    if (!newMsg.trim()) return;
-    
-    socket.emit('sendMessage', {
-      roomId,
-      sender: currentUserId,
-      text: newMsg
-    });
-    setNewMsg('');
+    socketRef.current.emit('sendMessage', payload);
+    setMessages(prev => [...prev, { ...payload, createdAt: new Date() }]);
+    setText('');
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '80vh' }}>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{ 
-            textAlign: m.sender === currentUserId ? 'right' : 'left', 
-            margin: '0.5rem 0' 
-          }}>
-            <span style={{ 
-              background: m.sender === currentUserId ? '#007bff' : '#e9ecef', 
-              color: m.sender === currentUserId ? '#fff' : '#000', 
-              padding: '0.5rem 1rem', 
-              borderRadius: '1rem',
-              display: 'inline-block'
-            }}>
-              {m.text}
-            </span>
+    <div style={{ paddingTop: '2rem' }}>
+      <h2 style={{ textAlign: 'center', marginBottom: '1rem' }}>Chat</h2>
+
+      <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem', minHeight: '300px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            style={{
+              alignSelf: msg.senderId === 'system' ? 'center' : (msg.senderId === JSON.parse(localStorage.getItem('user') || '{}').id ? 'flex-end' : 'flex-start'),
+              background: msg.senderId === 'system' ? '#f0f0f0' : '#dfe8ff',
+              borderRadius: '12px',
+              padding: '0.6rem 0.8rem',
+              maxWidth: '75%'
+            }}
+          >
+            {msg.content}
           </div>
         ))}
-        <div ref={messagesEndRef} />
       </div>
-      <form onSubmit={sendMessage} style={{ padding: '1rem', borderTop: '1px solid #ccc' }}>
-        <input 
-          value={newMsg} 
-          onChange={e => setNewMsg(e.target.value)} 
-          placeholder="Type a message..." 
-          style={{ width: '80%', padding: '0.5rem' }} 
+
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Type a message..."
+          style={{ flex: 1, padding: '0.8rem', borderRadius: '8px', border: '1px solid #dfe3ea' }}
         />
-        <button type="submit" style={{ padding: '0.5rem 1rem' }}>Send</button>
-      </form>
+        <button onClick={sendMessage} style={{ padding: '0.8rem 1rem', background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+          Send
+        </button>
+      </div>
     </div>
   );
 }
 
-export default Chat;
+export default ChatScreen;

@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_URL = "https://pairhaven.onrender.com";
-const PLACEHOLDER = "https://via.placeholder.com/400?text=No+Image";
+const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
+const PLACEHOLDER = 'https://via.placeholder.com/400?text=No+Image';
 
 function ProfileScreen() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Read token inside effect so we don't depend on an external token variable
     const token = localStorage.getItem('token');
+
     if (!token) {
       setLoading(false);
       return;
@@ -22,26 +22,26 @@ function ProfileScreen() {
       try {
         const res = await axios.get(`${API_URL}/api/users/profile`, {
           headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal, // supports AbortController
+          signal: controller.signal
         });
-        setUser(res.data?.user ?? null);
-        // Optionally cache a minimal user snapshot for offline fallback
-        try {
-          const snapshot = JSON.stringify(res.data?.user ?? {});
-          localStorage.setItem('user', snapshot);
-        } catch (_) { /* ignore storage errors */ }
-      } catch (err) {
-        // If request was aborted, do nothing
-        if (err.name === "CanceledError" || err.name === "AbortError") return;
 
-        console.error("Failed to fetch profile:", err);
+        const safeUser = res.data?.user || null;
+        setUser(safeUser);
 
-        // Fallback: try reading a saved user snapshot safely
+        if (safeUser) {
+          localStorage.setItem('user', JSON.stringify(safeUser));
+        }
+      } catch (error) {
+        if (error.name === 'CanceledError' || error.name === 'AbortError') return;
+        console.error('Failed to fetch profile:', error);
+
         try {
           const stored = localStorage.getItem('user');
-          if (stored) setUser(JSON.parse(stored));
-        } catch (parseErr) {
-          console.warn("No valid user in localStorage", parseErr);
+          if (stored) {
+            setUser(JSON.parse(stored));
+          }
+        } catch (e) {
+          console.warn('No valid cached user', e);
         }
       } finally {
         setLoading(false);
@@ -49,108 +49,127 @@ function ProfileScreen() {
     };
 
     fetchProfile();
-
     return () => controller.abort();
-  }, []); // run once on mount
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
-    // If you use react-router, redirect to login here; fallback:
     window.location.href = '/login';
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading profile...</div>;
-  if (!user) return (
-    <div style={{ textAlign: 'center', padding: '2rem' }}>
-      Please log in again.
-      <div style={{ marginTop: '1rem' }}>
-        <button onClick={() => window.location.href = '/login'} style={buttonStyle}>Go to Login</button>
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading profile...</div>;
+  }
+
+  if (!user) {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem' }}>
+        <p>Please log in again.</p>
+        <button onClick={() => (window.location.href = '/login')} style={buttonStyle}>
+          Go to Login
+        </button>
       </div>
-    </div>
-  );
+    );
+  }
 
   const photos = Array.isArray(user.photos) ? user.photos : [];
+  const followers = Array.isArray(user.followers) ? user.followers : [];
+  const following = Array.isArray(user.following) ? user.following : [];
+  const matches = Array.isArray(user.matches) ? user.matches : [];
 
   return (
     <div style={{ padding: '1rem', paddingBottom: '90px' }}>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h2 style={{ margin: 0 }}>{user.name}</h2>
+        <h2 style={{ margin: 0 }}>{user.name || 'Profile'}</h2>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            onClick={() => alert("Edit Profile coming soon!")}
-            style={buttonStyle}
-            aria-label="Edit profile"
-          >
+          <button style={buttonStyle} onClick={() => alert('Edit Profile coming soon!')}>
             Edit Profile
           </button>
-          <button
-            onClick={handleLogout}
-            style={{ ...buttonStyle, background: '#e53e3e' }}
-            aria-label="Log out"
-          >
+          <button onClick={handleLogout} style={{ ...buttonStyle, background: '#e53e3e' }}>
             Log out
           </button>
         </div>
       </div>
 
-      {/* PHOTO GALLERY - responsive */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
-          gap: '8px',
-          marginBottom: '1.5rem'
-        }}
-        role="list"
-        aria-label="User photos"
-      >
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+        <div
+          style={{
+            width: '120px',
+            height: '120px',
+            borderRadius: '50%',
+            background: '#5b72f2',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '3rem',
+            fontWeight: 700
+          }}
+        >
+          {(user.name || 'U').charAt(0).toUpperCase()}
+        </div>
+      </div>
+
+      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+        <h3 style={{ margin: 0 }}>{user.name || 'Unknown user'}</h3>
+        <p style={{ margin: '0.6rem 0 0', color: '#666' }}>{user.bio || 'No bio yet.'}</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.75rem', background: '#f0f0f0', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{followers.length}</div>
+          <div style={{ fontSize: '0.8rem', color: '#666' }}>Followers</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{following.length}</div>
+          <div style={{ fontSize: '0.8rem', color: '#666' }}>Following</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{matches.length}</div>
+          <div style={{ fontSize: '0.8rem', color: '#666' }}>Matches</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px', marginBottom: '1rem' }}>
         {photos.length > 0 ? (
           photos.map((photo, i) => {
-            const src = (typeof photo === 'string') ? photo : (photo?.url || photo?.secure_url || photo?.location);
+            const src = typeof photo === 'string' ? photo : photo?.url || photo?.secure_url || PLACEHOLDER;
             return (
               <img
                 key={i}
-                src={src || PLACEHOLDER}
-                alt={`${user.name}'s photo ${i + 1}`}
-                style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '8px' }}
-                onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
-                role="listitem"
+                src={src}
+                alt={`${user.name || 'User'} photo ${i + 1}`}
+                style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '10px' }}
+                onError={(e) => {
+                  e.currentTarget.src = PLACEHOLDER;
+                }}
               />
             );
           })
         ) : (
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', background: '#f5f5f5', borderRadius: '8px' }}>
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', background: '#fff', borderRadius: '10px', color: '#555' }}>
             No photos uploaded yet.
           </div>
         )}
       </div>
 
-      {/* User Details */}
-      <div style={{ background: '#f9f9f9', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
+      <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem' }}>
         <p><strong>Age:</strong> {user.age ?? '—'}</p>
         <p><strong>Gender:</strong> {user.gender ?? '—'}</p>
-        <p><strong>Bio:</strong> {user.bio || "No bio provided."}</p>
-      </div>
-
-      {/* Stats */}
-      <div style={{ display: 'flex', justifyContent: 'space-around', background: '#f9f9f9', padding: '1rem', borderRadius: '8px' }}>
-        <div style={{ textAlign: 'center' }}><strong>{user.followers?.length ?? 0}</strong><br />Followers</div>
-        <div style={{ textAlign: 'center' }}><strong>{user.following?.length ?? 0}</strong><br />Following</div>
-        <div style={{ textAlign: 'center' }}><strong>{user.matches?.length ?? 0}</strong><br />Matches</div>
+        <p><strong>Bio:</strong> {user.bio || 'No bio provided.'}</p>
       </div>
     </div>
   );
 }
 
 const buttonStyle = {
-  background: '#667eea',
-  color: 'white',
+  background: '#5b72f2',
+  color: '#fff',
   border: 'none',
   borderRadius: '8px',
-  padding: '0.5rem 1rem',
+  padding: '0.55rem 1rem',
   cursor: 'pointer'
 };
 

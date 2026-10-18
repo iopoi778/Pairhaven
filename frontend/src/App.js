@@ -1,110 +1,104 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import ProfileScreen from './pages/ProfileScreen'; // Ensure this file exists at frontend/src/pages/ProfileScreen.js
+import ProfileScreen from './pages/ProfileScreen';
+import MatchingScreen from './pages/MatchingScreen';
+import ChatScreen from './pages/chat';
 
-// --- Protected Route Wrapper ---
+const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
+
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" replace />;
 };
 
-// --- Main App Component ---
 function App() {
   return (
     <Router>
-      <div style={{ fontFamily: 'Arial, sans-serif', minHeight: '100vh', background: '#f5f5f5' }}>
+      <div style={{ fontFamily: 'Arial, sans-serif', minHeight: '100vh', background: '#f2f2f2' }}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          
-          {/* Protected Dashboard Routes */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          } />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </Router>
   );
 }
 
-// --- Dashboard Layout with Navigation ---
 function DashboardLayout() {
   const [activeTab, setActiveTab] = useState('home');
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login', { replace: true });
-  };
-
-  // Render content based on active tab
   const renderContent = () => {
-    switch(activeTab) {
-      case 'home': return <HomeFeed userId={user._id} />;
-      case 'matching': return <MatchingScreen userId={user._id} />;
-      case 'messages': return <MessagesScreen userId={user._id} />;
-      case 'notifications': return <NotificationsScreen />;
-      case 'profile': return <ProfileScreen />; // Uses internal fetch logic
-      default: return <HomeFeed userId={user._id} />;
+    switch (activeTab) {
+      case 'home':
+        return <HomeFeed />;
+      case 'matching':
+        return <MatchingScreen />;
+      case 'messages':
+        return <ChatScreen />;
+      case 'notifications':
+        return <NotificationsScreen />;
+      case 'profile':
+        return <ProfileScreen />;
+      default:
+        return <HomeFeed />;
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login', { replace: true });
+  };
+
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', background: 'white', minHeight: '100vh', boxShadow: '0 0 20px rgba(0,0,0,0.1)', position: 'relative' }}>
-      {/* Header */}
-      <header style={{ padding: '1rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0, color: '#667eea' }}>PairHaven</h2>
-        <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>Logout</button>
+    <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
+        <h2 style={{ margin: 0, color: '#5b72f2', fontWeight: 700 }}>PairHaven</h2>
+        <button
+          onClick={handleLogout}
+          style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}
+        >
+          Logout
+        </button>
       </header>
 
-      {/* Main Content Area - Added paddingBottom to prevent overlap with nav */}
-      <main style={{ padding: '1rem', paddingBottom: '88px' }}>
+      <main style={{ padding: '1rem', minHeight: 'calc(100vh - 120px)', background: '#f6f6f6' }}>
         {renderContent()}
       </main>
 
-      {/* Bottom Navigation Bar - Added zIndex and height */}
-      <nav style={{ 
-        position: 'fixed', 
-        bottom: 0, 
-        left: '50%', 
-        transform: 'translateX(-50%)', 
-        width: '100%', 
-        maxWidth: '600px', 
-        background: 'white', 
-        borderTop: '1px solid #eee', 
-        display: 'flex', 
-        justifyContent: 'space-around', 
-        padding: '0.8rem 0',
-        zIndex: 1000,
-        height: '72px'
-      }}>
+      <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px' }}>
         {[
-          { id: 'home', icon: '', label: 'Home' },
-          { id: 'matching', icon: '❤️', label: 'Match' },
-          { id: 'messages', icon: '💬', label: 'Chat' },
-          { id: 'notifications', icon: '🔔', label: 'Alerts' },
-          { id: 'profile', icon: '', label: 'Profile' }
+          { id: 'home', label: 'Home', icon: '🏠' },
+          { id: 'matching', label: 'Match', icon: '💖' },
+          { id: 'messages', label: 'Chat', icon: '💬' },
+          { id: 'notifications', label: 'Alerts', icon: '🔔' },
+          { id: 'profile', label: 'Profile', icon: '👤' }
         ].map(tab => (
-          <button 
+          <button
             key={tab.id}
-            type="button"
             onClick={() => setActiveTab(tab.id)}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              color: activeTab === tab.id ? '#667eea' : '#999',
-              fontSize: '0.75rem',
+            style={{
+              border: activeTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent',
+              background: activeTab === tab.id ? '#eef2ff' : 'transparent',
+              borderRadius: '10px',
+              padding: '0.5rem 0.8rem',
+              minWidth: '70px',
+              textAlign: 'center',
+              color: activeTab === tab.id ? '#5b72f2' : '#666',
               cursor: 'pointer'
             }}
           >
-            <span style={{ fontSize: '1.3rem' }}>{tab.icon}</span>
-            {tab.label}
+            <div style={{ fontSize: '1.3rem' }}>{tab.icon}</div>
+            <div style={{ fontSize: '0.72rem', marginTop: '0.15rem' }}>{tab.label}</div>
           </button>
         ))}
       </nav>
@@ -112,80 +106,73 @@ function DashboardLayout() {
   );
 }
 
-// --- Page Components (Placeholders) ---
-function HomeFeed({ userId }) {
+function HomeFeed() {
   return (
-    <div style={{ textAlign: 'center', padding: '2rem' }}>
-      <h3>Your Feed</h3>
-      <p>Posts from people you follow will appear here.</p>
-    </div>
-  );
-}
+    <div style={{ textAlign: 'center', paddingTop: '3rem' }}>
+      <h2 style={{ marginBottom: '1rem' }}>Your Feed</h2>
+      <p style={{ fontSize: '1.05rem', color: '#555' }}>Posts from people you follow will appear here.</p>
 
-function MatchingScreen({ userId }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '2rem' }}>
-      <h3>Find Matches</h3>
-      <p>No more profiles to show right now.</p>
-    </div>
-  );
-}
-
-function MessagesScreen({ userId }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '2rem' }}>
-      <h3>Messages</h3>
-      <p>Select a match to start chatting.</p>
+      <div style={{ marginTop: '2rem', background: '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+        <h3 style={{ margin: 0, marginBottom: '0.7rem' }}>Sample Post</h3>
+        <p style={{ margin: 0 }}>Hello world! This is a sample feed item.</p>
+      </div>
     </div>
   );
 }
 
 function NotificationsScreen() {
   return (
-    <div style={{ textAlign: 'center', padding: '2rem' }}>
-      <h3>Notifications</h3>
-      <p>You have no new notifications.</p>
+    <div style={{ textAlign: 'center', paddingTop: '3rem' }}>
+      <h2 style={{ marginBottom: '1rem' }}>Notifications</h2>
+      <p style={{ fontSize: '1.05rem', color: '#555' }}>You have no new notifications.</p>
     </div>
   );
 }
 
-// --- Auth Pages with React Router Navigation ---
+// Auth screens
 function LoginPage() {
   const navigate = useNavigate();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+
     try {
-      const res = await fetch('https://pairhaven.onrender.com/api/auth/login', {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: e.target.email.value,
-          password: e.target.password.value
-        })
+        body: JSON.stringify({ email, password })
       });
+
       const data = await res.json();
-      if (res.ok) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/', { replace: true });
-      } else {
+
+      if (!res.ok) {
         alert(data.message || 'Login failed');
+        return;
       }
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      navigate('/', { replace: true });
     } catch (err) {
+      console.error(err);
       alert('Server error. Please try again later.');
     }
   };
+
   return (
-    <div style={{ maxWidth: '400px', margin: '2rem auto', padding: '2rem', background: 'white', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-      <h2 style={{ textAlign: 'center', color: '#667eea' }}>Welcome Back</h2>
+    <div style={{ maxWidth: 400, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
+      <h2 style={{ textAlign: 'center', color: '#5b72f2' }}>Welcome Back</h2>
       <form onSubmit={handleSubmit}>
-        <input name="email" type="email" placeholder="Email" required style={{ width: '100%', padding: '0.8rem', marginBottom: '1rem', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
-        <input name="password" type="password" placeholder="Password" required style={{ width: '100%', padding: '0.8rem', marginBottom: '1rem', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
-        <button type="submit" style={{ width: '100%', padding: '0.8rem', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer' }}>Log In</button>
+        <input name="email" type="email" placeholder="Email" required style={inputStyle} />
+        <input name="password" type="password" placeholder="Password" required style={inputStyle} />
+        <button type="submit" style={primaryButtonStyle}>Log In</button>
       </form>
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         New here?{' '}
-        <a href="/register" onClick={(e) => { e.preventDefault(); navigate('/register'); }} style={{ color: '#667eea' }}>
+        <a href="/register" onClick={(e) => { e.preventDefault(); navigate('/register'); }} style={{ color: '#5b72f2' }}>
           Create Account
         </a>
       </p>
@@ -195,54 +182,83 @@ function LoginPage() {
 
 function RegisterPage() {
   const navigate = useNavigate();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const formData = new FormData(e.target);
+
     try {
-      const formData = new FormData(e.target);
-      const res = await fetch('https://pairhaven.onrender.com/api/auth/register', {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         body: formData
       });
+
       const data = await res.json();
-      if (res.ok) {
-        alert('Registered! Please log in.');
-        navigate('/login', { replace: true });
-      } else {
+
+      if (!res.ok) {
         alert(data.message || 'Registration failed');
+        return;
       }
+
+      alert('Registered! Please log in.');
+      navigate('/login', { replace: true });
     } catch (err) {
+      console.error(err);
       alert('Server error. Please try again later.');
     }
   };
+
   return (
-    <div style={{ maxWidth: '400px', margin: '2rem auto', padding: '2rem', background: 'white', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-      <h2 style={{ textAlign: 'center', color: '#667eea' }}>Join PairHaven</h2>
+    <div style={{ maxWidth: 420, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
+      <h2 style={{ textAlign: 'center', color: '#5b72f2' }}>Join PairHaven</h2>
       <form onSubmit={handleSubmit}>
-        <input name="name" placeholder="Full Name" required style={{ width: '100%', padding: '0.8rem', marginBottom: '1rem', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
-        <input name="email" type="email" placeholder="Email" required style={{ width: '100%', padding: '0.8rem', marginBottom: '1rem', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
-        <input name="phone" placeholder="Phone" required style={{ width: '100%', padding: '0.8rem', marginBottom: '1rem', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
-        <input name="password" type="password" placeholder="Password" required style={{ width: '100%', padding: '0.8rem', marginBottom: '1rem', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-          <input name="age" type="number" placeholder="Age" required style={{ flex: 1, padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }} />
-          <select name="gender" required style={{ flex: 1, padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}>
+        <input name="name" placeholder="Full Name" required style={inputStyle} />
+        <input name="email" type="email" placeholder="Email" required style={inputStyle} />
+        <input name="phone" placeholder="Phone" required style={inputStyle} />
+        <input name="password" type="password" placeholder="Password" required style={inputStyle} />
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <input name="age" type="number" placeholder="Age" required style={{ ...inputStyle, flex: 1 }} />
+          <select name="gender" required style={{ ...inputStyle, flex: 1 }}>
             <option value="">Gender</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
             <option value="other">Other</option>
           </select>
         </div>
-        <textarea name="bio" placeholder="Bio" rows="3" style={{ width: '100%', padding: '0.8rem', marginBottom: '1rem', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
-        <input name="photos" type="file" multiple accept="image/*" required style={{ width: '100%', marginBottom: '1rem' }} />
-        <button type="submit" style={{ width: '100%', padding: '0.8rem', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer' }}>Sign Up</button>
+        <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
+        <input name="photos" type="file" multiple accept="image/*" required style={{ marginBottom: '1rem', width: '100%' }} />
+        <button type="submit" style={primaryButtonStyle}>Sign Up</button>
       </form>
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         Already have an account?{' '}
-        <a href="/login" onClick={(e) => { e.preventDefault(); navigate('/login'); }} style={{ color: '#667eea' }}>
+        <a href="/login" onClick={(e) => { e.preventDefault(); navigate('/login'); }} style={{ color: '#5b72f2' }}>
           Log In
         </a>
       </p>
     </div>
   );
 }
+
+const inputStyle = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '0.8rem',
+  borderRadius: '8px',
+  border: '1px solid #dfe3ea',
+  marginBottom: '1rem',
+  fontSize: '1rem'
+};
+
+const primaryButtonStyle = {
+  width: '100%',
+  padding: '0.9rem',
+  border: 'none',
+  borderRadius: '8px',
+  background: '#5b72f2',
+  color: '#fff',
+  fontWeight: 700,
+  cursor: 'pointer'
+};
 
 export default App;
