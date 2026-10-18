@@ -1,0 +1,65 @@
+const express = require('express');
+const router = express.Router();
+const Notification = require('../models/Notification');
+const auth = require('../middleware/auth');
+
+// GET NOTIFICATIONS
+router.get('/', auth, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ 
+      recipient: req.user.userId 
+    })
+    .populate('sender', 'name photos')
+    .sort({ createdAt: -1 })
+    .limit(50);
+
+    res.json(notifications);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// MARK NOTIFICATION AS READ
+router.patch('/:id/read', auth, async (req, res) => {
+  try {
+    const notification = await Notification.findByIdAndUpdate(
+      req.params.id,
+      { read: true },
+      { new: true }
+    );
+
+    res.json(notification);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// MARK ALL AS READ
+router.patch('/read-all', auth, async (req, res) => {
+  try {
+    await Notification.updateMany(
+      { recipient: req.user.userId, read: false },
+      { read: true }
+    );
+
+    res.json({ message: 'All notifications marked as read' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET UNREAD COUNT
+router.get('/unread-count', auth, async (req, res) => {
+  try {
+    const count = await Notification.countDocuments({
+      recipient: req.user.userId,
+      read: false
+    });
+
+    res.json({ count });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+module.exports = router;
