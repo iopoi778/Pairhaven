@@ -20,6 +20,66 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
+// --- Dedicated Component for Feed Posts (Handles Likes Correctly) ---
+function FeedPost({ post }) {
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const [liked, setLiked] = useState(post.likes?.includes(currentUser._id));
+  const [likeCount, setLikeCount] = useState(post.likes?.length || 0);
+  const token = localStorage.getItem('token');
+
+  const handleLike = async () => {
+    try {
+      const res = await axios.post(`${API_URL}/api/posts/${post._id}/like`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLiked(!liked);
+      setLikeCount(res.data.likesCount);
+    } catch (err) {
+      console.error("Like failed", err);
+    }
+  };
+
+  return (
+    <div style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+      {/* Author Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#5b72f2', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+          {(post.author?.name || 'U').charAt(0).toUpperCase()}
+        </div>
+        <div>
+          <div style={{ fontWeight: 700 }}>{post.author?.name || 'User'}</div>
+          <div style={{ fontSize: 12, color: '#666' }}>{new Date(post.createdAt).toLocaleString()}</div>
+        </div>
+      </div>
+
+      {/* Content */}
+      {post.text && <div style={{ marginBottom: 8 }}>{post.text}</div>}
+      
+      {post.mediaType === 'video' && post.mediaUrl ? (
+        <video src={post.mediaUrl} controls style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} />
+      ) : post.mediaUrl ? (
+        <img src={post.mediaUrl} alt="" style={{ width: '100%', borderRadius: 10 }} />
+      ) : null}
+
+      {/* LIKE BUTTON WITH COUNT */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
+        <button 
+          onClick={handleLike}
+          style={{ 
+            background: 'none', border: 'none', cursor: 'pointer', 
+            fontSize: '1.5rem', color: liked ? '#e53e3e' : '#666',
+            transition: 'transform 0.2s',
+            transform: liked ? 'scale(1.2)' : 'scale(1)'
+          }}
+        >
+          {liked ? '❤️' : '🤍'}
+        </button>
+        <span style={{ fontWeight: 600, color: '#333' }}>{likeCount} {likeCount === 1 ? 'Like' : 'Likes'}</span>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   return (
     <Router>
@@ -73,10 +133,10 @@ function DashboardLayout() {
 
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px' }}>
         {[
-          { id: 'home', label: 'Home', icon: '🏠' },
+          { id: 'home', label: 'Home', icon: '' },
           { id: 'matching', label: 'Match', icon: '💖' },
           { id: 'messages', label: 'Chat', icon: '💬' },
-          { id: 'notifications', label: 'Alerts', icon: '' },
+          { id: 'notifications', label: 'Alerts', icon: '🔔' },
           { id: 'profile', label: 'Profile', icon: '👤' }
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
@@ -96,10 +156,10 @@ function DashboardLayout() {
 
 function HomeFeed() {
   const [posts, setPosts] = useState([]);
+  const token = localStorage.getItem('token');
 
   useEffect(() => {
     const fetchPosts = async () => {
-      const token = localStorage.getItem('token');
       if (!token) return;
       try {
         const res = await axios.get(`${API_URL}/api/posts`, {
@@ -111,7 +171,7 @@ function HomeFeed() {
       }
     };
     fetchPosts();
-  }, []);
+  }, [token]);
 
   const handleNewPost = (newPost) => {
     setPosts(prev => [newPost, ...prev]);
@@ -126,88 +186,12 @@ function HomeFeed() {
           No posts yet.
         </div>
       ) : (
-        posts.map(post => (
-          <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#5b72f2', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                {(post.author?.name || 'U').charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <div style={{ fontWeight: 700 }}>{post.author?.name || 'User'}</div>
-                <div style={{ fontSize: 12, color: '#666' }}>{new Date(post.createdAt).toLocaleString()}</div>
-              </div>
-            </div>
-
-            {post.text ? <div style={{ marginBottom: 8 }}>{post.text}</div> : null}
-
-            {post.mediaType === 'video' && post.mediaUrl ? (
-              <video src={post.mediaUrl} controls style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} />
-            ) : post.mediaUrl ? (
-              <img src={post.mediaUrl} alt="" style={{ width: '100%', borderRadius: 10 }} />
-            ) : null}
-          </div>
-        ))
+        posts.map(post => <FeedPost key={post._id} post={post} />)
       )}
     </div>
   );
 }
-// Inside HomeFeed component, replace the post mapping section with:
-posts.map(post => {
-  const [liked, setLiked] = useState(post.likes?.includes(JSON.parse(localStorage.getItem('user'))?._id));
-  const [likeCount, setLikeCount] = useState(post.likes?.length || 0);
 
-  const handleLike = async () => {
-    try {
-      const res = await axios.post(`${API_URL}/api/posts/${post._id}/like`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setLiked(!liked);
-      setLikeCount(res.data.likesCount);
-    } catch (err) {
-      console.error("Like failed", err);
-    }
-  };
-
-  return (
-    <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-      {/* Author Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#5b72f2', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-          {(post.author?.name || 'U').charAt(0).toUpperCase()}
-        </div>
-        <div>
-          <div style={{ fontWeight: 700 }}>{post.author?.name || 'User'}</div>
-          <div style={{ fontSize: 12, color: '#666' }}>{new Date(post.createdAt).toLocaleString()}</div>
-        </div>
-      </div>
-
-      {/* Content */}
-      {post.text && <div style={{ marginBottom: 8 }}>{post.text}</div>}
-      
-      {post.mediaType === 'video' && post.mediaUrl ? (
-        <video src={post.mediaUrl} controls style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} />
-      ) : post.mediaUrl ? (
-        <img src={post.mediaUrl} alt="" style={{ width: '100%', borderRadius: 10 }} />
-      ) : null}
-
-      {/* LIKE BUTTON WITH COUNT */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f0f0f0' }}>
-        <button 
-          onClick={handleLike}
-          style={{ 
-            background: 'none', border: 'none', cursor: 'pointer', 
-            fontSize: '1.5rem', color: liked ? '#e53e3e' : '#666',
-            transition: 'transform 0.2s',
-            transform: liked ? 'scale(1.2)' : 'scale(1)'
-          }}
-        >
-          {liked ? '❤️' : '🤍'}
-        </button>
-        <span style={{ fontWeight: 600, color: '#333' }}>{likeCount} {likeCount === 1 ? 'Like' : 'Likes'}</span>
-      </div>
-    </div>
-  );
-})
 function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
