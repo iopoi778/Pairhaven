@@ -102,7 +102,25 @@ router.post('/match/filter', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// BEFORE (Crashes or excludes users without location)
+if (shouldApplyGeo) {
+  query.location = { $near: { ... } };
+}
 
+// AFTER (Gracefully handles missing location)
+const hasValidLocation = currentUser.location && 
+                         Array.isArray(currentUser.location.coordinates) && 
+                         currentUser.location.coordinates.length === 2 &&
+                         currentUser.location.coordinates[0] !== 0;
+
+if (hasValidLocation && !isNaN(distanceKm) && distanceKm > 0) {
+  query.location = {
+    $near: {
+      $geometry: { type: 'Point', coordinates: currentUser.location.coordinates.map(Number) },
+      $maxDistance: Math.round(distanceKm * 1000)
+    }
+  };
+}
 // POST /api/matches/create-match/:userId - Create mutual match
 router.post('/create-match/:userId', auth, async (req, res) => {
   try {
