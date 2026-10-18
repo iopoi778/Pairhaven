@@ -10,46 +10,27 @@ function ProfileScreen() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-
     if (!token) {
       setLoading(false);
       return;
     }
 
-    const controller = new AbortController();
-
-    const fetchProfile = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/users/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal
-        });
-
+    axios.get(`${API_URL}/api/users/profile`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => {
         const safeUser = res.data?.user || null;
         setUser(safeUser);
-
-        if (safeUser) {
-          localStorage.setItem('user', JSON.stringify(safeUser));
-        }
-      } catch (error) {
-        if (error.name === 'CanceledError' || error.name === 'AbortError') return;
-        console.error('Failed to fetch profile:', error);
-
+        if (safeUser) localStorage.setItem('user', JSON.stringify(safeUser));
+      })
+      .catch(err => {
+        console.error('Failed to fetch profile:', err);
         try {
-          const stored = localStorage.getItem('user');
-          if (stored) {
-            setUser(JSON.parse(stored));
-          }
-        } catch (e) {
-          console.warn('No valid cached user', e);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-    return () => controller.abort();
+          const stored = JSON.parse(localStorage.getItem('user') || 'null');
+          if (stored) setUser(stored);
+        } catch (_) {}
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const handleLogout = () => {
@@ -59,15 +40,12 @@ function ProfileScreen() {
     window.location.href = '/login';
   };
 
-  if (loading) {
-    return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading profile...</div>;
-  }
-
+  if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading profile...</div>;
   if (!user) {
     return (
       <div style={{ textAlign: 'center', padding: '2rem' }}>
         <p>Please log in again.</p>
-        <button onClick={() => (window.location.href = '/login')} style={buttonStyle}>
+        <button onClick={() => window.location.href = '/login'} style={buttonStyle}>
           Go to Login
         </button>
       </div>
@@ -84,9 +62,7 @@ function ProfileScreen() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h2 style={{ margin: 0 }}>{user.name || 'Profile'}</h2>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button style={buttonStyle} onClick={() => alert('Edit Profile coming soon!')}>
-            Edit Profile
-          </button>
+          <button style={buttonStyle}>Edit Profile</button>
           <button onClick={handleLogout} style={{ ...buttonStyle, background: '#e53e3e' }}>
             Log out
           </button>
@@ -94,20 +70,18 @@ function ProfileScreen() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-        <div
-          style={{
-            width: '120px',
-            height: '120px',
-            borderRadius: '50%',
-            background: '#5b72f2',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '3rem',
-            fontWeight: 700
-          }}
-        >
+        <div style={{
+          width: '120px',
+          height: '120px',
+          borderRadius: '50%',
+          background: '#5b72f2',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '3rem',
+          fontWeight: 700
+        }}>
           {(user.name || 'U').charAt(0).toUpperCase()}
         </div>
       </div>
@@ -140,11 +114,9 @@ function ProfileScreen() {
               <img
                 key={i}
                 src={src}
-                alt={`${user.name || 'User'} photo ${i + 1}`}
+                alt={`${user.name || 'User'} ${i + 1}`}
                 style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '10px' }}
-                onError={(e) => {
-                  e.currentTarget.src = PLACEHOLDER;
-                }}
+                onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
               />
             );
           })
@@ -163,18 +135,7 @@ function ProfileScreen() {
     </div>
   );
 }
-{/* Under Stats / below matches count */}
-<div style={{ marginTop: 12 }}>
-  <h4>Matches</h4>
-  <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
-    {matches.map(m => (
-      <button key={m._id} onClick={() => /* navigate to chat and open conversation with m */ window.location.hash = `#/messages?open=${m._id}`} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}>
-        <img src={m.photos?.[0]?.url || 'https://via.placeholder.com/64'} style={{ width: 64, height: 64, borderRadius: 8 }} alt='' />
-        <div style={{ fontSize: 12, textAlign: 'center' }}>{m.name}</div>
-      </button>
-    ))}
-  </div>
-</div>
+
 const buttonStyle = {
   background: '#5b72f2',
   color: '#fff',
