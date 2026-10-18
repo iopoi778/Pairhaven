@@ -7,9 +7,10 @@ import ChatScreen from './pages/chat';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
-// Set axios defaults from stored token at app startup
 const tokenAtStart = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-if (tokenAtStart) axios.defaults.headers.common['Authorization'] = `Bearer ${tokenAtStart}`;
+if (tokenAtStart) {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${tokenAtStart}`;
+}
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -61,7 +62,6 @@ function DashboardLayout() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // clear axios default header
     delete axios.defaults.headers.common['Authorization'];
     navigate('/login', { replace: true });
   };
@@ -70,10 +70,7 @@ function DashboardLayout() {
     <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
         <h2 style={{ margin: 0, color: '#5b72f2', fontWeight: 700 }}>PairHaven</h2>
-        <button
-          onClick={handleLogout}
-          style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}
-        >
+        <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}>
           Logout
         </button>
       </header>
@@ -126,25 +123,39 @@ function HomeFeed() {
     </div>
   );
 }
-const [unreadCount, setUnreadCount] = useState(0);
-useEffect(() => {
-  const token = localStorage.getItem('token');
-  if (!token) return;
-  axios.get(`${API_URL}/api/notifications`, { headers: { Authorization: `Bearer ${token}` } })
-    .then(res => setUnreadCount(res.data.filter(n => !n.read).length))
-    .catch(err => console.warn('notif load failed', err));
-}, []);
 
 function NotificationsScreen() {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    axios.get(`${API_URL}/api/notifications`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setNotes(res.data || []))
+      .catch(err => console.error('Failed to fetch notifications', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ padding: 20, textAlign: 'center' }}>Loading alerts...</div>;
+  if (!notes.length) return <div style={{ padding: 20, textAlign: 'center' }}>No alerts yet.</div>;
+
   return (
-    <div style={{ textAlign: 'center', paddingTop: '3rem' }}>
-      <h2 style={{ marginBottom: '1rem' }}>Notifications</h2>
-      <p style={{ fontSize: '1.05rem', color: '#555' }}>You have no new notifications.</p>
+    <div style={{ padding: 16 }}>
+      <h2>Alerts</h2>
+      {notes.map(note => (
+        <div key={note._id} style={{ background: '#fff', padding: 12, borderRadius: 8, marginBottom: 8 }}>
+          <div><strong>{note.type}</strong></div>
+          <div>{note.message}</div>
+          <div style={{ fontSize: 12, color: '#666' }}>{new Date(note.createdAt).toLocaleString()}</div>
+        </div>
+      ))}
     </div>
   );
 }
 
-// Auth screens
+// Login screen
 function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -152,7 +163,6 @@ function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    console.time('login');
 
     const email = e.target.email.value;
     const password = e.target.password.value;
@@ -179,7 +189,6 @@ function LoginPage() {
       console.error(err);
       alert('Server error. Please try again later.');
     } finally {
-      console.timeEnd('login');
       setLoading(false);
     }
   };
@@ -190,7 +199,9 @@ function LoginPage() {
       <form onSubmit={handleSubmit}>
         <input name="email" type="email" placeholder="Email" required autoComplete="email" style={inputStyle} />
         <input name="password" type="password" placeholder="Password" required autoComplete="current-password" style={inputStyle} />
-        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>{loading ? 'Logging in...' : 'Log In'}</button>
+        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>
+          {loading ? 'Logging in...' : 'Log In'}
+        </button>
       </form>
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         New here?{' '}
@@ -202,6 +213,7 @@ function LoginPage() {
   );
 }
 
+// Register screen
 function RegisterPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -209,13 +221,11 @@ function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    console.time('register');
 
     const form = e.target;
     const formData = new FormData(form);
 
     try {
-      // attempt to capture geolocation and append
       if (navigator.geolocation) {
         try {
           const pos = await new Promise((resolve, reject) => {
@@ -240,14 +250,18 @@ function RegisterPage() {
         return;
       }
 
-      // Auto-login after successful registration
       try {
         const loginRes = await fetch(`${API_URL}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.get('email'), password: formData.get('password') })
+          body: JSON.stringify({
+            email: formData.get('email'),
+            password: formData.get('password')
+          })
         });
+
         const loginData = await loginRes.json();
+
         if (loginRes.ok) {
           localStorage.setItem('token', loginData.token);
           localStorage.setItem('user', JSON.stringify(loginData.user));
@@ -265,7 +279,6 @@ function RegisterPage() {
       console.error(err);
       alert('Server error. Please try again later.');
     } finally {
-      console.timeEnd('register');
       setLoading(false);
     }
   };
@@ -289,7 +302,9 @@ function RegisterPage() {
         </div>
         <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
         <input name="photos" type="file" multiple accept="image/*" required style={{ marginBottom: '1rem', width: '100%' }} />
-        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>{loading ? 'Signing up...' : 'Sign Up'}</button>
+        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>
+          {loading ? 'Signing up...' : 'Sign Up'}
+        </button>
       </form>
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         Already have an account?{' '}
