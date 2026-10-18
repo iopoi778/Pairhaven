@@ -169,7 +169,34 @@ function HomeFeed() {
     </div>
   );
 }
+// BEFORE (Blocks registration if GPS fails)
+const pos = await new Promise((resolve, reject) => {
+  navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
+});
+formData.append('location', JSON.stringify({ type: 'Point', coordinates: [pos.coords.longitude, pos.coords.latitude] }));
 
+// AFTER (Continues even if GPS fails)
+try {
+  const pos = await new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, { 
+      enableHighAccuracy: false, // Less strict
+      timeout: 5000,             // Shorter timeout
+      maximumAge: 0 
+    });
+  });
+  formData.append('location', JSON.stringify({ 
+    type: 'Point', 
+    coordinates: [pos.coords.longitude, pos.coords.latitude] 
+  }));
+} catch (geoErr) {
+  console.warn('Location skipped:', geoErr.message);
+  // DO NOT throw error - allow registration without location
+  // Optionally append a default location or null
+  formData.append('location', JSON.stringify({ 
+    type: 'Point', 
+    coordinates: [0, 0] // Default fallback
+  }));
+}
 // Login screen
 function LoginPage() {
   const navigate = useNavigate();
