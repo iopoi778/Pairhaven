@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import ProfileScreen from './pages/ProfileScreen'; // Ensure this file exists at frontend/src/pages/ProfileScreen.js
 
 // --- Protected Route Wrapper ---
 const ProtectedRoute = ({ children }) => {
@@ -46,7 +47,7 @@ function DashboardLayout() {
       case 'matching': return <MatchingScreen userId={user._id} />;
       case 'messages': return <MessagesScreen userId={user._id} />;
       case 'notifications': return <NotificationsScreen />;
-      case 'profile': return <ProfileScreen user={user} />;
+      case 'profile': return <ProfileScreen />; // Uses internal fetch logic
       default: return <HomeFeed userId={user._id} />;
     }
   };
@@ -144,18 +145,6 @@ function NotificationsScreen() {
     <div style={{ textAlign: 'center', padding: '2rem' }}>
       <h3>Notifications</h3>
       <p>You have no new notifications.</p>
-    </div>
-  );
-}
-
-function ProfileScreen({ user }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '2rem' }}>
-      <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#667eea', margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '2rem' }}>
-        {user?.name?.charAt(0) || 'U'}
-      </div>
-      <h3>{user?.name || 'User'}</h3>
-      <p>{user?.bio || 'No bio yet.'}</p>
     </div>
   );
 }
