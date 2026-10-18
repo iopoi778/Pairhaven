@@ -1,0 +1,34 @@
+openapi: "3.0.3"
+info:
+  title: PairHaven API (profiles & uploads)
+  version: "1.0.0"
+servers:
+  - url: http://localhost:5000
+paths:
+  /api/users/profile:
+    get:
+      summary: Get current user's profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profile returned
+    put:
+      summary: Update current user's profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+      responses:
+        "200":
+          description: Updated profile
+  /api/users/photos:
+    post:
+      summary: Upload one photo (multipart/form-data)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+      responses:
+        "201":
+          description: Photo uploaded
