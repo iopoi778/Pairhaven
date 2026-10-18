@@ -3,7 +3,6 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const { v2: cloudinary } = require('cloudinary');
-const streamifier = require('streamifier');
 const Post = require('../models/Post'); // create simple Post model
 
 // multer-like: rely on memory buffer via multer in upload middleware or use upload.single in this route
