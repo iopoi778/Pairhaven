@@ -1,97 +1,51 @@
+
 const express = require('express');
 const router = express.Router();
-const Post = require('../models/Post');
-const User = require('../models/User');
-const { uploadVideo } = require('../middleware/upload');
 const auth = require('../middleware/auth');
+const { v2: cloudinary } = require('cloudinary');
+const streamifier = require('streamifier');
+const Post = require('../models/Post'); // create simple Post model
 
-// CREATE VIDEO POST
-router.post('/', auth, uploadVideo.single('video'), async (req, res) => {
+// multer-like: rely on memory buffer via multer in upload middleware or use upload.single in this route
+const multer = require('multer');
+const upload = multer(); // memory storage
+
+router.post('/', auth, upload.single('media'), async (req, res) => {
   try {
-    const { caption } = req.body;
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-    if (!req.file) {
-      return res.status(400).json({ message: 'Video is required' });
-    }
-
-    const post = new Post({
-      user: req.user.userId,
-      videoUrl: req.file.path,
-      thumbnail: req.file.path + '?thumbnail=true',
-      caption
+    // Upload to Cloudinary as video
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { resource_type: 'video', folder: 'pairhaven/posts' },
+        (err, res) => (err ? reject(err) : resolve(res))
+      );
+      streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
     });
 
-    await post.save();
-
-    const populatedPost = await Post.findById(post._id)
-      .populate('user', 'name photos verificationStatus');
-
-    res.status(201).json(populatedPost);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// GET ALL POSTS (Feed)
-router.get('/feed', auth, async (req, res) => {
-  try {
-    const posts = await Post.find()
-      .populate('user', 'name photos verificationStatus')
-      .populate({
-        path: 'comments',
-        populate: { path: 'user', select: 'name photos' }
-      })
-      .sort({ createdAt: -1 })
-      .limit(50);
-
-    res.json(posts);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// GET USER'S POSTS
-router.get('/user/:userId', auth, async (req, res) => {
-  try {
-    const posts = await Post.find({ user: req.params.userId })
-      .populate('user', 'name photos verificationStatus')
-      .populate({
-        path: 'comments',
-        populate: { path: 'user', select: 'name photos' }
-      })
-      .sort({ createdAt: -1 });
-
-    res.json(posts);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// LIKE A POST
-router.post('/:postId/like', auth, async (req, res) => {
-  try {
-    const post = await Post.findById(req.params.postId);
-    
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
-
-    const alreadyLiked = post.likes.includes(req.user.userId);
-    
-    if (alreadyLiked) {
-      post.likes = post.likes.filter(id => id.toString() !== req.user.userId);
-    } else {
-      post.likes.push(req.user.userId);
-    }
-
-    await post.save();
-
-    res.json({ 
-      likesCount: post.likes.length,
-      liked: !alreadyLiked 
+    const post = await Post.create({
+      author: req.user.userId,
+      text: req.body.text || '',
+      mediaUrl: result.secure_url,
+      mediaPublicId: result.public_id,
+      mediaType: 'video',
+      createdAt: new Date()
     });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+
+    return res.status(201).json({ post });
+  } catch (err) {
+    console.error('post upload error', err);
+    return res.status(500).json({ message: 'Upload failed', error: err.message });
+  }
+});
+
+// GET feed
+router.get('/', auth, async (req, res) => {
+  try {
+    const posts = await Post.find().populate('author', 'name photos').sort({ createdAt: -1 }).limit(50);
+    res.json(posts);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 
