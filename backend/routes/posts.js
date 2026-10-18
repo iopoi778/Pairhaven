@@ -15,13 +15,13 @@ router.post('/', auth, upload.single('media'), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
     // Upload to Cloudinary as video
-    const result = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { resource_type: 'video', folder: 'pairhaven/posts' },
-        (err, res) => (err ? reject(err) : resolve(res))
-      );
-      streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
-    });
+const base64 = req.file.buffer.toString('base64');
+const dataUri = `data:${req.file.mimetype};base64,${base64}`;
+
+const result = await cloudinary.uploader.upload(dataUri, {
+  resource_type: 'video',
+  folder: 'pairhaven/posts'
+});
 
     const post = await Post.create({
       author: req.user.userId,
