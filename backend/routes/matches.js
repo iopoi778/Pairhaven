@@ -28,10 +28,12 @@ router.get('/random', auth, async (req, res) => {
 
     // Geospatial filter (optional, based on user location)
     const distanceKm = parseFloat(req.query.distance || 50);
-    const hasLocation = Array.isArray(currentUser.location?.coordinates) && 
-                        currentUser.location.coordinates.length === 2;
+    const hasValidLocation = currentUser.location && 
+                             Array.isArray(currentUser.location.coordinates) && 
+                             currentUser.location.coordinates.length === 2 &&
+                             currentUser.location.coordinates[0] !== 0;
 
-    if (hasLocation && !isNaN(distanceKm) && distanceKm > 0) {
+    if (hasValidLocation && !isNaN(distanceKm) && distanceKm > 0) {
       query.location = {
         $near: {
           $geometry: { 
@@ -84,43 +86,25 @@ router.post('/match/filter', auth, async (req, res) => {
 
     const distKm = parseFloat(distance || currentUser.preferences?.distance || 50);
     if (distKm && currentUser.location && Array.isArray(currentUser.location.coordinates)) {
-    const distanceKm = parseFloat(req.query.distance || 50);
-    const hasValidLocation = currentUser.location && 
-                         Array.isArray(currentUser.location.coordinates) && 
-                         currentUser.location.coordinates.length === 2 &&
-                         currentUser.location.coordinates[0] !== 0; // Exclude [0,0] fallback
-
-if (hasValidLocation && !isNaN(distanceKm) && distanceKm > 0) {
-  query.location = {
-    $near: {
-      $geometry: { 
-        type: 'Point', 
-        coordinates: currentUser.location.coordinates.map(Number) 
-      },
-      $maxDistance: Math.round(distanceKm * 1000)
+      query.location = {
+        $near: {
+          $geometry: { type: 'Point', coordinates: currentUser.location.coordinates.map(Number) },
+          $maxDistance: Math.round(distKm * 1000)
+        }
+      };
     }
-  };
-} 
+
+    const matches = await User.find(query)
+      .select('name photos age location bio interests verificationStatus')
+      .limit(50);
+
+    res.json(matches);
+  } catch (error) {
+    console.error('Match filter error:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
-// BEFORE (Crashes or excludes users without location)
-if (shouldApplyGeo) {
-  query.location = { $near: { ... } };
-}
 
-// AFTER (Gracefully handles missing location)
-const hasValidLocation = currentUser.location && 
-                         Array.isArray(currentUser.location.coordinates) && 
-                         currentUser.location.coordinates.length === 2 &&
-                         currentUser.location.coordinates[0] !== 0;
-
-if (hasValidLocation && !isNaN(distanceKm) && distanceKm > 0) {
-  query.location = {
-    $near: {
-      $geometry: { type: 'Point', coordinates: currentUser.location.coordinates.map(Number) },
-      $maxDistance: Math.round(distanceKm * 1000)
-    }
-  };
-}
 // POST /api/matches/create-match/:userId - Create mutual match
 router.post('/create-match/:userId', auth, async (req, res) => {
   try {
