@@ -99,15 +99,17 @@ router.delete('/unfollow/:userId', auth, async (req, res) => {
   }
 });
 
-// LIKE USER
+// LIKE USER (with mutual match detection)
 router.post('/like/:userId', auth, async (req, res) => {
   try {
     const userToLike = await User.findById(req.params.userId);
+    const currentUser = await User.findById(req.user.userId);
     
     if (!userToLike) {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Check if already liked
     const alreadyLiked = userToLike.likesReceived.find(
       like => like.from.toString() === req.user.userId
     );
@@ -116,18 +118,52 @@ router.post('/like/:userId', auth, async (req, res) => {
       return res.status(400).json({ message: 'Already liked' });
     }
 
+    // Add like
     userToLike.likesReceived.push({ from: req.user.userId });
     await userToLike.save();
 
+    // CREATE NOTIFICATION
     await Notification.create({
       recipient: req.params.userId,
       sender: req.user.userId,
       type: 'like',
-      message: `Someone liked your profile`
+      message: `${currentUser.name} liked your profile`
     });
 
+    // CHECK FOR MUTUAL LIKE → CREATE MATCH
+    const mutualLike = currentUser.likesReceived.find(
+      like => like.from.toString() === req.params.userId
+    );
+
+    if (mutualLike) {
+      // Add to BOTH users' matches arrays
+      if (!currentUser.matches.includes(req.params.userId)) {
+        currentUser.matches.push(req.params.userId);
+        await currentUser.save();
+      }
+      if (!userToLike.matches.includes(req.user.userId)) {
+        userToLike.matches.push(req.user.userId);
+        await userToLike.save();
+      }
+
+      // Create match notification for both
+      await Notification.create({
+        recipient: req.params.userId,
+        sender: req.user.userId,
+        type: 'match',
+        message: `You matched with ${currentUser.name}!`
+      });
+      await Notification.create({
+        recipient: req.user.userId,
+        sender: req.params.userId,
+        type: 'match',
+        message: `You matched with ${userToLike.name}!`
+      });
+    }
+
     res.json({ 
-      message: 'Liked successfully',
+      message: mutualLike ? 'It\'s a match!' : 'Liked successfully',
+      isMatch: !!mutualLike,
       likesCount: userToLike.likesReceived.length 
     });
   } catch (error) {
