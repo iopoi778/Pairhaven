@@ -48,6 +48,39 @@ module.exports = function(io) {
       }
     });
 
+    socket.on('sendMessage', async (data) => {
+  try {
+    const Message = require('./models/Message');
+    const Notification = require('./models/Notification');
+
+    const msg = await Message.create({
+      sender: data.senderId,
+      receiver: data.receiverId,
+      content: data.content
+    });
+
+    // notify receiver
+    await Notification.create({
+      recipient: data.receiverId,
+      sender: data.senderId,
+      type: 'message',
+      message: 'New message received',
+      metadata: { messageId: msg._id }
+    });
+
+    const receiverSocketId = userSockets.get(data.receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('newMessage', {
+        ...msg.toObject(),
+        senderId: data.senderId,
+        receiverId: data.receiverId
+      });
+    }
+    socket.emit('messageSent', { ...msg.toObject(), senderId: data.senderId, receiverId: data.receiverId });
+  } catch (err) {
+    console.error('sendMessage error', err);
+  }
+});
     socket.on('disconnect', () => {
       for (const [userId, socketId] of userSockets.entries()) {
         if (socketId === socket.id) {
