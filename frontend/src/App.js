@@ -175,26 +175,28 @@ const pos = await new Promise((resolve, reject) => {
 });
 formData.append('location', JSON.stringify({ type: 'Point', coordinates: [pos.coords.longitude, pos.coords.latitude] }));
 
-// AFTER (Continues even if GPS fails)
 try {
-  const pos = await new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, { 
-      enableHighAccuracy: false, // Less strict
-      timeout: 5000,             // Shorter timeout
-      maximumAge: 0 
+  if (navigator.geolocation) {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, { 
+        enableHighAccuracy: false,
+        timeout: 5000,
+        maximumAge: 0 
+      });
     });
-  });
-  formData.append('location', JSON.stringify({ 
-    type: 'Point', 
-    coordinates: [pos.coords.longitude, pos.coords.latitude] 
-  }));
+    formData.append('location', JSON.stringify({ 
+      type: 'Point', 
+      coordinates: [pos.coords.longitude, pos.coords.latitude] 
+    }));
+  } else {
+    throw new Error('Geolocation not supported');
+  }
 } catch (geoErr) {
   console.warn('Location skipped:', geoErr.message);
-  // DO NOT throw error - allow registration without location
-  // Optionally append a default location or null
+  // Always append fallback so backend doesn't reject
   formData.append('location', JSON.stringify({ 
     type: 'Point', 
-    coordinates: [0, 0] // Default fallback
+    coordinates: [0, 0] 
   }));
 }
 // Login screen
