@@ -9,24 +9,53 @@ const auth = require('../middleware/auth');
 router.get('/random', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.userId);
-    
+    if (!currentUser) return res.status(404).json({ message: 'User not found' });
+
+    // build excluded ids safely
     const excludedIds = [
-      req.user.userId,
-      ...currentUser.following,
-      ...currentUser.matches
+      String(req.user.userId),
+      ...((currentUser.following || []).map(String)),
+      ...((currentUser.matches || []).map(String))
     ];
 
-    const users = await User.find({
-      _id: { $nin: excludedIds },
-      verificationStatus: 'verified'
-    })
-    .select('name photos age location bio interests')
-    .limit(20)
-    .sort({ createdAt: -1 });
+    // base query excludes self, following and matches
+    const query = { _id: { $nin: excludedIds } };
 
-    res.json(users);
+    // require verified accounts in production
+    if (process.env.NODE_ENV === 'production') {
+      query.verificationStatus = 'verified';
+    }
+
+    // distance in km (query param `distance` or user preference or default 50 km)
+    const distanceKm = parseFloat(req.query.distance || req.body.distance || (currentUser.preferences && currentUser.preferences.distance) || 50);
+
+    // apply geospatial filter only when running in production (enforce distance) or when a distance param is provided
+    const shouldApplyGeo = Array.isArray(currentUser.location && currentUser.location.coordinates) && currentUser.location.coordinates.length === 2;
+
+    if (shouldApplyGeo) {
+      // convert to numbers to be safe
+      const coords = currentUser.location.coordinates.map(Number);
+
+      // Only add $near if distanceKm is a positive number
+      if (!Number.isNaN(distanceKm) && distanceKm > 0) {
+        query.location = {
+          $near: {
+            $geometry: { type: 'Point', coordinates: coords },
+            $maxDistance: Math.round(distanceKm * 1000)
+          }
+        };
+      }
+    }
+
+    const users = await User.find(query)
+      .select('name photos age location bio interests verificationStatus')
+      .limit(30)
+      .sort({ createdAt: -1 });
+
+    return res.json(users);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('random matches error', error);
+    return res.status(500).json({ message: error.message });
   }
 });
 
@@ -36,31 +65,35 @@ router.post('/match/filter', auth, async (req, res) => {
     const { ageMin, ageMax, distance, gender } = req.body;
     const currentUser = await User.findById(req.user.userId);
 
-    const query = {
-      _id: { 
-        $ne: req.user.userId,
-        $nin: [...currentUser.following, ...currentUser.matches]
-      }
-    };
+    if (!currentUser) return res.status(404).json({ message: 'User not found' });
+
+    const excluded = [String(req.user.userId), ...((currentUser.following || []).map(String)), ...((currentUser.matches || []).map(String))];
+
+    const query = { _id: { $nin: excluded } };
 
     if (ageMin || ageMax) {
       query.age = {};
-      if (ageMin) query.age.$gte = parseInt(ageMin);
-      if (ageMax) query.age.$lte = parseInt(ageMax);
+      if (ageMin) query.age.$gte = parseInt(ageMin, 10);
+      if (ageMax) query.age.$lte = parseInt(ageMax, 10);
     }
 
     if (gender) {
       query.gender = gender;
     }
 
-    if (distance && currentUser.location) {
+    // always require verified in production
+    if (process.env.NODE_ENV === 'production') {
+      query.verificationStatus = 'verified';
+    }
+
+    // distance filter: prefer explicit request distance, then user's pref, else default 50km
+    const distanceKm = parseFloat(distance || currentUser.preferences?.distance || 50);
+
+    if (distanceKm && currentUser.location && Array.isArray(currentUser.location.coordinates) && currentUser.location.coordinates.length === 2) {
       query.location = {
         $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: currentUser.location.coordinates
-          },
-          $maxDistance: distance * 1000
+          $geometry: { type: 'Point', coordinates: currentUser.location.coordinates.map(Number) },
+          $maxDistance: Math.round(distanceKm * 1000)
         }
       };
     }
@@ -71,6 +104,7 @@ router.post('/match/filter', auth, async (req, res) => {
 
     res.json(matches);
   } catch (error) {
+    console.error('match filter error', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -97,29 +131,15 @@ router.post('/create-match/:userId', auth, async (req, res) => {
 
     await match.save();
 
-    await User.findByIdAndUpdate(req.user.userId, {
-      $push: { matches: req.params.userId }
-    });
-    await User.findByIdAndUpdate(req.params.userId, {
-      $push: { matches: req.user.userId }
-    });
+    await User.findByIdAndUpdate(req.user.userId, { $push: { matches: req.params.userId } });
+    await User.findByIdAndUpdate(req.params.userId, { $push: { matches: req.user.userId } });
 
-    await Notification.create({
-      recipient: req.params.userId,
-      sender: req.user.userId,
-      type: 'match',
-      message: 'You have a new match!'
-    });
-
-    await Notification.create({
-      recipient: req.user.userId,
-      sender: req.user.userId,
-      type: 'match',
-      message: 'You have a new match!'
-    });
+    await Notification.create({ recipient: req.params.userId, sender: req.user.userId, type: 'match', message: 'You have a new match!' });
+    await Notification.create({ recipient: req.user.userId, sender: req.user.userId, type: 'match', message: 'You have a new match!' });
 
     res.json({ message: 'Match created successfully', match });
   } catch (error) {
+    console.error('create match error', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -127,11 +147,10 @@ router.post('/create-match/:userId', auth, async (req, res) => {
 // GET USER'S MATCHES
 router.get('/my-matches', auth, async (req, res) => {
   try {
-    const currentUser = await User.findById(req.user.userId)
-      .populate('matches', 'name photos age location verificationStatus');
-
+    const currentUser = await User.findById(req.user.userId).populate('matches', 'name photos age location verificationStatus');
     res.json(currentUser.matches);
   } catch (error) {
+    console.error('my-matches error', error);
     res.status(500).json({ message: error.message });
   }
 });
