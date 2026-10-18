@@ -12,7 +12,64 @@ router.post('/register', uploadPhotos.array('photos', 5), async (req, res) => {
     if (!req.files || req.files.length < 2) {
       return res.status(400).json({ message: 'At least 2 photos are required' });
     }
+try {
+  let loc = req.body.location;
+  if (loc) {
+    if (typeof loc === 'string') loc = JSON.parse(loc);
+    if (Array.isArray(loc.coordinates) && loc.coordinates.length === 2) {
+      user.location = {
+        type: 'Point',
+        coordinates: loc.coordinates,
+        address: loc.address || ''
+      };
+    }
+  }
+} catch (err) {
+  console.warn('Invalid location provided during registration', err);
+}
 
+// For dev convenience, consider auto-verify accounts (only when not production)
+if (process.env.NODE_ENV !== 'production') {
+  user.verificationStatus = 'verified';
+}
+
+// Save user
+await user.save();
+
+// Notify nearby users about the new user
+try {
+  const Notification = require('../models/Notification');
+  // radius in meters (default 50km for notification; tune as needed)
+  const notifyRadius = parseInt(process.env.NEW_USER_NOTIFY_RADIUS_METERS || '50000', 10);
+
+  if (user.location && Array.isArray(user.location.coordinates)) {
+    // Find users within radius, exclude the new user
+    const nearby = await require('../models/User').find({
+      _id: { $ne: user._id },
+      location: {
+        $near: {
+          $geometry: { type: 'Point', coordinates: user.location.coordinates },
+          $maxDistance: notifyRadius
+        }
+      }
+    }).select('_id');
+
+    // Create a notification for each nearby user
+    const notifications = nearby.map(u => ({
+      recipient: u._id,
+      sender: user._id,
+      type: 'new-user',
+      message: `${user.name} joined near you`,
+      metadata: { newUserId: user._id }
+    }));
+
+    if (notifications.length) {
+      await Notification.insertMany(notifications);
+    }
+  }
+} catch (notifyErr) {
+  console.warn('Failed to create new-user notifications', notifyErr);
+}  
     const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists with this email or phone' });
