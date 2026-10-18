@@ -18,7 +18,18 @@ router.post('/register', uploadPhotos.array('photos', 5), async (req, res) => {
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists with this email or phone' });
     }
+let locationData = req.body.location;
+if (typeof locationData === 'string') {
+  try { locationData = JSON.parse(locationData); } 
+  catch (e) { locationData = null; }
+}
 
+// If no valid location, use default instead of rejecting
+if (!locationData || !Array.isArray(locationData.coordinates)) {
+  locationData = { type: 'Point', coordinates: [0, 0] };
+}
+
+user.location = locationData;
     let parsedLocation = null;
     if (req.body.location) {
       try {
