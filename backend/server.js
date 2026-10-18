@@ -33,9 +33,9 @@ mongoose.connect(process.env.MONGODB_URI)
 .then(() => console.log('✅ Connected to MongoDB'))
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// Routes
+// Routes (REMOVE THE DUPLICATE)
 app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/users', userRoutes); // ← Only ONE users route
 app.use('/api/matches', matchRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
