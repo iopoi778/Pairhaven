@@ -126,6 +126,14 @@ function HomeFeed() {
     </div>
   );
 }
+const [unreadCount, setUnreadCount] = useState(0);
+useEffect(() => {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  axios.get(`${API_URL}/api/notifications`, { headers: { Authorization: `Bearer ${token}` } })
+    .then(res => setUnreadCount(res.data.filter(n => !n.read).length))
+    .catch(err => console.warn('notif load failed', err));
+}, []);
 
 function NotificationsScreen() {
   return (
