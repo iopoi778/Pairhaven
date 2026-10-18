@@ -24,22 +24,20 @@ router.post('/', auth, async (req, res) => {
     if (!target) return res.status(404).json({ message: 'Target user not found' });
 
     if (action === 'pass') {
-      // Optionally you can record passes
       return res.json({ message: 'Pass recorded', matched: false });
     }
 
-    // Prevent duplicate like
-    const alreadyLiked = target.likesReceived?.some(l => l.from && l.from.toString() === me._id.toString());
+    const alreadyLiked = (target.likesReceived || []).some(
+      like => like.from && like.from.toString() === me._id.toString()
+    );
     if (alreadyLiked) {
       return res.status(400).json({ message: 'You already liked this user' });
     }
 
-    // Record like on target
     target.likesReceived = target.likesReceived || [];
     target.likesReceived.push({ from: me._id, createdAt: new Date() });
     await target.save();
 
-    // Notify target of the like
     await Notification.create({
       recipient: target._id,
       sender: me._id,
@@ -48,11 +46,11 @@ router.post('/', auth, async (req, res) => {
       metadata: { from: me._id }
     });
 
-    // Check reciprocal: has current user previously been liked by target?
-    const isMutual = (me.likesReceived || []).some(l => l.from && l.from.toString() === target._id.toString());
+    const isMutual = (me.likesReceived || []).some(
+      like => like.from && like.from.toString() === target._id.toString()
+    );
 
     if (isMutual) {
-      // Ensure a match does not already exist
       const existingMatch = await Match.findOne({
         $or: [
           { user1: me._id, user2: target._id },
@@ -61,19 +59,22 @@ router.post('/', auth, async (req, res) => {
       });
 
       if (!existingMatch) {
-        const match = new Match({ user1: me._id, user2: target._id, status: 'accepted' });
+        const match = new Match({
+          user1: me._id,
+          user2: target._id,
+          status: 'accepted'
+        });
         await match.save();
 
-        // push match ids into users (avoid duplicates)
         me.matches = me.matches || [];
         target.matches = target.matches || [];
+
         if (!me.matches.find(id => id.toString() === target._id.toString())) me.matches.push(target._id);
         if (!target.matches.find(id => id.toString() === me._id.toString())) target.matches.push(me._id);
 
         await me.save();
         await target.save();
 
-        // create notifications for both
         await Notification.create({
           recipient: target._id,
           sender: me._id,
@@ -90,11 +91,18 @@ router.post('/', auth, async (req, res) => {
           metadata: { matchId: match._id, userId: target._id }
         });
 
-        return res.json({ message: 'Match created', matched: true, matchId: match._id });
+        return res.json({
+          message: 'Match created',
+          matched: true,
+          matchId: match._id
+        });
       }
     }
 
-    return res.json({ message: 'Like recorded', matched: false });
+    return res.json({
+      message: 'Like recorded',
+      matched: false
+    });
   } catch (error) {
     console.error('Swipe error', error);
     return res.status(500).json({ message: error.message });
