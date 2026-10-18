@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Link } from 'react-router-dom';
 
 // --- Protected Route Wrapper ---
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" />;
+  return token ? children : <Navigate to="/login" replace />;
 };
 
 // --- Main App Component ---
@@ -36,7 +36,7 @@ function DashboardLayout() {
 
   const handleLogout = () => {
     localStorage.clear();
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   // Render content based on active tab
@@ -52,20 +52,34 @@ function DashboardLayout() {
   };
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', background: 'white', minHeight: '100vh', boxShadow: '0 0 20px rgba(0,0,0,0.1)' }}>
+    <div style={{ maxWidth: '600px', margin: '0 auto', background: 'white', minHeight: '100vh', boxShadow: '0 0 20px rgba(0,0,0,0.1)', position: 'relative' }}>
       {/* Header */}
       <header style={{ padding: '1rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0, color: '#667eea' }}>PairHaven</h2>
         <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>Logout</button>
       </header>
 
-      {/* Main Content Area */}
-      <main style={{ padding: '1rem' }}>
+      {/* Main Content Area - Added paddingBottom to prevent overlap with nav */}
+      <main style={{ padding: '1rem', paddingBottom: '88px' }}>
         {renderContent()}
       </main>
 
-      {/* Bottom Navigation Bar */}
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-around', padding: '0.8rem 0', maxWidth: '600px', margin: '0 auto' }}>
+      {/* Bottom Navigation Bar - Added zIndex and height */}
+      <nav style={{ 
+        position: 'fixed', 
+        bottom: 0, 
+        left: '50%', 
+        transform: 'translateX(-50%)', 
+        width: '100%', 
+        maxWidth: '600px', 
+        background: 'white', 
+        borderTop: '1px solid #eee', 
+        display: 'flex', 
+        justifyContent: 'space-around', 
+        padding: '0.8rem 0',
+        zIndex: 1000,
+        height: '72px'
+      }}>
         {[
           { id: 'home', icon: '', label: 'Home' },
           { id: 'matching', icon: '❤️', label: 'Match' },
@@ -75,6 +89,7 @@ function DashboardLayout() {
         ].map(tab => (
           <button 
             key={tab.id}
+            type="button"
             onClick={() => setActiveTab(tab.id)}
             style={{ 
               background: 'none', 
@@ -87,7 +102,7 @@ function DashboardLayout() {
               cursor: 'pointer'
             }}
           >
-            <span style={{ fontSize: '1.5rem' }}>{tab.icon}</span>
+            <span style={{ fontSize: '1.3rem' }}>{tab.icon}</span>
             {tab.label}
           </button>
         ))}
@@ -96,16 +111,12 @@ function DashboardLayout() {
   );
 }
 
-// --- Page Components (Placeholders for now) ---
+// --- Page Components (Placeholders) ---
 function HomeFeed({ userId }) {
   return (
     <div style={{ textAlign: 'center', padding: '2rem' }}>
       <h3>Your Feed</h3>
       <p>Posts from people you follow will appear here.</p>
-      <div style={{ marginTop: '2rem', padding: '1rem', background: '#f9f9f9', borderRadius: '8px' }}>
-        <strong>Sample Post</strong>
-        <p>Hello world! This is a sample feed item.</p>
-      </div>
     </div>
   );
 }
@@ -114,13 +125,7 @@ function MatchingScreen({ userId }) {
   return (
     <div style={{ textAlign: 'center', padding: '2rem' }}>
       <h3>Find Matches</h3>
-      <div style={{ width: '100%', height: '400px', background: '#e0e7ff', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '1rem 0' }}>
-        <p>No more profiles to show right now.</p>
-      </div>
-      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-        <button style={{ padding: '1rem 2rem', borderRadius: '50%', border: '2px solid #ff4b4b', background: 'white', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
-        <button style={{ padding: '1rem 2rem', borderRadius: '50%', border: '2px solid #4bff4b', background: 'white', fontSize: '1.5rem', cursor: 'pointer' }}>❤️</button>
-      </div>
+      <p>No more profiles to show right now.</p>
     </div>
   );
 }
@@ -130,13 +135,6 @@ function MessagesScreen({ userId }) {
     <div style={{ textAlign: 'center', padding: '2rem' }}>
       <h3>Messages</h3>
       <p>Select a match to start chatting.</p>
-      <div style={{ marginTop: '1rem', padding: '1rem', background: '#f9f9f9', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: '#ddd' }}></div>
-        <div style={{ textAlign: 'left' }}>
-          <strong>User Name</strong>
-          <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>Hey! How are you?</p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -154,20 +152,15 @@ function ProfileScreen({ user }) {
   return (
     <div style={{ textAlign: 'center', padding: '2rem' }}>
       <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#667eea', margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '2rem' }}>
-        {user.name?.charAt(0) || 'U'}
+        {user?.name?.charAt(0) || 'U'}
       </div>
-      <h3>{user.name || 'User'}</h3>
-      <p>{user.bio || 'No bio yet.'}</p>
-      <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '2rem', padding: '1rem', background: '#f9f9f9', borderRadius: '8px' }}>
-        <div><strong>0</strong><br/>Followers</div>
-        <div><strong>0</strong><br/>Following</div>
-        <div><strong>0</strong><br/>Matches</div>
-      </div>
+      <h3>{user?.name || 'User'}</h3>
+      <p>{user?.bio || 'No bio yet.'}</p>
     </div>
   );
 }
 
-// --- Auth Pages (Simplified for brevity) ---
+// --- Auth Pages with React Router Navigation ---
 function LoginPage() {
   const navigate = useNavigate();
   const handleSubmit = async (e) => {
@@ -185,7 +178,7 @@ function LoginPage() {
       if (res.ok) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/');
+        navigate('/', { replace: true });
       } else {
         alert(data.message || 'Login failed');
       }
@@ -201,7 +194,12 @@ function LoginPage() {
         <input name="password" type="password" placeholder="Password" required style={{ width: '100%', padding: '0.8rem', marginBottom: '1rem', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
         <button type="submit" style={{ width: '100%', padding: '0.8rem', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer' }}>Log In</button>
       </form>
-      <p style={{ textAlign: 'center', marginTop: '1rem' }}>New here? <a href="/register" style={{ color: '#667eea' }}>Create Account</a></p>
+      <p style={{ textAlign: 'center', marginTop: '1rem' }}>
+        New here?{' '}
+        <a href="/register" onClick={(e) => { e.preventDefault(); navigate('/register'); }} style={{ color: '#667eea' }}>
+          Create Account
+        </a>
+      </p>
     </div>
   );
 }
@@ -219,7 +217,7 @@ function RegisterPage() {
       const data = await res.json();
       if (res.ok) {
         alert('Registered! Please log in.');
-        navigate('/login');
+        navigate('/login', { replace: true });
       } else {
         alert(data.message || 'Registration failed');
       }
@@ -248,7 +246,12 @@ function RegisterPage() {
         <input name="photos" type="file" multiple accept="image/*" required style={{ width: '100%', marginBottom: '1rem' }} />
         <button type="submit" style={{ width: '100%', padding: '0.8rem', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer' }}>Sign Up</button>
       </form>
-      <p style={{ textAlign: 'center', marginTop: '1rem' }}>Already have an account? <a href="/login" style={{ color: '#667eea' }}>Log In</a></p>
+      <p style={{ textAlign: 'center', marginTop: '1rem' }}>
+        Already have an account?{' '}
+        <a href="/login" onClick={(e) => { e.preventDefault(); navigate('/login'); }} style={{ color: '#667eea' }}>
+          Log In
+        </a>
+      </p>
     </div>
   );
 }
