@@ -267,22 +267,31 @@ function RegisterPage() {
 
     const formData = new FormData(e.target);
 
-    try {
-      if (navigator.geolocation) {
-        try {
-          const pos = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
-          });
-
-          const { latitude, longitude } = pos.coords;
-          formData.append('location', JSON.stringify({
-            type: 'Point',
-            coordinates: [longitude, latitude]
-          }));
-        } catch (geoErr) {
-          console.warn('Geolocation not available or denied', geoErr);
-        }
-      }
+    // REPLACE LINES 207-220 IN YOUR CURRENT FILE WITH THIS:
+try {
+  if (navigator.geolocation) {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, { 
+        enableHighAccuracy: false, // Less strict for faster response
+        timeout: 5000,             // Shorter timeout prevents hanging
+        maximumAge: 0 
+      });
+    });
+    formData.append('location', JSON.stringify({ 
+      type: 'Point', 
+      coordinates: [pos.coords.longitude, pos.coords.latitude] 
+    }));
+  } else {
+    throw new Error('Geolocation not supported');
+  }
+} catch (geoErr) {
+  console.warn('Location skipped:', geoErr.message);
+  // CRITICAL: Always append a fallback so backend doesn't reject
+  formData.append('location', JSON.stringify({ 
+    type: 'Point', 
+    coordinates: [0, 0] 
+  }));
+}
 
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
