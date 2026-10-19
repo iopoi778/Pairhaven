@@ -165,7 +165,7 @@ router.post('/request/:userId', auth, async (req, res) => {
       return res.status(400).json({ message: 'Request already sent' });
     }
 
-    // ✅ INITIALIZE ARRAYS IF MISSING
+    // ✅ INITIALIZE ARRAYS IF MISSING TO PREVENT 500 ERRORS
     currentUser.requestsSent = [...(currentUser.requestsSent || []), req.params.userId];
     targetUser.requestsReceived = [...(targetUser.requestsReceived || []), req.user.userId];
     
