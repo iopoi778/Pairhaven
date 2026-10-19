@@ -114,14 +114,14 @@ function ProfileScreen({ userId }) {
   const formData = new FormData();
   formData.append('text', newPostText);
   if (newPostMedia) {
-    formData.append('media', newPostMedia); // Send File object directly
+    formData.append('media', newPostMedia);
   }
   
   try {
     const res = await axios.post(`${API_URL}/api/posts`, formData, {
       headers: { 
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data' // Required for file uploads
+        'Content-Type': 'multipart/form-data'
       }
     });
     
