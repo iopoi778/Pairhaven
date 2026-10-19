@@ -5,30 +5,26 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 
-// GET /api/posts - FIX: Ensure all fields are returned
+// GET /api/posts - Ensure all fields are returned
 router.get('/', auth, async (req, res) => {
   try {
     const posts = await Post.find()
-      .populate('author', 'name photos') // Get author name and photo
-      .populate('likes', '_id')          // For reaction counts
-      .populate('loves', '_id')          // For reaction counts
-      .sort({ createdAt: -1 });
+      .populate('author', 'name photos')
+      .populate('likes', '_id')
+      .populate('loves', '_id')
+      .sort({ createdAt: -1 })
+      .lean();
 
-    // Transform to include safe counts and user status
-    const formattedPosts = posts.map(post => {
-      const postObj = post.toObject();
-      return {
-        ...postObj,
-        // ✅ ENSURE THESE FIELDS EXIST
-        text: postObj.text || '',
-        mediaUrl: postObj.mediaUrl || null,
-        mediaType: postObj.mediaType || null,
-        likesCount: post.likes ? post.likes.length : 0,
-        lovesCount: post.loves ? post.loves.length : 0,
-        userLiked: post.likes ? post.likes.some(u => u._id.toString() === req.user.userId) : false,
-        userLoved: post.loves ? post.loves.some(u => u._id.toString() === req.user.userId) : false
-      };
-    });
+    const formattedPosts = posts.map(post => ({
+      ...post,
+      text: typeof post.text === 'string' ? post.text.trim() : '',
+      mediaUrl: post.mediaUrl || null,
+      mediaType: post.mediaType || null,
+      likesCount: (post.likes || []).length,
+      lovesCount: (post.loves || []).length,
+      userLiked: (post.likes || []).some(u => u._id.toString() === req.user.userId),
+      userLoved: (post.loves || []).some(u => u._id.toString() === req.user.userId)
+    }));
 
     res.json(formattedPosts);
   } catch (error) {
@@ -40,7 +36,7 @@ router.get('/', auth, async (req, res) => {
 // ✅ SINGLE REACT ROUTE WITH NOTIFICATION LOGIC
 router.post('/:postId/react', auth, async (req, res) => {
   try {
-    const { type } = req.body; // 'like' or 'love'
+    const { type } = req.body;
     const post = await Post.findById(req.params.postId).populate('author', '_id name');
     
     if (!post) return res.status(404).json({ message: 'Post not found' });
@@ -53,27 +49,19 @@ router.post('/:postId/react', auth, async (req, res) => {
     if (type === 'like') {
       const idx = post.likes.indexOf(userId);
       isAdding = idx === -1;
-      if (isAdding) {
-        post.likes.push(userId);
-      } else {
-        post.likes.splice(idx, 1);
-      }
+      if (isAdding) post.likes.push(userId);
+      else post.likes.splice(idx, 1);
     } else if (type === 'love') {
       const idx = post.loves.indexOf(userId);
       isAdding = idx === -1;
-      if (isAdding) {
-        post.loves.push(userId);
-      } else {
-        post.loves.splice(idx, 1);
-      }
+      if (isAdding) post.loves.push(userId);
+      else post.loves.splice(idx, 1);
     }
 
     await post.save();
 
-    // ✅ SEND NOTIFICATION ONLY WHEN ADDING A REACTION (not removing)
     if (isAdding && post.author._id.toString() !== userId) {
       const actionText = type === 'like' ? 'liked your post' : 'loved your post';
-      
       await Notification.create({
         recipient: post.author._id,
         sender: userId,
@@ -95,23 +83,57 @@ router.post('/:postId/react', auth, async (req, res) => {
   }
 });
 
-// POST /api/posts - Create new post
+// ✅ STRICT POST CREATION - PREVENTS EMPTY POSTS
 router.post('/', auth, async (req, res) => {
   try {
     const { text, mediaUrl, mediaType } = req.body;
+    
+    // Validate content exists
+    const hasText = text && typeof text === 'string' && text.trim().length > 0;
+    const hasMedia = mediaUrl && typeof mediaUrl === 'string' && mediaUrl.trim().length > 0;
+    
+    if (!hasText && !hasMedia) {
+      return res.status(400).json({ 
+        message: 'Post must contain text or media. Empty posts are not allowed.' 
+      });
+    }
+
     const newPost = new Post({
       author: req.user.userId,
-      text,
-      mediaUrl,
-      mediaType,
+      text: hasText ? text.trim() : '',
+      mediaUrl: hasMedia ? mediaUrl.trim() : null,
+      mediaType: hasMedia ? (mediaType || 'image') : null,
       likes: [],
       loves: []
     });
+    
     await newPost.save();
-    const populated = await Post.findById(newPost._id).populate('author', 'name photos');
+    
+    const populated = await Post.findById(newPost._id)
+      .populate('author', 'name photos')
+      .lean();
+      
     res.status(201).json(populated);
   } catch (error) {
     console.error('Create post error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ✅ DELETE POST - FIXES THE 404 ERROR
+router.delete('/:postId', auth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+    
+    if (post.author.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+    
+    await Post.findByIdAndDelete(req.params.postId);
+    res.json({ message: 'Deleted successfully' });
+  } catch (error) {
+    console.error('Delete error:', error);
     res.status(500).json({ message: error.message });
   }
 });
