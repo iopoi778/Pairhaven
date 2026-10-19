@@ -152,7 +152,7 @@ router.patch('/profile/me', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-// ✅ FIXED: GET USER POSTS WITH VALIDATION
+// ✅ FIXED: GET USER POSTS WITH VALIDATION & DEBUG LOGGING
 router.get('/profile/:userId/posts', auth, async (req, res) => {
   try {
     const targetUser = await User.findById(req.params.userId);
@@ -164,18 +164,31 @@ router.get('/profile/:userId/posts', auth, async (req, res) => {
       return res.json([]);
     }
 
+    // ✅ USE .lean() FOR FASTER QUERIES & CLEANER DATA
     const posts = await Post.find({ author: req.params.userId })
       .sort({ createdAt: -1 })
       .populate('author', 'name photos')
-      .lean(); // ✅ USE LEAN FOR BETTER PERFORMANCE
+      .lean(); 
 
-    // ✅ TRANSFORM TO GUARANTEE CONTENT FIELDS EXIST
+    console.log(`📋 Found ${posts.length} posts for user ${req.params.userId}`);
+
+    // ✅ EXPLICITLY MAP EVERY FIELD TO PREVENT MISSING DATA
     const safePosts = posts.map(post => ({
-      ...post,
-      text: post.text?.trim() || '',
+      _id: post._id,
+      author: post.author,
+      text: typeof post.text === 'string' ? post.text.trim() : '',
       mediaUrl: post.mediaUrl || null,
-      mediaType: post.mediaType || null
+      mediaType: post.mediaType || null,
+      createdAt: post.createdAt,
+      likes: post.likes || [],
+      loves: post.loves || []
     }));
+
+    console.log("✅ Safe posts returned:", safePosts.map(p => ({ 
+      id: p._id, 
+      hasText: !!p.text, 
+      hasMedia: !!p.mediaUrl 
+    })));
 
     res.json(safePosts);
   } catch (error) {
