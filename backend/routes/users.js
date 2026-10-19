@@ -122,70 +122,98 @@ router.delete('/posts/:postId', auth, async (req, res) => {
   }
 });
 
-// FOLLOW USER
-router.post('/follow/:userId', auth, async (req, res) => {
+// SEND MATCH REQUEST (Replaces 'Like')
+router.post('/request/:userId', auth, async (req, res) => {
   try {
-    const userToFollow = await User.findById(req.params.userId);
+    const targetUser = await User.findById(req.params.userId);
     const currentUser = await User.findById(req.user.userId);
-
-    if (!userToFollow || !currentUser) {
-      return res.status(404).json({ message: 'User not found' });
+    
+    if (!targetUser || !currentUser) return res.status(404).json({ message: 'User not found' });
+    
+    // Check if already matched or requested
+    if (currentUser.matches.includes(req.params.userId)) {
+      return res.status(400).json({ message: 'Already matched' });
+    }
+    if (currentUser.requestsSent?.includes(req.params.userId)) {
+      return res.status(400).json({ message: 'Request already sent' });
     }
 
-    if (currentUser.following?.includes(req.params.userId)) {
-      return res.status(400).json({ message: 'Already following' });
-    }
-
-    currentUser.following.push(req.params.userId);
-    userToFollow.followers.push(req.user.userId);
-
+    // Add to pending requests
+    currentUser.requestsSent = [...(currentUser.requestsSent || []), req.params.userId];
+    targetUser.requestsReceived = [...(targetUser.requestsReceived || []), req.user.userId];
+    
     await currentUser.save();
-    await userToFollow.save();
+    await targetUser.save();
 
+    // Send notification
     await Notification.create({
       recipient: req.params.userId,
       sender: req.user.userId,
-      type: 'follow',
-      message: `${currentUser.name} started following you`
+      type: 'match_request',
+      message: `${currentUser.name} wants to match with you`
     });
 
-    res.json({ 
-      message: 'Successfully followed',
-      followersCount: userToFollow.followers.length 
-    });
+    res.json({ message: 'Match request sent successfully' });
   } catch (error) {
-    console.error('Follow error:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// UNFOLLOW USER
-router.delete('/unfollow/:userId', auth, async (req, res) => {
+// ACCEPT MATCH REQUEST (Creates the actual match + enables chat)
+router.post('/accept-request/:userId', auth, async (req, res) => {
+  try {
+    const requester = await User.findById(req.params.userId);
+    const currentUser = await User.findById(req.user.userId);
+    
+    if (!requester || !currentUser) return res.status(404).json({ message: 'User not found' });
+
+    // Remove from pending lists
+    currentUser.requestsReceived = (currentUser.requestsReceived || []).filter(id => id.toString() !== req.params.userId);
+    requester.requestsSent = (requester.requestsSent || []).filter(id => id.toString() !== req.user.userId);
+
+    // ADD TO MATCHES ARRAY (This enables messaging)
+    currentUser.matches = [...(currentUser.matches || []), req.params.userId];
+    requester.matches = [...(requester.matches || []), req.user.userId];
+    
+    await currentUser.save();
+    await requester.save();
+
+    // Send mutual match notification
+    await Notification.create({
+      recipient: req.params.userId,
+      sender: req.user.userId,
+      type: 'match_accepted',
+      message: `You matched with ${currentUser.name}! You can now chat.`
+    });
+
+    res.json({ message: 'Match accepted! You can now message each other.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// DECLINE/CANCEL REQUEST
+router.delete('/request/:userId', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.userId);
-    const userToUnfollow = await User.findById(req.params.userId);
+    const targetUser = await User.findById(req.params.userId);
 
-    if (!currentUser || !userToUnfollow) {
-      return res.status(404).json({ message: 'User not found' });
+    // Remove from both sent/received arrays
+    currentUser.requestsSent = (currentUser.requestsSent || []).filter(id => id.toString() !== req.params.userId);
+    currentUser.requestsReceived = (currentUser.requestsReceived || []).filter(id => id.toString() !== req.params.userId);
+    
+    if (targetUser) {
+      targetUser.requestsReceived = (targetUser.requestsReceived || []).filter(id => id.toString() !== req.user.userId);
+      targetUser.requestsSent = (targetUser.requestsSent || []).filter(id => id.toString() !== req.user.userId);
+      await targetUser.save();
     }
 
-    currentUser.following = (currentUser.following || []).filter(
-      id => id.toString() !== req.params.userId
-    );
-    userToUnfollow.followers = (userToUnfollow.followers || []).filter(
-      id => id.toString() !== req.user.userId
-    );
-
     await currentUser.save();
-    await userToUnfollow.save();
-
-    res.json({ message: 'Successfully unfollowed' });
+    res.json({ message: 'Request removed' });
   } catch (error) {
-    console.error('Unfollow error:', error);
     res.status(500).json({ message: error.message });
   }
 });
-
 // LIKE USER (with mutual match detection)
 router.post('/like/:userId', auth, async (req, res) => {
   try {
