@@ -151,6 +151,7 @@ function DashboardLayout({ activeTabOverride, children }) {
 
 function HomeFeed({ onNavigateToProfile }) {
   const [posts, setPosts] = useState([]);
+  const navigate = useNavigate(); // ✅ Add this import at top of file
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -184,9 +185,9 @@ function HomeFeed({ onNavigateToProfile }) {
         posts.map(post => (
           <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
             
-            {/* CLICKABLE AUTHOR HEADER */}
+            {/* ✅ FIXED: Direct hash navigation for HashRouter */}
             <div 
-              onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)}
+              onClick={() => window.location.hash = `/profile/${post.author?._id}`}
               style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}
             >
               <img 
