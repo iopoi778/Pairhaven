@@ -5,7 +5,35 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 
-// POST /api/posts/:postId/react - Handle Like/Love Toggle + Send Alert
+// ✅ FIXED GET /api/posts - Populates likes/loves AND calculates user status
+router.get('/', auth, async (req, res) => {
+  try {
+    const posts = await Post.find()
+      .populate('author', 'name photos')
+      .populate('likes', '_id')   // ✅ CRITICAL: Populate likes array
+      .populate('loves', '_id')   // ✅ CRITICAL: Populate loves array
+      .sort({ createdAt: -1 });
+
+    // Transform posts to include counts and boolean flags for current user
+    const formattedPosts = posts.map(post => {
+      const postObj = post.toObject();
+      return {
+        ...postObj,
+        likesCount: post.likes.length,
+        lovesCount: post.loves.length,
+        userLiked: post.likes.some(u => u._id.toString() === req.user.userId),
+        userLoved: post.loves.some(u => u._id.toString() === req.user.userId)
+      };
+    });
+
+    res.json(formattedPosts);
+  } catch (error) {
+    console.error('Get posts error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ✅ SINGLE REACT ROUTE WITH NOTIFICATION LOGIC
 router.post('/:postId/react', auth, async (req, res) => {
   try {
     const { type } = req.body; // 'like' or 'love'
@@ -14,7 +42,7 @@ router.post('/:postId/react', auth, async (req, res) => {
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
     const userId = req.user.userId;
-    const currentUser = await User.findById(userId); // Get current user for notification message
+    const currentUser = await User.findById(userId);
     
     let isAdding = false;
     
@@ -45,49 +73,12 @@ router.post('/:postId/react', auth, async (req, res) => {
       await Notification.create({
         recipient: post.author._id,
         sender: userId,
-        type: type, // 'like' or 'love'
+        type: type,
         message: `${currentUser.name} ${actionText}`,
-        post: post._id // Optional: Link back to the specific post
+        post: post._id
       });
     }
 
-    res.json({ 
-      likesCount: post.likes.length, 
-      lovesCount: post.loves.length,
-      userLiked: post.likes.includes(userId),
-      userLoved: post.loves.includes(userId)
-    });
-  } catch (error) {
-    console.error('React error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-    res.json(formattedPosts);
-  } catch (error) {
-    console.error('Get posts error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// POST /api/posts/:postId/react - Handle Like/Love Toggle
-router.post('/:postId/react', auth, async (req, res) => {
-  try {
-    const { type } = req.body; // 'like' or 'love'
-    const post = await Post.findById(req.params.postId);
-    if (!post) return res.status(404).json({ message: 'Post not found' });
-
-    const userId = req.user.userId;
-    
-    if (type === 'like') {
-      const idx = post.likes.indexOf(userId);
-      idx === -1 ? post.likes.push(userId) : post.likes.splice(idx, 1);
-    } else if (type === 'love') {
-      const idx = post.loves.indexOf(userId);
-      idx === -1 ? post.loves.push(userId) : post.loves.splice(idx, 1);
-    }
-
-    await post.save();
     res.json({ 
       likesCount: post.likes.length, 
       lovesCount: post.loves.length,
@@ -110,7 +101,7 @@ router.post('/', auth, async (req, res) => {
       mediaUrl,
       mediaType,
       likes: [],
-      loves: [] // ✅ Ensure loves array is initialized
+      loves: []
     });
     await newPost.save();
     const populated = await Post.findById(newPost._id).populate('author', 'name photos');
