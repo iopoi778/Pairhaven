@@ -8,35 +8,29 @@ function MatchingScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   
-  // Track actions for the CURRENT profile
-  const [hasFollowed, setHasFollowed] = useState(false);
-  const [hasLiked, setHasLiked] = useState(false);
+  // Persistent history of actions keyed by userId
+  const [actionHistory, setActionHistory] = useState({});
   
   const token = localStorage.getItem('token');
+  const currentProfile = profiles[currentIndex];
+  const currentUserId = currentProfile?._id;
 
-  // Reset states when moving to next profile
-  useEffect(() => {
-    setHasFollowed(false);
-    setHasLiked(false);
-  }, [currentIndex]);
+  // Get current state from history (defaults to false)
+  const hasFollowed = actionHistory[currentUserId]?.followed || false;
+  const hasLiked = actionHistory[currentUserId]?.liked || false;
 
+  // Check follow status ONLY when loading a new profile for the first time
   useEffect(() => {
-    fetchProfiles();
-  }, []);
-
-  // Check if already following when profile loads
-  useEffect(() => {
+    if (!currentUserId || actionHistory[currentUserId]) return; // Skip if already tracked
+    
     const checkFollowStatus = async () => {
-      if (profiles.length === 0 || currentIndex >= profiles.length) return;
-      
       try {
-        const currentProfileId = profiles[currentIndex]._id;
-        const res = await axios.get(`${API_URL}/api/users/profile/${currentProfileId}`, {
+        const res = await axios.get(`${API_URL}/api/users/profile/${currentUserId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
         if (res.data.isFollowing) {
-          setHasFollowed(true);
+          updateHistory(currentUserId, 'followed', true);
         }
       } catch (err) {
         console.error("Could not check follow status", err);
@@ -44,7 +38,22 @@ function MatchingScreen() {
     };
 
     checkFollowStatus();
-  }, [currentIndex, profiles, token]);
+  }, [currentUserId]); // Only runs when userId changes AND not yet in history
+
+  // Helper to update history without triggering re-checks
+  const updateHistory = (userId, action, value) => {
+    setActionHistory(prev => ({
+      ...prev,
+      [userId]: {
+        ...(prev[userId] || {}),
+        [action]: value
+      }
+    }));
+  };
+
+  useEffect(() => {
+    fetchProfiles();
+  }, []);
 
   const fetchProfiles = async () => {
     try {
@@ -60,24 +69,21 @@ function MatchingScreen() {
     }
   };
 
-  // Handle Follow -> Auto Swipe Next
+  // Handle Follow -> Auto Swipe Next + Persist State
   const handleFollow = async () => {
-    if (currentIndex >= profiles.length || hasFollowed) return;
-    const profile = profiles[currentIndex];
+    if (!currentUserId || hasFollowed) return;
     
     try {
-      await axios.post(`${API_URL}/api/users/follow/${profile._id}`, {}, {
+      await axios.post(`${API_URL}/api/users/follow/${currentUserId}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Mark as followed AND auto-swipe
-      setHasFollowed(true);
+      updateHistory(currentUserId, 'followed', true);
       setCurrentIndex(prev => prev + 1); 
       
     } catch (err) {
-      // If already following, just swipe anyway without error
       if (err.response?.data?.message === 'Already following') {
-        setHasFollowed(true);
+        updateHistory(currentUserId, 'followed', true);
         setCurrentIndex(prev => prev + 1);
       } else {
         console.error("Follow failed", err);
@@ -85,28 +91,24 @@ function MatchingScreen() {
     }
   };
 
-  // Handle Like -> Auto Swipe Next
+  // Handle Like -> Auto Swipe Next + Persist State
   const handleLike = async () => {
-    if (currentIndex >= profiles.length || hasLiked) return;
-    const profile = profiles[currentIndex];
+    if (!currentUserId || hasLiked) return;
     
     try {
-      const res = await axios.post(`${API_URL}/api/users/like/${profile._id}`, {}, {
+      const res = await axios.post(`${API_URL}/api/users/like/${currentUserId}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Mark as liked AND auto-swipe
-      setHasLiked(true);
+      updateHistory(currentUserId, 'liked', true);
       setCurrentIndex(prev => prev + 1);
       
-      // Optional: Keep mutual match alert but remove others
       if (res.data.isMatch) {
-        alert(`It's a match with ${profile.name}!`); 
+        alert(`It's a match with ${currentProfile.name}!`); 
       }
     } catch (err) {
-      // If already liked, just swipe anyway
       if (err.response?.data?.message === 'Already liked') {
-        setHasLiked(true);
+        updateHistory(currentUserId, 'liked', true);
         setCurrentIndex(prev => prev + 1);
       } else {
         console.error("Like failed", err);
@@ -135,8 +137,6 @@ function MatchingScreen() {
       </div>
     );
   }
-
-  const currentProfile = profiles[currentIndex];
 
   return (
     <div style={{ padding: '1rem', textAlign: 'center', paddingBottom: '90px' }}>
@@ -174,7 +174,7 @@ function MatchingScreen() {
           ✕
         </button>
 
-        {/* FOLLOW BUTTON */}
+        {/* FOLLOW BUTTON - PERSISTENT STATE */}
         <button 
           onClick={handleFollow}
           disabled={hasFollowed}
@@ -192,7 +192,7 @@ function MatchingScreen() {
           {hasFollowed ? '✓' : '👤+'}
         </button>
 
-        {/* LIKE BUTTON */}
+        {/* LIKE BUTTON - PERSISTENT STATE */}
         <button 
           onClick={handleLike}
           disabled={hasLiked}
