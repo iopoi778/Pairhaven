@@ -153,9 +153,10 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {renderContent()}
       </main>
 
+      {/* ✅ NAV BAR WITH ALL 5 ICONS GUARANTEED */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
-          { id: 'home', label: 'Home', icon: '🏠' },
+          { id: 'home', label: 'Home', icon: '' },
           { id: 'matching', label: 'Match', icon: '💖' },
           { id: 'messages', label: 'Chat', icon: '', count: navCounts?.chat },
           { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
@@ -313,7 +314,7 @@ function HomeFeed({ onNavigateToProfile }) {
   );
 }
 
-// ✅ NEW: ANIMATED LOGIN PAGE WITH ROMANTIC SLIDESHOW
+// ✅ MOBILE-OPTIMIZED ANIMATED LOGIN PAGE
 function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -335,49 +336,52 @@ function LoginPage() {
   return (
     <div style={{ 
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-      overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' 
+      overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#000' // Prevents white flash before images load
     }}>
-      {/* ✅ BACKGROUND ANIMATION LAYER */}
+      {/* ✅ BACKGROUND ANIMATION LAYER - OPTIMIZED FOR PHONE */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         <style>{`
           @keyframes fadeSlide {
-            0% { opacity: 0; transform: scale(1.05); }
-            10% { opacity: 1; transform: scale(1); }
-            33% { opacity: 1; transform: scale(1); }
-            43% { opacity: 0; transform: scale(1.05); }
+            0% { opacity: 0; }
+            10% { opacity: 1; }
+            33% { opacity: 1; }
+            43% { opacity: 0; }
             100% { opacity: 0; }
           }
           .bg-slide {
             position: absolute; inset: 0; 
             background-size: cover; background-position: center;
             opacity: 0; animation: fadeSlide 18s infinite;
+            /* ✅ REMOVED SCALE TRANSFORM TO PREVENT BLURRING ON MOBILE */
           }
-          .bg-1 { animation-delay: 0s; background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=2000&auto=format&fit=crop'); }
-          .bg-2 { animation-delay: 6s; background-image: url('https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?q=80&w=2000&auto=format&fit=crop'); }
-          .bg-3 { animation-delay: 12s; background-image: url('https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2000&auto=format&fit=crop'); }
+          .bg-1 { animation-delay: 0s; background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=1080&auto=format&fit=crop'); }
+          .bg-2 { animation-delay: 6s; background-image: url('https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?q=80&w=1080&auto=format&fit=crop'); }
+          .bg-3 { animation-delay: 12s; background-image: url('https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1080&auto=format&fit=crop'); }
         `}</style>
         <div className="bg-slide bg-1"></div>
         <div className="bg-slide bg-2"></div>
         <div className="bg-slide bg-3"></div>
         {/* Dark overlay for readability */}
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }}></div>
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}></div>
       </div>
 
-      {/* ✅ LOGIN FORM CARD */}
+      {/* ✅ LOGIN FORM CARD - MOBILE SAFE PADDING */}
       <div style={{ 
-        position: 'relative', zIndex: 1, width: '100%', maxWidth: 400, 
-        background: '#fff', padding: '2.5rem', borderRadius: '16px', 
-        boxShadow: '0 10px 40px rgba(0,0,0,0.2)', margin: '1rem' 
+        position: 'relative', zIndex: 1, width: '90%', maxWidth: 400, 
+        background: '#fff', padding: '2rem 1.5rem', borderRadius: '16px', 
+        boxShadow: '0 10px 40px rgba(0,0,0,0.3)', margin: '1rem',
+        maxHeight: '90vh', overflowY: 'auto' // ✅ PREVENTS CUT-OFF ON SMALL PHONES
       }}>
-        <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '1.5rem' }}>Welcome Back</h2>
+        <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '1.5rem', fontSize: '1.8rem' }}>Welcome Back</h2>
         <form onSubmit={handleSubmit}>
           <input name="email" type="email" placeholder="Email" required autoComplete="email" style={inputStyle} />
           <input name="password" type="password" placeholder="Password" required autoComplete="current-password" style={inputStyle} />
-          <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1, marginTop: '0.5rem' }} disabled={loading}>
+          <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1, marginTop: '0.5rem', padding: '1rem' }} disabled={loading}>
             {loading ? 'Logging in...' : 'Log In'}
           </button>
         </form>
-        <p style={{ textAlign: 'center', marginTop: '1.5rem', color: '#666' }}>
+        <p style={{ textAlign: 'center', marginTop: '1.5rem', color: '#666', fontSize: '0.95rem' }}>
           New here? <span onClick={() => navigate('/register')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}>Create Account</span>
         </p>
       </div>
