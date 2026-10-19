@@ -120,14 +120,23 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// ✅ DELETE POST - FIXES THE 404 ERROR
+// ✅ DELETE POST - FIXED AUTHORIZATION CHECK
 router.delete('/:postId', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
     if (!post) return res.status(404).json({ message: 'Post not found' });
     
-    if (post.author.toString() !== req.user.userId) {
-      return res.status(403).json({ message: 'Unauthorized' });
+    // ✅ SAFE COMPARISON: Convert both to strings before comparing
+    const postAuthorId = post.author.toString();
+    const currentUserId = req.user.userId.toString();
+    
+    console.log(`Delete attempt: Post author=${postAuthorId}, Current user=${currentUserId}`);
+    
+    if (postAuthorId !== currentUserId) {
+      return res.status(403).json({ 
+        message: 'Unauthorized',
+        debug: { postAuthor: postAuthorId, currentUser: currentUserId }
+      });
     }
     
     await Post.findByIdAndDelete(req.params.postId);
