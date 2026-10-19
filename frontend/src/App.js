@@ -33,17 +33,18 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           
-          {/* Dynamic Profile Route - MUST be before generic "/" */}
-          <Route path="/profile/:userId" element={
-            <ProtectedRoute>
-              <DashboardLayout activeTabOverride="profile">
+          {/* ✅ FIXED: Dynamic Profile Route for HashRouter */}
+          <Route 
+            path="/profile/*" 
+            element={
+              <ProtectedRoute>
                 <ProfileRouteWrapper />
-              </DashboardLayout>
-            </ProtectedRoute>
-          } />
+              </ProtectedRoute>
+            } 
+          />
 
           {/* Default Self Profile & Dashboard */}
-          <Route path="/" element={
+          <Route path="/*" element={
             <ProtectedRoute>
               <DashboardLayout />
             </ProtectedRoute>
@@ -51,6 +52,20 @@ function App() {
         </Routes>
       </div>
     </Router>
+  );
+}
+
+// ✅ NEW: Wrapper that manually parses userId from window.location.hash
+function ProfileRouteWrapper() {
+  // HashRouter stores path after #/
+  const hash = window.location.hash;
+  const parts = hash.replace('#/', '').split('/');
+  const userId = parts[1]; // /profile/USERID -> parts[1] is USERID
+  
+  return (
+    <DashboardLayout activeTabOverride="profile">
+      <ProfileScreen userId={userId} />
+    </DashboardLayout>
   );
 }
 
