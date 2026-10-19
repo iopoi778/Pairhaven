@@ -7,6 +7,7 @@ function MatchingScreen() {
   const [profiles, setProfiles] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const token = localStorage.getItem('token');
 
   useEffect(() => {
     fetchProfiles();
@@ -14,7 +15,6 @@ function MatchingScreen() {
 
   const fetchProfiles = async () => {
     try {
-      const token = localStorage.getItem('token');
       const res = await axios.get(`${API_URL}/api/matches/random`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -27,35 +27,53 @@ function MatchingScreen() {
     }
   };
 
-  const handleSwipe = async (liked) => {
+  // EXISTING: Handle Like (Heart Button)
+  const handleLike = async () => {
     if (currentIndex >= profiles.length) return;
-    
     const profile = profiles[currentIndex];
-    const token = localStorage.getItem('token');
-
+    
     try {
-      if (liked) {
-        // Call your like endpoint
-        await axios.post(`${API_URL}/api/users/like/${profile._id}`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      }
+      await axios.post(`${API_URL}/api/users/like/${profile._id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
-      // Move to next profile
-      if (currentIndex + 1 < profiles.length) {
-        setCurrentIndex(prev => prev + 1);
-      } else {
-        // No more profiles
-        setCurrentIndex(profiles.length); 
-      }
+      // Move to next profile after liking
+      setCurrentIndex(prev => prev + 1);
     } catch (err) {
-      console.error("Swipe action failed", err);
+      console.error("Like failed", err);
+      alert(err.response?.data?.message || "Failed to like");
+    }
+  };
+
+  // NEW: Handle Follow (Plus/Follow Button)
+  const handleFollow = async () => {
+    if (currentIndex >= profiles.length) return;
+    const profile = profiles[currentIndex];
+    
+    try {
+      await axios.post(`${API_URL}/api/users/follow/${profile._id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      alert(`Successfully followed ${profile.name}!`);
+      // Optional: Move to next profile or stay on same one
+      // setCurrentIndex(prev => prev + 1); 
+    } catch (err) {
+      console.error("Follow failed", err);
+      alert(err.response?.data?.message || "Failed to follow");
+    }
+  };
+
+  // EXISTING: Handle Pass/Cancel (X Button)
+  const handlePass = () => {
+    if (currentIndex < profiles.length) {
+      setCurrentIndex(prev => prev + 1);
     }
   };
 
   if (loading) return <div style={{padding:'2rem', textAlign:'center'}}>Loading...</div>;
 
-  // If no profiles or finished swiping
+  // Empty State
   if (profiles.length === 0 || currentIndex >= profiles.length) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
@@ -73,7 +91,7 @@ function MatchingScreen() {
   const currentProfile = profiles[currentIndex];
 
   return (
-    <div style={{ padding: '1rem', textAlign: 'center' }}>
+    <div style={{ padding: '1rem', textAlign: 'center', paddingBottom: '90px' }}>
       <h3>Find Matches</h3>
       
       {/* Profile Card */}
@@ -89,23 +107,47 @@ function MatchingScreen() {
         <div style={{ padding: '1.5rem', textAlign: 'left' }}>
           <h2 style={{ margin: '0 0 0.5rem' }}>{currentProfile.name}, {currentProfile.age}</h2>
           <p style={{ color: '#666', margin: '0 0 1rem' }}>{currentProfile.bio || 'No bio yet.'}</p>
-          {currentProfile.location && (
-            <p style={{ fontSize: '0.9rem', color: '#888' }}>📍 {currentProfile.location.address || 'Location available'}</p>
-          )}
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', marginTop: '1.5rem' }}>
+      {/* ACTION BUTTONS: Cancel, Follow, Like */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '1.5rem' }}>
+        
+        {/* CANCEL / PASS BUTTON */}
         <button 
-          onClick={() => handleSwipe(false)}
-          style={{ width: '60px', height: '60px', borderRadius: '50%', border: '2px solid #ef4444', background: '#fff', fontSize: '1.5rem', cursor: 'pointer', color: '#ef4444' }}
+          onClick={handlePass}
+          style={{ 
+            width: '60px', height: '60px', borderRadius: '50%', 
+            border: '2px solid #ef4444', background: '#fff', 
+            fontSize: '1.5rem', cursor: 'pointer', color: '#ef4444',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
         >
           ✕
         </button>
+
+        {/* NEW: FOLLOW BUTTON */}
         <button 
-          onClick={() => handleSwipe(true)}
-          style={{ width: '60px', height: '60px', borderRadius: '50%', border: '2px solid #10b981', background: '#fff', fontSize: '1.5rem', cursor: 'pointer', color: '#10b981' }}
+          onClick={handleFollow}
+          style={{ 
+            width: '60px', height: '60px', borderRadius: '50%', 
+            border: '2px solid #3b82f6', background: '#fff', 
+            fontSize: '1.5rem', cursor: 'pointer', color: '#3b82f6',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
+        >
+          👤+
+        </button>
+
+        {/* LIKE BUTTON */}
+        <button 
+          onClick={handleLike}
+          style={{ 
+            width: '60px', height: '60px', borderRadius: '50%', 
+            border: '2px solid #10b981', background: '#fff', 
+            fontSize: '1.5rem', cursor: 'pointer', color: '#10b981',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
         >
           ♥
         </button>
