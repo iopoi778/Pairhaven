@@ -12,21 +12,27 @@ function MatchingScreen() {
   
   const token = localStorage.getItem('token');
   
-  // ✅ FRESH USER STATE - NOT FROM LOCALSTORAGE
+  // ✅ FRESH USER STATE
   const [freshUser, setFreshUser] = useState(null);
 
-  // ✅ SYNC USER DATA ON MOUNT
+  // ✅ SYNC USER DATA ON MOUNT WITH DEBUG LOGS
   useEffect(() => {
     const syncUserData = async () => {
       try {
+        console.log("🔄 Fetching fresh user data...");
         const res = await axios.get(`${API_URL}/api/users/profile/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
+        console.log("✅ Fresh User Data:", res.data);
+        console.log("📋 Matches Array:", res.data.matches);
+        console.log("📤 Requests Sent:", res.data.requestsSent);
+        console.log("📥 Requests Received:", res.data.requestsReceived);
+        
         setFreshUser(res.data);
-        localStorage.setItem('user', JSON.stringify(res.data)); // Update localStorage too
+        localStorage.setItem('user', JSON.stringify(res.data));
       } catch (err) {
-        console.error("Failed to sync user data", err);
+        console.error("❌ Failed to sync user data", err);
       } finally {
         setLoading(false);
       }
@@ -84,6 +90,7 @@ function MatchingScreen() {
     } catch (err) {
       // Handle "Already Matched" as success
       if (err.response?.status === 400 && err.response?.data?.message === 'Already matched') {
+        console.log("⚠️ Already matched - refreshing UI...");
         await refreshData();
       } else if (err.response?.status !== 400) {
         alert(err.response?.data?.message || "Action failed");
@@ -101,6 +108,9 @@ function MatchingScreen() {
         axios.get(`${API_URL}/api/users/potential-matches`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
       
+      console.log("🔄 Refreshed User Data:", userRes.data);
+      console.log("📋 Updated Matches:", userRes.data.matches);
+      
       setFreshUser(userRes.data);
       localStorage.setItem('user', JSON.stringify(userRes.data));
       setUsers(matchesRes.data || []);
@@ -109,13 +119,22 @@ function MatchingScreen() {
     }
   };
 
-  // ✅ USE freshUser.matches INSTEAD OF STALE localStorage
+  // ✅ BUTTON CONFIG WITH DEBUG LOGS
   const getButtonConfig = (targetUser) => {
     if (!freshUser) return { label: '...', disabled: true };
     
     const isMatched = (freshUser.matches || []).includes(targetUser._id);
     const hasSentRequest = (freshUser.requestsSent || []).includes(targetUser._id);
     const hasReceivedRequest = (freshUser.requestsReceived || []).includes(targetUser._id);
+
+    // Debug log for James Galloges (replace with actual ID if different)
+    if (targetUser.name === 'James Galloges') {
+      console.log(`🔍 Button check for ${targetUser.name}:`);
+      console.log(`   - Is Matched: ${isMatched}`);
+      console.log(`   - Has Sent Request: ${hasSentRequest}`);
+      console.log(`   - Has Received Request: ${hasReceivedRequest}`);
+      console.log(`   - My Matches Array:`, freshUser.matches);
+    }
 
     if (isMatched) {
       return { 
@@ -179,7 +198,7 @@ function MatchingScreen() {
                   {btnConfig.dualButtons ? (
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <button onClick={() => handleMatchAction(user, 'accept')} disabled={isLoading} style={{ flex: 1, background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem', cursor: isLoading ? 'wait' : 'pointer' }}>✅</button>
-                      <button onClick={() => handleMatchAction(user, 'decline')} disabled={isLoading} style={{ flex: 1, background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem', cursor: isLoading ? 'wait' : 'pointer' }}></button>
+                      <button onClick={() => handleMatchAction(user, 'decline')} disabled={isLoading} style={{ flex: 1, background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem', cursor: isLoading ? 'wait' : 'pointer' }}>❌</button>
                     </div>
                   ) : (
                     <button 
