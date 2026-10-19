@@ -51,46 +51,37 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
 function App() {
   const [navCounts, setNavCounts] = useState({ chat: 0, alerts: 0 });
 
-  // ✅ BULLETPROOF COUNT FETCHER
+  // ✅ ROBUST COUNT FETCHER WITH FALLBACKS
   const fetchNavCounts = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
     
     try {
-      console.log("🔍 Fetching nav counts...");
-      
-      // ✅ CHAT COUNTS - Handle missing unreadCount field
+      // ✅ CHAT COUNTS - Handle missing unreadCount field safely
       let totalUnreadMsgs = 0;
       try {
         const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, { 
           headers: { Authorization: `Bearer ${token}` } 
         });
         
-        console.log(" Conversations:", msgRes.data);
-        
         totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => {
-          // Fallback: if unreadCount is missing, check messages array length or default to 0
+          // Fallback: if unreadCount is missing, check messages array or default to 0
           const count = c.unreadCount ?? (c.messages?.filter(m => !m.read).length ?? 0);
           return sum + (count || 0);
         }, 0);
-        
-        console.log(`✅ Total unread messages: ${totalUnreadMsgs}`);
       } catch (err) {
-        console.error("❌ Chat count failed:", err.response?.status, err.message);
+        console.error(" Chat count failed:", err.response?.status, err.message);
       }
 
-      // ✅ ALERT COUNTS - Handle missing read field
+      // ✅ ALERT COUNTS - Handle undefined 'read' field safely
       let unreadNotifs = 0;
       try {
         const notifRes = await axios.get(`${API_URL}/api/notifications`, { 
           headers: { Authorization: `Bearer ${token}` } 
         });
         
-        console.log(" Notifications:", notifRes.data);
-        
+        // Filter strictly for read === false to avoid counting undefined as unread
         unreadNotifs = (notifRes.data || []).filter(n => n.read === false).length;
-        
-        console.log(`✅ Total unread notifications: ${unreadNotifs}`);
       } catch (err) {
         console.error("❌ Alert count failed:", err.response?.status, err.message);
       }
@@ -146,7 +137,7 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
     }
   };
 
-  // ✅ RENDER BADGE FUNCTION
+  // ✅ RENDER BADGE FUNCTION - Placed before return
   const renderBadge = (count) => {
     if (!count || count <= 0) return null;
     return (
@@ -178,14 +169,14 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {renderContent()}
       </main>
 
-      {/* ✅ NAV BAR WITH ICONS & BADGES */}
+      {/* ✅ NAV BAR WITH ALL ICONS RESTORED & BADGES */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
           { id: 'home', label: 'Home', icon: '🏠' },
           { id: 'matching', label: 'Match', icon: '💖' },
-          { id: 'messages', label: 'Chat', icon: '📥', count: navCounts?.chat },
-          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
-          { id: 'profile', label: 'Profile', icon: '👤' }
+          { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },   // ✅ RESTORED Chat Icon
+          { id: 'notifications', label: 'Alerts', icon: '', count: navCounts?.alerts },
+          { id: 'profile', label: 'Profile', icon: '👤' }                        // ✅ RESTORED Profile Icon
         ].map(tab => (
           <button 
             key={tab.id} 
