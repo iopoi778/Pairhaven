@@ -13,11 +13,12 @@ function ProfileScreen({ userId }) {
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   
-  // ✅ NEW: Post Creation State
+  // Post Creation State
   const [showPostModal, setShowPostModal] = useState(false);
   const [newPostText, setNewPostText] = useState('');
   const [newPostMedia, setNewPostMedia] = useState(null);
   const [posting, setPosting] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const token = localStorage.getItem('token');
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -45,30 +46,84 @@ function ProfileScreen({ userId }) {
     if (token) fetchData();
   }, [userId, token]);
 
-  // ✅ NEW: Handle Post Submission
+  // ✅ NEW: Match Request Handlers
+  const handleSendRequest = async () => {
+    setActionLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/users/request/${user._id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Optimistic update
+      setUser(prev => ({ 
+        ...prev, 
+        requestsSent: [...(prev.requestsSent || []), currentUser._id] 
+      }));
+      alert("Match request sent!");
+    } catch (err) { 
+      alert(err.response?.data?.message || "Failed to send request"); 
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAcceptRequest = async () => {
+    setActionLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/users/accept-request/${user._id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Optimistic update
+      setUser(prev => ({ 
+        ...prev, 
+        matches: [...(prev.matches || []), currentUser._id],
+        requestsReceived: (prev.requestsReceived || []).filter(id => id !== currentUser._id)
+      }));
+      alert("Match accepted! You can now chat.");
+    } catch (err) { 
+      alert(err.response?.data?.message || "Failed to accept request"); 
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeclineRequest = async () => {
+    setActionLoading(true);
+    try {
+      await axios.delete(`${API_URL}/api/users/request/${user._id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(prev => ({ 
+        ...prev, 
+        requestsReceived: (prev.requestsReceived || []).filter(id => id !== currentUser._id)
+      }));
+    } catch (err) { 
+      alert("Failed to decline request"); 
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleOpenChat = () => {
+    localStorage.setItem('activeTab', 'messages');
+    window.location.hash = '/';
+  };
+
+  // Existing handlers remain unchanged
   const handleCreatePost = async () => {
     if (!newPostText.trim() && !newPostMedia) return;
     setPosting(true);
-
     const formData = new FormData();
     formData.append('text', newPostText);
     if (newPostMedia) formData.append('media', newPostMedia);
-
     try {
       const res = await axios.post(`${API_URL}/api/posts`, formData, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
       });
-      
-      // Add new post to top of list
       setPosts(prev => [res.data, ...prev]);
       setNewPostText('');
       setNewPostMedia(null);
       setShowPostModal(false);
     } catch (err) {
-      console.error("Post creation failed", err);
       alert(err.response?.data?.message || "Failed to create post");
     } finally {
       setPosting(false);
@@ -137,53 +192,27 @@ function ProfileScreen({ userId }) {
   return (
     <div style={{ padding: '1rem', paddingBottom: '90px', position: 'relative' }}>
       
-      {/* ✅ INSTAGRAM-STYLE POST MODAL OVERLAY */}
+      {/* POST MODAL */}
       {showPostModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.8)', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '1rem'
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px',
-            maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem'
-          }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0 }}>New Post</h3>
-              <button onClick={() => setShowPostModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+              <button onClick={() => setShowPostModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}></button>
             </div>
-            
-            <textarea 
-              value={newPostText}
-              onChange={e => setNewPostText(e.target.value)}
-              placeholder="What's on your mind?"
-              rows="4"
-              style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '0.8rem', resize: 'none', fontSize: '1rem', boxSizing: 'border-box' }}
-            />
-            
+            <textarea value={newPostText} onChange={e => setNewPostText(e.target.value)} placeholder="What's on your mind?" rows="4" style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '0.8rem', resize: 'none', fontSize: '1rem', boxSizing: 'border-box' }} />
             {newPostMedia && (
               <div style={{ marginTop: '1rem', position: 'relative' }}>
                 <img src={URL.createObjectURL(newPostMedia)} alt="Preview" style={{ width: '100%', borderRadius: '8px', maxHeight: '200px', objectFit: 'cover' }} />
                 <button onClick={() => setNewPostMedia(null)} style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#fff', border: '1px solid #ddd', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer' }}>×</button>
               </div>
             )}
-            
             <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <label style={{ cursor: 'pointer', color: '#5b72f2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
                 📷 Add Photo
                 <input type="file" accept="image/*" onChange={e => setNewPostMedia(e.target.files[0])} style={{ display: 'none' }} />
               </label>
-              
-              <button 
-                onClick={handleCreatePost}
-                disabled={posting || (!newPostText.trim() && !newPostMedia)}
-                style={{
-                  marginLeft: 'auto', background: '#5b72f2', color: '#fff', border: 'none',
-                  borderRadius: '20px', padding: '0.6rem 1.5rem', fontWeight: 600,
-                  cursor: posting ? 'wait' : 'pointer', opacity: posting ? 0.7 : 1
-                }}
-              >
+              <button onClick={handleCreatePost} disabled={posting || (!newPostText.trim() && !newPostMedia)} style={{ marginLeft: 'auto', background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', fontWeight: 600, cursor: posting ? 'wait' : 'pointer', opacity: posting ? 0.7 : 1 }}>
                 {posting ? 'Posting...' : 'Share'}
               </button>
             </div>
@@ -191,71 +220,22 @@ function ProfileScreen({ userId }) {
         </div>
       )}
 
-      {/* ✅ FLOATING "+" BUTTON (Instagram Style) - Only on own profile */}
+      {/* FLOATING "+" BUTTON */}
       {isOwnProfile && (
-        <button 
-          onClick={() => setShowPostModal(true)}
-          style={{
-            position: 'fixed',
-            bottom: '90px',
-            left: '20px', // Opposite side of logout
-            background: '#5b72f2',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '50%',
-            width: '56px',
-            height: '56px',
-            fontSize: '2rem',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(91, 114, 242, 0.4)',
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'transform 0.2s'
-          }}
-          onMouseOver={e => e.target.style.transform = 'scale(1.1)'}
-          onMouseOut={e => e.target.style.transform = 'scale(1)'}
-        >
-          +
-        </button>
+        <button onClick={() => setShowPostModal(true)} style={{ position: 'fixed', bottom: '90px', left: '20px', background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '50%', width: '56px', height: '56px', fontSize: '2rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(91, 114, 242, 0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s' }} onMouseOver={e => e.target.style.transform = 'scale(1.1)'} onMouseOut={e => e.target.style.transform = 'scale(1)'}>+</button>
       )}
 
-      {/* ✅ FIXED LOGOUT BUTTON: Bottom right, only on own profile */}
+      {/* LOGOUT BUTTON */}
       {isOwnProfile && (
-        <button 
-          onClick={handleLogout}
-          style={{
-            position: 'fixed',
-            bottom: '90px',
-            right: '20px',
-            background: '#fff',
-            color: '#e53e3e',
-            border: '1px solid #fee2e2',
-            borderRadius: '50px',
-            padding: '0.6rem 1.2rem',
-            fontSize: '0.9rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(229, 62, 62, 0.15)',
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
+        <button onClick={handleLogout} style={{ position: 'fixed', bottom: '90px', right: '20px', background: '#fff', color: '#e53e3e', border: '1px solid #fee2e2', borderRadius: '50px', padding: '0.6rem 1.2rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(229, 62, 62, 0.15)', zIndex: 100, display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span>🚪</span> Logout
         </button>
       )}
 
-      {/* Profile Picture Section */}
+      {/* PROFILE PICTURE SECTION */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
         <div style={{ position: 'relative' }}>
-          <img 
-            src={getAvatarUrl()} 
-            alt={user.name}
-            style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
-          />
+          <img src={getAvatarUrl()} alt={user.name} style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
           {isOwnProfile && (
             <label style={{ position: 'absolute', bottom: 0, right: 0, background: '#5b72f2', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploadingPhoto ? 'wait' : 'pointer', border: '2px solid #fff', fontSize: '1rem' }}>
               📷
@@ -268,24 +248,51 @@ function ProfileScreen({ userId }) {
           {user.age ? `${user.age} years old` : ''} 
           {user.location?.address ? ` • ${user.location.address}` : ''}
         </p>
+        
+        {/* ✅ MATCH ACTION BUTTONS - REPLACES FOLLOWERS/FOLLOWING */}
+        {!isOwnProfile && (
+          <div style={{ display: 'flex', gap: '10px', marginTop: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {/* PENDING REQUEST SENT BY ME */}
+            {currentUser.requestsSent?.includes(user._id) && (
+              <button disabled style={{ background: '#ccc', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: 'not-allowed', fontSize: '0.9rem' }}>⏳ Request Sent</button>
+            )}
+
+            {/* RECEIVED REQUEST - SHOW ACCEPT/DECLINE */}
+            {currentUser.requestsReceived?.includes(user._id) && (
+              <>
+                <button onClick={handleAcceptRequest} disabled={actionLoading} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: actionLoading ? 'wait' : 'pointer', fontSize: '0.9rem' }}>✅ Accept Match</button>
+                <button onClick={handleDeclineRequest} disabled={actionLoading} style={{ background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: actionLoading ? 'wait' : 'pointer', fontSize: '0.9rem' }}>❌ Decline</button>
+              </>
+            )}
+
+            {/* ALREADY MATCHED - SHOW CHAT BUTTON */}
+            {currentUser.matches?.includes(user._id) && (
+              <button onClick={handleOpenChat} style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>💬 Message</button>
+            )}
+
+            {/* NO RELATIONSHIP YET - SHOW SEND REQUEST */}
+            {!currentUser.requestsSent?.includes(user._id) && 
+             !currentUser.requestsReceived?.includes(user._id) && 
+             !currentUser.matches?.includes(user._id) && (
+              <button onClick={handleSendRequest} disabled={actionLoading} style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: actionLoading ? 'wait' : 'pointer', fontSize: '0.9rem' }}>❤️ Send Match Request</button>
+            )}
+          </div>
+        )}
+
         {isOwnProfile && (
           <button onClick={handleTogglePrivacy} style={{ marginTop: '0.8rem', background: user.isPrivate ? '#e53e3e' : '#10b981', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-            {user.isPrivate ? '🔒 Private' : ' Public'}
+            {user.isPrivate ? '🔒 Private' : '🌍 Public'}
           </button>
         )}
       </div>
 
-      {/* Stats Row */}
+      {/* ✅ UPDATED STATS ROW - REMOVED FOLLOWERS/FOLLOWING */}
       <div style={{ display: 'flex', justifyContent: 'space-around', padding: '1rem 0', borderTop: '1px solid #eee', borderBottom: '1px solid #eee', marginBottom: '1.5rem' }}>
         <div style={{textAlign:'center'}}><strong>{posts.length}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Posts</span></div>
-        <div style={{textAlign:'center'}}><strong>{user.followersCount}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Followers</span></div>
-        <div style={{textAlign:'center'}}><strong>{user.matchesCount}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Matches</span></div>
-        {isOwnProfile && (
-          <div style={{textAlign:'center'}}><strong>{user.followingCount}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Following</span></div>
-        )}
+        <div style={{textAlign:'center'}}><strong>{user.matchesCount || 0}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Matches</span></div>
       </div>
 
-      {/* Bio Section */}
+      {/* BIO SECTION */}
       <div style={{ background: '#f9f9f9', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
         {isEditingBio ? (
           <>
@@ -303,7 +310,7 @@ function ProfileScreen({ userId }) {
         )}
       </div>
 
-      {/* Posts Grid */}
+      {/* POSTS GRID */}
       <h3 style={{ marginBottom: '1rem' }}>Posts</h3>
       {posts.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
