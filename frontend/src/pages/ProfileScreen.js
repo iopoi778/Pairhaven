@@ -108,25 +108,33 @@ function ProfileScreen({ userId }) {
   };
 
   const handleCreatePost = async () => {
-    if (!newPostText.trim() && !newPostMedia) return;
-    setPosting(true);
-    const formData = new FormData();
-    formData.append('text', newPostText);
-    if (newPostMedia) formData.append('media', newPostMedia);
-    try {
-      const res = await axios.post(`${API_URL}/api/posts`, formData, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
-      });
-      setPosts(prev => [res.data, ...prev]);
-      setNewPostText('');
-      setNewPostMedia(null);
-      setShowPostModal(false);
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to create post");
-    } finally {
-      setPosting(false);
-    }
-  };
+  if (!newPostText.trim() && !newPostMedia) return;
+  setPosting(true);
+  
+  const formData = new FormData();
+  formData.append('text', newPostText);
+  if (newPostMedia) {
+    formData.append('media', newPostMedia); // Send File object directly
+  }
+  
+  try {
+    const res = await axios.post(`${API_URL}/api/posts`, formData, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data' // Required for file uploads
+      }
+    });
+    
+    setPosts(prev => [res.data, ...prev]);
+    setNewPostText('');
+    setNewPostMedia(null);
+    setShowPostModal(false);
+  } catch (err) {
+    alert(err.response?.data?.message || "Failed to create post");
+  } finally {
+    setPosting(false);
+  }
+};
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
