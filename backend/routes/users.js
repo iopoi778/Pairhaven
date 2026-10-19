@@ -148,15 +148,23 @@ router.post('/', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-// DELETE POST
+// DELETE POST - FIX 404 ERROR
 router.delete('/posts/:postId', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
-    if (!post) return res.status(404).json({ message: 'Not found' });
-    if (post.author.toString() !== req.user.userId) return res.status(403).json({ message: 'Unauthorized' });
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+    
+    // Verify ownership
+    if (post.author.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+    
     await Post.findByIdAndDelete(req.params.postId);
-    res.json({ message: 'Deleted' });
-  } catch (error) { res.status(500).json({ message: error.message }); }
+    res.json({ message: 'Deleted successfully' });
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
 
 // ⚠️ TEMPORARY CLEANUP ROUTE - RUN ONCE THEN DELETE THIS BLOCK
