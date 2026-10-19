@@ -19,37 +19,24 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
-// ✅ FIXED: useEffect moved BEFORE all conditional returns
 function ProfileRouteWrapper({ onUpdateCounts }) {
   const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   
-  // Parse hash manually: #/profile/USERID
   const hashPath = window.location.hash.replace('#', '') || '/';
   const parts = hashPath.split('/').filter(Boolean);
   
-  // ✅ HOOK MUST BE CALLED FIRST - unconditional execution
   useEffect(() => {
-    // Only fetch counts if we are actually viewing a valid OTHER user's profile
     if (parts[0] === 'profile' && parts[1] && parts[1] !== currentUser._id) {
       if (onUpdateCounts) onUpdateCounts();
     }
   }, [hashPath]); 
 
-  // NOW it's safe to do conditional returns
-  if (parts[0] === 'profile' && !parts[1]) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (parts[0] !== 'profile') {
-    return <Navigate to="/" replace />;
-  }
+  if (parts[0] === 'profile' && !parts[1]) return <Navigate to="/" replace />;
+  if (parts[0] !== 'profile') return <Navigate to="/" replace />;
 
   const userId = parts[1];
-  
-  if (userId === currentUser._id) {
-    return <Navigate to="/" replace />;
-  }
+  if (userId === currentUser._id) return <Navigate to="/" replace />;
 
   return (
     <DashboardLayout 
@@ -65,31 +52,18 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
 function App() {
   const [navCounts, setNavCounts] = useState({ chat: 0, alerts: 0 });
 
-  // Function to fetch unread counts
   const fetchNavCounts = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
-
     try {
-      // Fetch unread messages count
-      const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, { headers: { Authorization: `Bearer ${token}` } });
       const totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-
-      // Fetch unread notifications count
-      const notifRes = await axios.get(`${API_URL}/api/notifications`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const notifRes = await axios.get(`${API_URL}/api/notifications`, { headers: { Authorization: `Bearer ${token}` } });
       const unreadNotifs = (notifRes.data || []).filter(n => !n.read).length;
-
       setNavCounts({ chat: totalUnreadMsgs, alerts: unreadNotifs });
-    } catch (err) {
-      console.error("Failed to fetch nav counts", err);
-    }
+    } catch (err) { console.error("Failed to fetch nav counts", err); }
   };
 
-  // Initial fetch on mount
   useEffect(() => {
     fetchNavCounts();
     const interval = setInterval(fetchNavCounts, 30000);
@@ -102,23 +76,8 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          
-          {/* ✅ Dynamic Profile Route */}
-          <Route 
-            path="/profile/*" 
-            element={
-              <ProtectedRoute>
-                <ProfileRouteWrapper onUpdateCounts={fetchNavCounts} />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Default Dashboard & Self Profile */}
-          <Route path="/*" element={
-            <ProtectedRoute>
-              <DashboardLayout navCounts={navCounts} onUpdateCounts={fetchNavCounts} />
-            </ProtectedRoute>
-          } />
+          <Route path="/profile/*" element={<ProtectedRoute><ProfileRouteWrapper onUpdateCounts={fetchNavCounts} /></ProtectedRoute>} />
+          <Route path="/*" element={<ProtectedRoute><DashboardLayout navCounts={navCounts} onUpdateCounts={fetchNavCounts} /></ProtectedRoute>} />
         </Routes>
       </div>
     </Router>
@@ -127,30 +86,18 @@ function App() {
 
 function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, navCounts, onUpdateCounts }) {
   const [activeTab, setActiveTab] = useState('home');
-  const navigate = useNavigate();
-
   const currentTab = activeTabOverride || activeTab;
 
-  // Refresh counts when tab changes AND handle localStorage tab signals from notifications
   useEffect(() => {
     if (onUpdateCounts) onUpdateCounts();
-    
-    // ✅ NEW: Check for tab signal from notifications
     const savedTab = localStorage.getItem('activeTab');
-    if (savedTab) {
-      setActiveTab(savedTab);
-      localStorage.removeItem('activeTab'); // Clear after use
-    }
+    if (savedTab) { setActiveTab(savedTab); localStorage.removeItem('activeTab'); }
   }, [currentTab]);
 
-  // Sync override state
-  useEffect(() => {
-    if (activeTabOverride) setActiveTab(activeTabOverride);
-  }, [activeTabOverride]);
+  useEffect(() => { if (activeTabOverride) setActiveTab(activeTabOverride); }, [activeTabOverride]);
 
   const renderContent = () => {
     if (children) return children;
-
     switch (currentTab) {
       case 'home': return <HomeFeed onNavigateToProfile={(id) => window.location.hash = `/profile/${id}`} />;
       case 'matching': return <MatchingScreen />;
@@ -161,24 +108,12 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    delete axios.defaults.headers.common['Authorization'];
-    navigate('/login', { replace: true });
-  };
+  // ✅ handleLogout REMOVED FROM HERE - MOVED TO PROFILE SCREEN
 
-  // Helper to render badge
   const renderBadge = (count) => {
     if (!count || count <= 0) return null;
     return (
-      <span style={{
-        position: 'absolute', top: '-5px', right: '-5px',
-        background: '#e53e3e', color: '#fff', fontSize: '0.65rem',
-        borderRadius: '50%', width: '16px', height: '16px',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontWeight: 700
-      }}>
+      <span style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#e53e3e', color: '#fff', fontSize: '0.65rem', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
         {count > 9 ? '9+' : count}
       </span>
     );
@@ -186,6 +121,7 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
 
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
+      {/* ✅ CLEAN HEADER: No Logout Button */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {showBackButton && (
@@ -193,40 +129,22 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
           )}
           <h2 style={{ margin: 0, color: '#5b72f2', fontWeight: 700 }}>PairHaven</h2>
         </div>
-        <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}>Logout</button>
+        {/* Logout button removed */}
       </header>
 
       <main style={{ padding: '1rem', minHeight: 'calc(100vh - 120px)', background: '#f6f6f6' }}>
         {renderContent()}
       </main>
 
-      {/* ✅ NAV BAR WITH ICONS RESTORED */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
           { id: 'home', label: 'Home', icon: '🏠' },
-          { id: 'matching', label: 'Match', icon: '💖' },
+          { id: 'matching', label: 'Match', icon: '' },
           { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
-          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
+          { id: 'notifications', label: 'Alerts', icon: '', count: navCounts?.alerts },
           { id: 'profile', label: 'Profile', icon: '👤' }
         ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => {
-              setActiveTab(tab.id);
-              if (tab.id === 'profile') window.location.hash = '/';
-            }}
-            style={{
-              border: currentTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent',
-              background: currentTab === tab.id ? '#eef2ff' : 'transparent',
-              borderRadius: '10px',
-              padding: '0.5rem 0.8rem',
-              minWidth: '70px',
-              textAlign: 'center',
-              color: currentTab === tab.id ? '#5b72f2' : '#666',
-              cursor: 'pointer',
-              position: 'relative' // For badge positioning
-            }}
-          >
+          <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (tab.id === 'profile') window.location.hash = '/'; }} style={{ border: currentTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent', background: currentTab === tab.id ? '#eef2ff' : 'transparent', borderRadius: '10px', padding: '0.5rem 0.8rem', minWidth: '70px', textAlign: 'center', color: currentTab === tab.id ? '#5b72f2' : '#666', cursor: 'pointer', position: 'relative' }}>
             <div style={{ fontSize: '1.3rem' }}>{tab.icon}</div>
             <div style={{ fontSize: '0.72rem', marginTop: '0.15rem' }}>{tab.label}</div>
             {renderBadge(tab.count)}
@@ -237,29 +155,21 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
   );
 }
 
+// ... Keep HomeFeed, LoginPage, RegisterPage exactly as they were ...
 function HomeFeed({ onNavigateToProfile }) {
   const [posts, setPosts] = useState([]);
-
   useEffect(() => {
     const fetchPosts = async () => {
       const token = localStorage.getItem('token');
       if (!token) return;
       try {
-        const res = await axios.get(`${API_URL}/api/posts`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await axios.get(`${API_URL}/api/posts`, { headers: { Authorization: `Bearer ${token}` } });
         setPosts(res.data || []);
-      } catch (err) {
-        console.warn('Failed to load feed posts', err);
-      }
+      } catch (err) { console.warn('Failed to load feed posts', err); }
     };
     fetchPosts();
   }, []);
-
-  const handleNewPost = (newPost) => {
-    setPosts(prev => [newPost, ...prev]);
-  };
-
+  const handleNewPost = (newPost) => { setPosts(prev => [newPost, ...prev]); };
   const getAvatarUrl = (author) => {
     if (!author) return 'https://via.placeholder.com/36';
     if (author.photos && Array.isArray(author.photos) && author.photos[0]) {
@@ -267,7 +177,6 @@ function HomeFeed({ onNavigateToProfile }) {
     }
     return 'https://via.placeholder.com/36';
   };
-
   return (
     <div style={{ padding: '0.5rem 0 3rem' }}>
       <h2 style={{ margin: '0 0 1rem' }}>Your Feed</h2>
@@ -278,7 +187,6 @@ function HomeFeed({ onNavigateToProfile }) {
         posts.map(post => {
           const isVideo = post.mediaType === 'video' || (post.mediaUrl && post.mediaUrl.includes('/video/upload'));
           const avatarSrc = getAvatarUrl(post.author);
-
           return (
             <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
               <div onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
