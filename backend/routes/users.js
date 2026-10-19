@@ -149,7 +149,7 @@ router.delete('/posts/:postId', auth, async (req, res) => {
   }
 });
 
-// SEND MATCH REQUEST
+// SEND MATCH REQUEST - SAFE VERSION
 router.post('/request/:userId', auth, async (req, res) => {
   try {
     const targetUser = await User.findById(req.params.userId);
@@ -157,7 +157,7 @@ router.post('/request/:userId', auth, async (req, res) => {
     
     if (!targetUser || !currentUser) return res.status(404).json({ message: 'User not found' });
     
-    // Check if already matched or requested
+    // ✅ SAFE CHECKS WITH OPTIONAL CHAINING
     if ((currentUser.matches || []).includes(req.params.userId)) {
       return res.status(400).json({ message: 'Already matched' });
     }
@@ -165,7 +165,7 @@ router.post('/request/:userId', auth, async (req, res) => {
       return res.status(400).json({ message: 'Request already sent' });
     }
 
-    // Add to pending requests safely
+    // ✅ INITIALIZE ARRAYS IF MISSING
     currentUser.requestsSent = [...(currentUser.requestsSent || []), req.params.userId];
     targetUser.requestsReceived = [...(targetUser.requestsReceived || []), req.user.userId];
     
