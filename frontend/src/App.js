@@ -270,7 +270,7 @@ function HomeFeed({ onNavigateToProfile }) {
                     transition: 'transform 0.2s'
                   }}
                 >
-                  <span style={{ fontSize: '1.4rem' }}>{post.userLoved ? '💖' : ''}</span>
+                  <span style={{ fontSize: '1.4rem' }}>{post.userLoved ? '💖' : '👍'}</span>
                   <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{loves}</span>
                 </button>
 
