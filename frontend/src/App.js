@@ -162,22 +162,32 @@ function HomeFeed({ onNavigateToProfile }) {
     const fetchPosts = async () => {
       if (!token) return;
       try {
-        const res = await axios.get(`${API_URL}/api/posts`, { headers: { Authorization: `Bearer ${token}` } });
-        setPosts(res.data || []);
+        const res = await axios.get(`${API_URL}/api/posts`, { 
+          headers: { Authorization: `Bearer ${token}` } 
+        });
+        
+        // ✅ ENSURE DATA STRUCTURE IS CORRECT ON LOAD
+        const safePosts = (res.data || []).map(post => ({
+          ...post,
+          likesCount: post.likesCount || 0,
+          lovesCount: post.lovesCount || 0,
+          userLiked: !!post.userLiked,
+          userLoved: !!post.userLoved
+        }));
+        
+        setPosts(safePosts);
       } catch (err) { console.warn('Failed to load feed posts', err); }
     };
     fetchPosts();
   }, [token]);
 
-  // ✅ REACTION HANDLER
   const handleReact = async (postId, type) => {
     try {
       const res = await axios.post(`${API_URL}/api/posts/${postId}/react`, 
-        { type }, // 'like' or 'love'
+        { type }, 
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      // Update local state instantly
       setPosts(prev => prev.map(post => {
         if (post._id === postId) {
           return {
@@ -192,7 +202,7 @@ function HomeFeed({ onNavigateToProfile }) {
       }));
     } catch (err) {
       console.error("Reaction failed", err);
-      // Fallback: Toggle locally if API fails
+      // Optimistic fallback
       setPosts(prev => prev.map(post => {
         if (post._id === postId) {
           if (type === 'like') return { ...post, userLiked: !post.userLiked, likesCount: post.userLiked ? post.likesCount - 1 : post.likesCount + 1 };
@@ -221,11 +231,6 @@ function HomeFeed({ onNavigateToProfile }) {
         posts.map(post => {
           const isVideo = post.mediaType === 'video' || (post.mediaUrl && post.mediaUrl.includes('/video/upload'));
           const avatarSrc = getAvatarUrl(post.author);
-          
-          // Safe defaults for counts
-          const likes = post.likesCount || 0;
-          const loves = post.lovesCount || 0;
-          const hasLikes = likes > 0 || loves > 0;
 
           return (
             <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
@@ -243,7 +248,7 @@ function HomeFeed({ onNavigateToProfile }) {
               {post.text && <div style={{ marginBottom: 8, lineHeight: '1.4' }}>{post.text}</div>}
               {post.mediaUrl && (isVideo ? <video src={post.mediaUrl} controls style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} /> : <img src={post.mediaUrl} alt="" style={{ width: '100%', borderRadius: 10 }} />)}
 
-              {/* ✅ REACTION BAR */}
+              {/* Reaction Bar */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f5f5f5' }}>
                 
                 {/* LIKE BUTTON */}
@@ -256,8 +261,8 @@ function HomeFeed({ onNavigateToProfile }) {
                     transition: 'transform 0.2s'
                   }}
                 >
-                  <span style={{ fontSize: '1.4rem' }}>{post.userLiked ? '👍' : '🤍'}</span>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{likes}</span>
+                  <span style={{ fontSize: '1.4rem' }}>{post.userLiked ? '❤️' : '🤍'}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{post.likesCount}</span>
                 </button>
 
                 {/* LOVE BUTTON */}
@@ -270,8 +275,8 @@ function HomeFeed({ onNavigateToProfile }) {
                     transition: 'transform 0.2s'
                   }}
                 >
-                  <span style={{ fontSize: '1.4rem' }}>{post.userLoved ? '💖' : '👍'}</span>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{loves}</span>
+                  <span style={{ fontSize: '1.4rem' }}>{post.userLoved ? '💖' : ''}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{post.lovesCount}</span>
                 </button>
 
               </div>
