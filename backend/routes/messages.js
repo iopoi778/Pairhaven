@@ -50,28 +50,21 @@ router.get('/conversation/:userId', auth, async (req, res) => {
         { sender: req.params.userId, receiver: req.user.userId }
       ]
     })
-    .populate('sender', 'name photos')
+    .populate('sender', 'name photos') // ✅ THIS LINE IS CRITICAL - ADD IT
     .sort({ createdAt: 1 });
 
-    // Mark messages as read ONLY if there are unread ones
-    const hasUnread = messages.some(m => 
-      m.sender?._id.toString() === req.params.userId && !m.read
+    // Mark messages as read
+    await Message.updateMany(
+      { 
+        sender: req.params.userId, 
+        receiver: req.user.userId,
+        read: false 
+      },
+      { read: true }
     );
-
-    if (hasUnread) {
-      await Message.updateMany(
-        { 
-          sender: req.params.userId, 
-          receiver: req.user.userId,
-          read: false 
-        },
-        { read: true }
-      );
-    }
 
     res.json(messages);
   } catch (error) {
-    console.error('Get conversation error:', error);
     res.status(500).json({ message: error.message });
   }
 });
