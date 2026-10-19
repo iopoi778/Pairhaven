@@ -13,15 +13,9 @@ function ChatScreen() {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
   
-  // ✅ SAFE USER PARSING
-  const getSafeUser = () => {
-    try {
-      return JSON.parse(localStorage.getItem('user')) || {};
-    } catch (e) {
-      return {};
-    }
-  };
-  const currentUser = getSafeUser();
+  // Get current user safely
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const myId = currentUser._id?.toString();
 
   // Fetch conversations
   useEffect(() => {
@@ -47,6 +41,14 @@ function ChatScreen() {
         const res = await axios.get(`${API_URL}/api/messages/conversation/${selectedMatch._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        
+        // ✅ DEBUG LOG: Check what the backend actually sends
+        console.log(" Messages received:", res.data);
+        if (res.data.length > 0) {
+          console.log("🔍 First message sender:", res.data[0].sender);
+          console.log(" My ID:", myId);
+        }
+        
         setMessages(res.data || []);
         
         // Auto-mark as read locally
@@ -60,7 +62,7 @@ function ChatScreen() {
     };
     
     fetchConversation();
-  }, [selectedMatch, token]);
+  }, [selectedMatch, token, myId]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -221,7 +223,7 @@ function ChatScreen() {
               </div>
             </div>
             
-            {/* MESSAGES SCROLL AREA - FIXED ID COMPARISON */}
+            {/* MESSAGES SCROLL AREA */}
             <div style={{ 
               flex: 1, padding: '1.5rem', overflowY: 'auto', 
               background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '0.4rem' 
@@ -232,10 +234,8 @@ function ChatScreen() {
                 </div>
               ) : (
                 messages.map(msg => {
-                  // ✅ FIX: Convert BOTH IDs to strings to ensure accurate comparison
-                  const myId = currentUser._id?.toString();
+                  // ✅ ROBUST ID COMPARISON
                   const senderId = msg.sender?._id?.toString() || msg.sender?.toString();
-                  
                   const isMe = myId && senderId && myId === senderId;
 
                   return (
@@ -249,7 +249,6 @@ function ChatScreen() {
                         background: isMe ? '#5b72f2' : '#f0f0f0',
                         color: isMe ? '#fff' : '#000',
                         padding: '10px 14px',
-                        // ✅ TAIL EFFECT: Sharp corner points to sender
                         borderRadius: isMe ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
                         maxWidth: '75%',
                         fontSize: '0.95rem',
