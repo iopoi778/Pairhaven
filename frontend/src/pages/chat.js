@@ -20,7 +20,7 @@ function ChatScreen() {
       if (!raw) return null;
       const user = JSON.parse(raw);
       
-      // Check multiple possible ID locations
+      // Check multiple possible ID locations and convert to string
       return (user._id || user.id || user.userId)?.toString();
     } catch (e) {
       console.error("Failed to parse user from localStorage", e);
