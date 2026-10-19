@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import ProfileScreen from './pages/ProfileScreen';
 import MatchingScreen from './pages/MatchingScreen';
@@ -19,6 +19,12 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
+// Wrapper to pass userId param to ProfileScreen
+function ProfileRouteWrapper() {
+  const { userId } = useParams();
+  return <ProfileScreen userId={userId} />;
+}
+
 function App() {
   return (
     <Router>
@@ -26,38 +32,46 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout />
-              </ProtectedRoute>
-            }
-          />
+          
+          {/* Dynamic Profile Route - MUST be before generic "/" */}
+          <Route path="/profile/:userId" element={
+            <ProtectedRoute>
+              <DashboardLayout activeTabOverride="profile">
+                <ProfileRouteWrapper />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } />
+
+          {/* Default Self Profile & Dashboard */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          } />
         </Routes>
       </div>
     </Router>
   );
 }
 
-function DashboardLayout() {
+function DashboardLayout({ activeTabOverride, children }) {
   const [activeTab, setActiveTab] = useState('home');
   const navigate = useNavigate();
 
+  // If viewing someone else's profile via URL, override tab state
+  const currentTab = activeTabOverride || activeTab;
+
   const renderContent = () => {
-    switch (activeTab) {
-      case 'home':
-        return <HomeFeed />;
-      case 'matching':
-        return <MatchingScreen />;
-      case 'messages':
-        return <ChatScreen />;
-      case 'notifications':
-        return <NotificationsScreen />;
-      case 'profile':
-        return <ProfileScreen />;
-      default:
-        return <HomeFeed />;
+    // If children are passed (for /profile/:userId route), render them directly
+    if (children) return children;
+
+    switch (currentTab) {
+      case 'home': return <HomeFeed onNavigateToProfile={(id) => navigate(`/profile/${id}`)} />;
+      case 'matching': return <MatchingScreen />;
+      case 'messages': return <ChatScreen />;
+      case 'notifications': return <NotificationsScreen />;
+      case 'profile': return <ProfileScreen />;
+      default: return <HomeFeed onNavigateToProfile={(id) => navigate(`/profile/${id}`)} />;
     }
   };
 
@@ -67,6 +81,11 @@ function DashboardLayout() {
     delete axios.defaults.headers.common['Authorization'];
     navigate('/login', { replace: true });
   };
+
+  // Sync nav bar highlight when viewing external profiles
+  useEffect(() => {
+    if (activeTabOverride) setActiveTab(activeTabOverride);
+  }, [activeTabOverride]);
 
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
@@ -83,7 +102,7 @@ function DashboardLayout() {
 
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px' }}>
         {[
-          { id: 'home', label: 'Home', icon: '🏠' },
+          { id: 'home', label: 'Home', icon: '' },
           { id: 'matching', label: 'Match', icon: '💖' },
           { id: 'messages', label: 'Chat', icon: '💬' },
           { id: 'notifications', label: 'Alerts', icon: '🔔' },
@@ -91,15 +110,18 @@ function DashboardLayout() {
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setActiveTab(tab.id);
+              if (tab.id === 'profile') navigate('/'); // Reset to self profile
+            }}
             style={{
-              border: activeTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent',
-              background: activeTab === tab.id ? '#eef2ff' : 'transparent',
+              border: currentTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent',
+              background: currentTab === tab.id ? '#eef2ff' : 'transparent',
               borderRadius: '10px',
               padding: '0.5rem 0.8rem',
               minWidth: '70px',
               textAlign: 'center',
-              color: activeTab === tab.id ? '#5b72f2' : '#666',
+              color: currentTab === tab.id ? '#5b72f2' : '#666',
               cursor: 'pointer'
             }}
           >
@@ -112,7 +134,7 @@ function DashboardLayout() {
   );
 }
 
-function HomeFeed() {
+function HomeFeed({ onNavigateToProfile }) {
   const [posts, setPosts] = useState([]);
 
   useEffect(() => {
@@ -146,10 +168,17 @@ function HomeFeed() {
       ) : (
         posts.map(post => (
           <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#5b72f2', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                {(post.author?.name || 'U').charAt(0).toUpperCase()}
-              </div>
+            
+            {/* CLICKABLE AUTHOR HEADER */}
+            <div 
+              onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}
+            >
+              <img 
+                src={post.author?.photos?.[0]?.url || post.author?.photos?.[0] || 'https://via.placeholder.com/36'} 
+                alt={post.author?.name}
+                style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }}
+              />
               <div>
                 <div style={{ fontWeight: 700 }}>{post.author?.name || 'User'}</div>
                 <div style={{ fontSize: 12, color: '#666' }}>{new Date(post.createdAt).toLocaleString()}</div>
@@ -170,7 +199,6 @@ function HomeFeed() {
   );
 }
 
-// Login screen
 function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -221,15 +249,12 @@ function LoginPage() {
 
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         New here?{' '}
-        <a href="/register" onClick={(e) => { e.preventDefault(); navigate('/register'); }} style={{ color: '#5b72f2' }}>
-          Create Account
-        </a>
+        <span onClick={() => navigate('/register')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Create Account</span>
       </p>
     </div>
   );
 }
 
-// Register screen
 function RegisterPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -244,24 +269,19 @@ function RegisterPage() {
       if (navigator.geolocation) {
         try {
           const pos = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 5000, maximumAge: 0 });
           });
-
-          const { latitude, longitude } = pos.coords;
           formData.append('location', JSON.stringify({
             type: 'Point',
-            coordinates: [longitude, latitude]
+            coordinates: [pos.coords.longitude, pos.coords.latitude]
           }));
         } catch (geoErr) {
-          console.warn('Geolocation not available or denied', geoErr);
+          console.warn('Geolocation skipped:', geoErr.message);
+          formData.append('location', JSON.stringify({ type: 'Point', coordinates: [0, 0] }));
         }
       }
 
-      const res = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST',
-        body: formData
-      });
-
+      const res = await fetch(`${API_URL}/api/auth/register`, { method: 'POST', body: formData });
       const data = await res.json();
 
       if (!res.ok) {
@@ -273,12 +293,8 @@ function RegisterPage() {
         const loginRes = await fetch(`${API_URL}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.get('email'),
-            password: formData.get('password')
-          })
+          body: JSON.stringify({ email: formData.get('email'), password: formData.get('password') })
         });
-
         const loginData = await loginRes.json();
 
         if (loginRes.ok) {
@@ -327,9 +343,7 @@ function RegisterPage() {
       </form>
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         Already have an account?{' '}
-        <a href="/login" onClick={(e) => { e.preventDefault(); navigate('/login'); }} style={{ color: '#5b72f2' }}>
-          Log In
-        </a>
+        <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
       </p>
     </div>
   );
