@@ -5,29 +5,25 @@ const Post = require('../models/Post');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
 
-// GET USER PROFILE - Enhanced with privacy & safe counts
+// GET USER PROFILE - Safe handling of new match request fields
 router.get('/profile/:id', auth, async (req, res) => {
   try {
     const targetId = req.params.id === 'me' ? req.user.userId : req.params.id;
-    const user = await User.findById(targetId)
-      .select('-password')
-      .populate('followers', 'name photos')
-      .populate('following', 'name photos');
+    const user = await User.findById(targetId).select('-password');
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const followers = user.followers || [];
-    const following = user.following || [];
-    const likesReceived = user.likesReceived || [];
+    // ✅ SAFE ARRAY HANDLING: Prevents 500 errors if arrays don't exist yet
     const matches = user.matches || [];
-
-    // Determine if viewer can see "Following" count (only self can see it)
-    const isOwnProfile = targetId === req.user.userId;
+    const requestsSent = user.requestsSent || [];
+    const requestsReceived = user.requestsReceived || [];
+    
+    const isOwnProfile = targetId.toString() === req.user.userId.toString();
 
     res.json({
-      id: user._id,
+      _id: user._id,
       name: user.name,
       phone: user.phone,
       email: user.email,
@@ -39,17 +35,50 @@ router.get('/profile/:id', auth, async (req, res) => {
       interests: user.interests,
       verificationStatus: user.verificationStatus,
       isPrivate: user.isPrivate || false,
-      followersCount: followers.length,
-      followingCount: following.length,
-      likesReceivedCount: likesReceived.length,
+      
+      // ✅ NEW MATCH REQUEST FIELDS
       matchesCount: matches.length,
-      isFollowing: followers.some(f => f._id.toString() === req.user.userId),
-      showFollowingCount: isOwnProfile,
-      followers,
-      following
+      requestsSent,
+      requestsReceived,
+      
+      // Legacy counts kept for backward compatibility but set to 0
+      followersCount: 0,
+      followingCount: 0,
+      likesReceivedCount: 0,
+      
+      isOwnProfile,
+      isFollowing: false // Removed follow logic
     });
   } catch (error) {
     console.error('Profile fetch error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ✅ NEW: POTENTIAL MATCHES FOR MATCH TAB
+router.get('/potential-matches', auth, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.userId);
+    if (!currentUser) return res.status(404).json({ message: 'User not found' });
+
+    // Get all users except yourself
+    const users = await User.find({ _id: { $ne: req.user.userId } })
+      .select('name photos age location bio');
+
+    // Enrich with relationship status using safe optional chaining
+    const enrichedUsers = users.map(user => {
+      const userObj = user.toObject();
+      
+      userObj.isMatched = (currentUser.matches || []).includes(user._id);
+      userObj.hasSentRequest = (currentUser.requestsSent || []).includes(user._id);
+      userObj.hasReceivedRequest = (currentUser.requestsReceived || []).includes(user._id);
+      
+      return userObj;
+    });
+
+    res.json(enrichedUsers);
+  } catch (error) {
+    console.error("Potential matches error:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -82,13 +111,12 @@ router.patch('/profile/me', auth, async (req, res) => {
 // GET USER POSTS (Respects Privacy)
 router.get('/profile/:userId/posts', auth, async (req, res) => {
   try {
-    // Populate followers to correctly check ObjectIds against req.user.userId
-    const targetUser = await User.findById(req.params.userId).populate('followers', '_id');
+    const targetUser = await User.findById(req.params.userId);
     if (!targetUser) return res.status(404).json({ message: 'User not found' });
 
-    // If private and viewer is NOT a follower, return empty array
-    const isFollower = targetUser.followers.some(f => f._id.toString() === req.user.userId);
-    if (targetUser.isPrivate && !isFollower) {
+    // If private and viewer is NOT a follower/match, return empty array
+    const isMatched = (targetUser.matches || []).some(m => m.toString() === req.user.userId);
+    if (targetUser.isPrivate && !isMatched) {
       return res.json([]);
     }
 
@@ -109,7 +137,6 @@ router.delete('/posts/:postId', auth, async (req, res) => {
     const post = await Post.findById(req.params.postId);
     if (!post) return res.status(404).json({ message: 'Post not found' });
     
-    // Only author can delete
     if (post.author.toString() !== req.user.userId) {
       return res.status(403).json({ message: 'Not authorized to delete this post' });
     }
@@ -122,7 +149,7 @@ router.delete('/posts/:postId', auth, async (req, res) => {
   }
 });
 
-// SEND MATCH REQUEST (Replaces 'Like')
+// SEND MATCH REQUEST
 router.post('/request/:userId', auth, async (req, res) => {
   try {
     const targetUser = await User.findById(req.params.userId);
@@ -131,21 +158,20 @@ router.post('/request/:userId', auth, async (req, res) => {
     if (!targetUser || !currentUser) return res.status(404).json({ message: 'User not found' });
     
     // Check if already matched or requested
-    if (currentUser.matches.includes(req.params.userId)) {
+    if ((currentUser.matches || []).includes(req.params.userId)) {
       return res.status(400).json({ message: 'Already matched' });
     }
-    if (currentUser.requestsSent?.includes(req.params.userId)) {
+    if ((currentUser.requestsSent || []).includes(req.params.userId)) {
       return res.status(400).json({ message: 'Request already sent' });
     }
 
-    // Add to pending requests
+    // Add to pending requests safely
     currentUser.requestsSent = [...(currentUser.requestsSent || []), req.params.userId];
     targetUser.requestsReceived = [...(targetUser.requestsReceived || []), req.user.userId];
     
     await currentUser.save();
     await targetUser.save();
 
-    // Send notification
     await Notification.create({
       recipient: req.params.userId,
       sender: req.user.userId,
@@ -155,11 +181,12 @@ router.post('/request/:userId', auth, async (req, res) => {
 
     res.json({ message: 'Match request sent successfully' });
   } catch (error) {
+    console.error('Send request error:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// ACCEPT MATCH REQUEST (Creates the actual match + enables chat)
+// ACCEPT MATCH REQUEST
 router.post('/accept-request/:userId', auth, async (req, res) => {
   try {
     const requester = await User.findById(req.params.userId);
@@ -167,18 +194,17 @@ router.post('/accept-request/:userId', auth, async (req, res) => {
     
     if (!requester || !currentUser) return res.status(404).json({ message: 'User not found' });
 
-    // Remove from pending lists
+    // Remove from pending lists safely
     currentUser.requestsReceived = (currentUser.requestsReceived || []).filter(id => id.toString() !== req.params.userId);
     requester.requestsSent = (requester.requestsSent || []).filter(id => id.toString() !== req.user.userId);
 
-    // ADD TO MATCHES ARRAY (This enables messaging)
+    // ADD TO MATCHES ARRAY
     currentUser.matches = [...(currentUser.matches || []), req.params.userId];
     requester.matches = [...(requester.matches || []), req.user.userId];
     
     await currentUser.save();
     await requester.save();
 
-    // Send mutual match notification
     await Notification.create({
       recipient: req.params.userId,
       sender: req.user.userId,
@@ -188,6 +214,7 @@ router.post('/accept-request/:userId', auth, async (req, res) => {
 
     res.json({ message: 'Match accepted! You can now message each other.' });
   } catch (error) {
+    console.error('Accept request error:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -198,7 +225,7 @@ router.delete('/request/:userId', auth, async (req, res) => {
     const currentUser = await User.findById(req.user.userId);
     const targetUser = await User.findById(req.params.userId);
 
-    // Remove from both sent/received arrays
+    // Remove from both sent/received arrays safely
     currentUser.requestsSent = (currentUser.requestsSent || []).filter(id => id.toString() !== req.params.userId);
     currentUser.requestsReceived = (currentUser.requestsReceived || []).filter(id => id.toString() !== req.params.userId);
     
@@ -211,76 +238,7 @@ router.delete('/request/:userId', auth, async (req, res) => {
     await currentUser.save();
     res.json({ message: 'Request removed' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-// LIKE USER (with mutual match detection)
-router.post('/like/:userId', auth, async (req, res) => {
-  try {
-    const userToLike = await User.findById(req.params.userId);
-    const currentUser = await User.findById(req.user.userId);
-    
-    if (!userToLike || !currentUser) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    const alreadyLiked = (userToLike.likesReceived || []).find(
-      like => like.from?.toString() === req.user.userId
-    );
-
-    if (alreadyLiked) {
-      return res.status(400).json({ message: 'Already liked' });
-    }
-
-    userToLike.likesReceived = userToLike.likesReceived || [];
-    userToLike.likesReceived.push({ from: req.user.userId });
-    await userToLike.save();
-
-    await Notification.create({
-      recipient: req.params.userId,
-      sender: req.user.userId,
-      type: 'like',
-      message: `${currentUser.name} liked your profile`
-    });
-
-    const mutualLike = (currentUser.likesReceived || []).find(
-      like => like.from?.toString() === req.params.userId
-    );
-
-    if (mutualLike) {
-      currentUser.matches = currentUser.matches || [];
-      userToLike.matches = userToLike.matches || [];
-
-      if (!currentUser.matches.includes(req.params.userId)) {
-        currentUser.matches.push(req.params.userId);
-        await currentUser.save();
-      }
-      if (!userToLike.matches.includes(req.user.userId)) {
-        userToLike.matches.push(req.user.userId);
-        await userToLike.save();
-      }
-
-      await Notification.create({
-        recipient: req.params.userId,
-        sender: req.user.userId,
-        type: 'match',
-        message: `You matched with ${currentUser.name}!`
-      });
-      await Notification.create({
-        recipient: req.user.userId,
-        sender: req.params.userId,
-        type: 'match',
-        message: `You matched with ${userToLike.name}!`
-      });
-    }
-
-    res.json({ 
-      message: mutualLike ? 'It\'s a match!' : 'Liked successfully',
-      isMatch: !!mutualLike,
-      likesCount: userToLike.likesReceived.length 
-    });
-  } catch (error) {
-    console.error('Like error:', error);
+    console.error('Decline request error:', error);
     res.status(500).json({ message: error.message });
   }
 });
