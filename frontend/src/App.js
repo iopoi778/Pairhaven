@@ -153,13 +153,13 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
   );
 }
 
-// ✅ HOME FEED: PostComposer REMOVED
 function HomeFeed({ onNavigateToProfile }) {
   const [posts, setPosts] = useState([]);
+  const token = localStorage.getItem('token');
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   
   useEffect(() => {
     const fetchPosts = async () => {
-      const token = localStorage.getItem('token');
       if (!token) return;
       try {
         const res = await axios.get(`${API_URL}/api/posts`, { headers: { Authorization: `Bearer ${token}` } });
@@ -167,11 +167,42 @@ function HomeFeed({ onNavigateToProfile }) {
       } catch (err) { console.warn('Failed to load feed posts', err); }
     };
     fetchPosts();
-  }, []);
+  }, [token]);
 
-  // handleNewPost kept for future compatibility, but not used in UI
-  const handleNewPost = (newPost) => { setPosts(prev => [newPost, ...prev]); };
-  
+  // ✅ REACTION HANDLER
+  const handleReact = async (postId, type) => {
+    try {
+      const res = await axios.post(`${API_URL}/api/posts/${postId}/react`, 
+        { type }, // 'like' or 'love'
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      // Update local state instantly
+      setPosts(prev => prev.map(post => {
+        if (post._id === postId) {
+          return {
+            ...post,
+            likesCount: res.data.likesCount,
+            lovesCount: res.data.lovesCount,
+            userLiked: res.data.userLiked,
+            userLoved: res.data.userLoved
+          };
+        }
+        return post;
+      }));
+    } catch (err) {
+      console.error("Reaction failed", err);
+      // Fallback: Toggle locally if API fails
+      setPosts(prev => prev.map(post => {
+        if (post._id === postId) {
+          if (type === 'like') return { ...post, userLiked: !post.userLiked, likesCount: post.userLiked ? post.likesCount - 1 : post.likesCount + 1 };
+          if (type === 'love') return { ...post, userLoved: !post.userLoved, lovesCount: post.userLoved ? post.lovesCount - 1 : post.lovesCount + 1 };
+        }
+        return post;
+      }));
+    }
+  };
+
   const getAvatarUrl = (author) => {
     if (!author) return 'https://via.placeholder.com/36';
     if (author.photos && Array.isArray(author.photos) && author.photos[0]) {
@@ -184,16 +215,22 @@ function HomeFeed({ onNavigateToProfile }) {
     <div style={{ padding: '0.5rem 0 3rem' }}>
       <h2 style={{ margin: '0 0 1rem' }}>Your Feed</h2>
       
-      {/* ✅ PostComposer COMPLETELY REMOVED FROM HERE */}
-      
       {posts.length === 0 ? (
         <div style={{ background: '#fff', borderRadius: '12px', padding: '1.2rem', textAlign: 'center', color: '#666' }}>No posts yet.</div>
       ) : (
         posts.map(post => {
           const isVideo = post.mediaType === 'video' || (post.mediaUrl && post.mediaUrl.includes('/video/upload'));
           const avatarSrc = getAvatarUrl(post.author);
+          
+          // Safe defaults for counts
+          const likes = post.likesCount || 0;
+          const loves = post.lovesCount || 0;
+          const hasLikes = likes > 0 || loves > 0;
+
           return (
             <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              
+              {/* Author Header */}
               <div onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
                 <img src={avatarSrc} alt={post.author?.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', background: '#eee' }} onError={(e) => { e.target.src = 'https://via.placeholder.com/36'; }} />
                 <div>
@@ -201,8 +238,43 @@ function HomeFeed({ onNavigateToProfile }) {
                   <div style={{ fontSize: 12, color: '#666' }}>{new Date(post.createdAt).toLocaleString()}</div>
                 </div>
               </div>
-              {post.text && <div style={{ marginBottom: 8 }}>{post.text}</div>}
+
+              {/* Content */}
+              {post.text && <div style={{ marginBottom: 8, lineHeight: '1.4' }}>{post.text}</div>}
               {post.mediaUrl && (isVideo ? <video src={post.mediaUrl} controls style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} /> : <img src={post.mediaUrl} alt="" style={{ width: '100%', borderRadius: 10 }} />)}
+
+              {/* ✅ REACTION BAR */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f5f5f5' }}>
+                
+                {/* LIKE BUTTON */}
+                <button 
+                  onClick={() => handleReact(post._id, 'like')}
+                  style={{ 
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    color: post.userLiked ? '#e53e3e' : '#666',
+                    transition: 'transform 0.2s'
+                  }}
+                >
+                  <span style={{ fontSize: '1.4rem' }}>{post.userLiked ? '👍' : '🤍'}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{likes}</span>
+                </button>
+
+                {/* LOVE BUTTON */}
+                <button 
+                  onClick={() => handleReact(post._id, 'love')}
+                  style={{ 
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    color: post.userLoved ? '#ff6b6b' : '#666',
+                    transition: 'transform 0.2s'
+                  }}
+                >
+                  <span style={{ fontSize: '1.4rem' }}>{post.userLoved ? '💖' : ''}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{loves}</span>
+                </button>
+
+              </div>
             </div>
           );
         })
