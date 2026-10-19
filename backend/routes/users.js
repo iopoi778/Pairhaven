@@ -152,18 +152,38 @@ router.patch('/profile/me', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-// GET POSTS
+// GET USER POSTS - FIX: Ensure text/media fields are returned
 router.get('/profile/:userId/posts', auth, async (req, res) => {
   try {
-    const target = await User.findById(req.params.userId);
-    if (!target) return res.status(404).json({ message: 'Not found' });
-    
-    const isMatched = (target.matches || []).some(m => m.toString() === req.user.userId);
-    if (target.isPrivate && !isMatched) return res.json([]);
+    const targetUser = await User.findById(req.params.userId);
+    if (!targetUser) return res.status(404).json({ message: 'User not found' });
 
-    const posts = await Post.find({ author: req.params.userId }).sort({ createdAt: -1 }).populate('author', 'name photos');
-    res.json(posts);
-  } catch (error) { res.status(500).json({ message: error.message }); }
+    // Privacy check
+    const isMatched = (targetUser.matches || []).some(m => m.toString() === req.user.userId);
+    if (targetUser.isPrivate && !isMatched) {
+      return res.json([]);
+    }
+
+    const posts = await Post.find({ author: req.params.userId })
+      .sort({ createdAt: -1 })
+      .populate('author', 'name photos');
+
+    // ✅ TRANSFORM TO GUARANTEE CONTENT FIELDS EXIST
+    const safePosts = posts.map(post => {
+      const postObj = post.toObject();
+      return {
+        ...postObj,
+        text: postObj.text || '',
+        mediaUrl: postObj.mediaUrl || null,
+        mediaType: postObj.mediaType || null
+      };
+    });
+
+    res.json(safePosts);
+  } catch (error) {
+    console.error('Fetch user posts error:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
 
 // DELETE POST
