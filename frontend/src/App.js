@@ -5,7 +5,6 @@ import ProfileScreen from './pages/ProfileScreen';
 import MatchingScreen from './pages/MatchingScreen';
 import ChatScreen from './pages/chat';
 import NotificationsScreen from './pages/NotificationsScreen';
-// PostComposer import kept for safety, but component removed from UI
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -108,10 +107,17 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
     }
   };
 
+  // ✅ RENDER BADGE FUNCTION - PLACED BEFORE RETURN STATEMENT
   const renderBadge = (count) => {
     if (!count || count <= 0) return null;
     return (
-      <span style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#e53e3e', color: '#fff', fontSize: '0.65rem', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+      <span style={{ 
+        position: 'absolute', top: '-5px', right: '-5px', 
+        background: '#e53e3e', color: '#fff', fontSize: '0.65rem', 
+        borderRadius: '50%', width: '16px', height: '16px', 
+        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+        fontWeight: 700, border: '2px solid #fff' 
+      }}>
         {count > 9 ? '9+' : count}
       </span>
     );
@@ -133,14 +139,14 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {renderContent()}
       </main>
 
-            {/* ✅ NAV BAR WITH RESTORED ICONS & BADGES */}
+      {/* ✅ NAV BAR WITH RESTORED ICONS & BADGES */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
-          { id: 'home', label: 'Home', icon: '🏠' },                   
-          { id: 'matching', label: 'Match', icon: '💖' },              
-          { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },    // ✅ Chat Icon + Count
-          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts }, // ✅ Alerts Icon + Count
-          { id: 'profile', label: 'Profile', icon: '' }              // ✅ Profile Icon
+          { id: 'home', label: 'Home', icon: '🏠' },
+          { id: 'matching', label: 'Match', icon: '💖' },
+          { id: 'messages', label: 'Chat', icon: '', count: navCounts?.chat },
+          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
+          { id: 'profile', label: 'Profile', icon: '👤' }
         ].map(tab => (
           <button 
             key={tab.id} 
@@ -157,22 +163,19 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
               position: 'relative' 
             }}
           >
-            {/* ✅ ICON RENDERING */}
             <div style={{ fontSize: '1.3rem' }}>{tab.icon}</div>
-            
-            {/* ✅ LABEL RENDERING */}
             <div style={{ fontSize: '0.72rem', marginTop: '0.15rem' }}>{tab.label}</div>
-            
-            {/* ✅ BADGE RENDERING (Only shows if count > 0) */}
             {renderBadge(tab.count)}
           </button>
         ))}
       </nav>
+    </div>
+  );
+}
 
 function HomeFeed({ onNavigateToProfile }) {
   const [posts, setPosts] = useState([]);
   const token = localStorage.getItem('token');
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   
   useEffect(() => {
     const fetchPosts = async () => {
@@ -182,7 +185,6 @@ function HomeFeed({ onNavigateToProfile }) {
           headers: { Authorization: `Bearer ${token}` } 
         });
         
-        // ✅ ENSURE DATA STRUCTURE IS CORRECT ON LOAD
         const safePosts = (res.data || []).map(post => ({
           ...post,
           likesCount: post.likesCount || 0,
@@ -218,7 +220,6 @@ function HomeFeed({ onNavigateToProfile }) {
       }));
     } catch (err) {
       console.error("Reaction failed", err);
-      // Optimistic fallback
       setPosts(prev => prev.map(post => {
         if (post._id === postId) {
           if (type === 'like') return { ...post, userLiked: !post.userLiked, likesCount: post.userLiked ? post.likesCount - 1 : post.likesCount + 1 };
@@ -251,7 +252,6 @@ function HomeFeed({ onNavigateToProfile }) {
           return (
             <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
               
-              {/* Author Header */}
               <div onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
                 <img src={avatarSrc} alt={post.author?.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', background: '#eee' }} onError={(e) => { e.target.src = 'https://via.placeholder.com/36'; }} />
                 <div>
@@ -260,14 +260,11 @@ function HomeFeed({ onNavigateToProfile }) {
                 </div>
               </div>
 
-              {/* Content */}
               {post.text && <div style={{ marginBottom: 8, lineHeight: '1.4' }}>{post.text}</div>}
               {post.mediaUrl && (isVideo ? <video src={post.mediaUrl} controls style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} /> : <img src={post.mediaUrl} alt="" style={{ width: '100%', borderRadius: 10 }} />)}
 
-              {/* Reaction Bar */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f5f5f5' }}>
                 
-                {/* LIKE BUTTON */}
                 <button 
                   onClick={() => handleReact(post._id, 'like')}
                   style={{ 
@@ -281,7 +278,6 @@ function HomeFeed({ onNavigateToProfile }) {
                   <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{post.likesCount}</span>
                 </button>
 
-                {/* LOVE BUTTON */}
                 <button 
                   onClick={() => handleReact(post._id, 'love')}
                   style={{ 
