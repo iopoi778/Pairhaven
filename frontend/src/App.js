@@ -8,34 +8,42 @@ import NotificationsScreen from './pages/NotificationsScreen';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
-const tokenAtStart = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-if (tokenAtStart) {
-  axios.defaults.headers.common['Authorization'] = `Bearer ${tokenAtStart}`;
+// ✅ SAFE TOKEN INITIALIZATION
+const initialToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+if (initialToken) {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
 }
 
 const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" replace />;
+  const currentToken = localStorage.getItem('token');
+  return currentToken ? children : <Navigate to="/login" replace />;
 };
 
 function ProfileRouteWrapper({ onUpdateCounts }) {
   const navigate = useNavigate();
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  // ✅ SAFE USER PARSING
+  const getCurrentUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem('user')) || {};
+    } catch (e) { return {}; }
+  };
+  const currentUserData = getCurrentUser();
   
   const hashPath = window.location.hash.replace('#', '') || '/';
   const parts = hashPath.split('/').filter(Boolean);
   
   useEffect(() => {
-    if (parts[0] === 'profile' && parts[1] && parts[1] !== currentUser._id) {
+    if (parts[0] === 'profile' && parts[1] && parts[1] !== currentUserData._id) {
       if (onUpdateCounts) onUpdateCounts();
     }
-  }, [hashPath]); 
+  }, [hashPath, currentUserData._id]); 
 
   if (parts[0] === 'profile' && !parts[1]) return <Navigate to="/" replace />;
   if (parts[0] !== 'profile') return <Navigate to="/" replace />;
 
-  const userId = parts[1];
-  if (userId === currentUser._id) return <Navigate to="/" replace />;
+  const targetUserId = parts[1];
+  if (targetUserId === currentUserData._id) return <Navigate to="/" replace />;
 
   return (
     <DashboardLayout 
@@ -43,7 +51,7 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
       showBackButton={true}
       onBack={() => navigate(-1)}
     >
-      <ProfileScreen userId={userId} />
+      <ProfileScreen userId={targetUserId} />
     </DashboardLayout>
   );
 }
@@ -52,14 +60,14 @@ function App() {
   const [navCounts, setNavCounts] = useState({ chat: 0, alerts: 0 });
 
   const fetchNavCounts = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    const currentToken = localStorage.getItem('token');
+    if (!currentToken) return;
     
     try {
       let totalUnreadMsgs = 0;
       try {
         const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, { 
-          headers: { Authorization: `Bearer ${token}` } 
+          headers: { Authorization: `Bearer ${currentToken}` } 
         });
         totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => {
           const count = c.unreadCount ?? (c.messages?.filter(m => !m.read).length ?? 0);
@@ -70,7 +78,7 @@ function App() {
       let unreadNotifs = 0;
       try {
         const notifRes = await axios.get(`${API_URL}/api/notifications`, { 
-          headers: { Authorization: `Bearer ${token}` } 
+          headers: { Authorization: `Bearer ${currentToken}` } 
         });
         unreadNotifs = (notifRes.data || []).filter(n => n.read === false).length;
       } catch (err) { console.error("Alert count failed:", err.message); }
@@ -156,8 +164,8 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
       {/* ✅ NAV BAR WITH ALL 5 ICONS GUARANTEED */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
-          { id: 'home', label: 'Home', icon: '' },
-          { id: 'matching', label: 'Match', icon: '💖' },
+          { id: 'home', label: 'Home', icon: '🏠' },
+          { id: 'matching', label: 'Match', icon: '' },
           { id: 'messages', label: 'Chat', icon: '', count: navCounts?.chat },
           { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
           { id: 'profile', label: 'Profile', icon: '' }
@@ -189,14 +197,14 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
 
 function HomeFeed({ onNavigateToProfile }) {
   const [posts, setPosts] = useState([]);
-  const token = localStorage.getItem('token');
+  const currentToken = localStorage.getItem('token');
   
   useEffect(() => {
     const fetchPosts = async () => {
-      if (!token) return;
+      if (!currentToken) return;
       try {
         const res = await axios.get(`${API_URL}/api/posts`, { 
-          headers: { Authorization: `Bearer ${token}` } 
+          headers: { Authorization: `Bearer ${currentToken}` } 
         });
         
         const safePosts = (res.data || []).map(post => ({
@@ -211,13 +219,13 @@ function HomeFeed({ onNavigateToProfile }) {
       } catch (err) { console.warn('Failed to load feed posts', err); }
     };
     fetchPosts();
-  }, [token]);
+  }, [currentToken]);
 
   const handleReact = async (postId, type) => {
     try {
       const res = await axios.post(`${API_URL}/api/posts/${postId}/react`, 
         { type }, 
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${currentToken}` } }
       );
       
       setPosts(prev => prev.map(post => {
@@ -337,9 +345,8 @@ function LoginPage() {
     <div style={{ 
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
       overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#000' // Prevents white flash before images load
+      background: '#000'
     }}>
-      {/* ✅ BACKGROUND ANIMATION LAYER - OPTIMIZED FOR PHONE */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         <style>{`
           @keyframes fadeSlide {
@@ -353,7 +360,6 @@ function LoginPage() {
             position: absolute; inset: 0; 
             background-size: cover; background-position: center;
             opacity: 0; animation: fadeSlide 18s infinite;
-            /* ✅ REMOVED SCALE TRANSFORM TO PREVENT BLURRING ON MOBILE */
           }
           .bg-1 { animation-delay: 0s; background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=1080&auto=format&fit=crop'); }
           .bg-2 { animation-delay: 6s; background-image: url('https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?q=80&w=1080&auto=format&fit=crop'); }
@@ -362,16 +368,14 @@ function LoginPage() {
         <div className="bg-slide bg-1"></div>
         <div className="bg-slide bg-2"></div>
         <div className="bg-slide bg-3"></div>
-        {/* Dark overlay for readability */}
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}></div>
       </div>
 
-      {/* ✅ LOGIN FORM CARD - MOBILE SAFE PADDING */}
       <div style={{ 
         position: 'relative', zIndex: 1, width: '90%', maxWidth: 400, 
         background: '#fff', padding: '2rem 1.5rem', borderRadius: '16px', 
         boxShadow: '0 10px 40px rgba(0,0,0,0.3)', margin: '1rem',
-        maxHeight: '90vh', overflowY: 'auto' // ✅ PREVENTS CUT-OFF ON SMALL PHONES
+        maxHeight: '90vh', overflowY: 'auto'
       }}>
         <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '1.5rem', fontSize: '1.8rem' }}>Welcome Back</h2>
         <form onSubmit={handleSubmit}>
