@@ -13,6 +13,12 @@ function ProfileScreen({ userId }) {
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   
+  // ✅ NEW: Post Creation State
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [newPostText, setNewPostText] = useState('');
+  const [newPostMedia, setNewPostMedia] = useState(null);
+  const [posting, setPosting] = useState(false);
+
   const token = localStorage.getItem('token');
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const isOwnProfile = userId === currentUser._id || !userId;
@@ -39,31 +45,49 @@ function ProfileScreen({ userId }) {
     if (token) fetchData();
   }, [userId, token]);
 
-  // ✅ RESTORED: Change Profile Picture Handler
-  const handlePhotoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // ✅ NEW: Handle Post Submission
+  const handleCreatePost = async () => {
+    if (!newPostText.trim() && !newPostMedia) return;
+    setPosting(true);
 
-    setUploadingPhoto(true);
     const formData = new FormData();
-    formData.append('photo', file);
+    formData.append('text', newPostText);
+    if (newPostMedia) formData.append('media', newPostMedia);
 
     try {
-      const res = await axios.patch(`${API_URL}/api/users/profile/me/photo`, formData, {
+      const res = await axios.post(`${API_URL}/api/posts`, formData, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         }
       });
       
-      // Update local state with new photo
-      setUser(prev => ({
-        ...prev,
-        photos: [res.data.photoUrl] // Adjust based on your backend response
-      }));
+      // Add new post to top of list
+      setPosts(prev => [res.data, ...prev]);
+      setNewPostText('');
+      setNewPostMedia(null);
+      setShowPostModal(false);
+    } catch (err) {
+      console.error("Post creation failed", err);
+      alert(err.response?.data?.message || "Failed to create post");
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    const formData = new FormData();
+    formData.append('photo', file);
+    try {
+      const res = await axios.patch(`${API_URL}/api/users/profile/me/photo`, formData, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+      });
+      setUser(prev => ({ ...prev, photos: [res.data.photoUrl] }));
       alert("Profile picture updated!");
     } catch (err) {
-      console.error("Photo upload failed", err);
       alert(err.response?.data?.message || "Failed to update photo");
     } finally {
       setUploadingPhoto(false);
@@ -72,9 +96,7 @@ function ProfileScreen({ userId }) {
 
   const handleSaveBio = async () => {
     try {
-      await axios.patch(`${API_URL}/api/users/profile/me`, { bio: bioText }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.patch(`${API_URL}/api/users/profile/me`, { bio: bioText }, { headers: { Authorization: `Bearer ${token}` } });
       setUser(prev => ({ ...prev, bio: bioText }));
       setIsEditingBio(false);
     } catch (err) { alert("Failed to update bio"); }
@@ -83,9 +105,7 @@ function ProfileScreen({ userId }) {
   const handleTogglePrivacy = async () => {
     try {
       const newStatus = !user.isPrivate;
-      await axios.patch(`${API_URL}/api/users/profile/me`, { isPrivate: newStatus }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.patch(`${API_URL}/api/users/profile/me`, { isPrivate: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
       setUser(prev => ({ ...prev, isPrivate: newStatus }));
     } catch (err) { alert("Failed to update privacy"); }
   };
@@ -93,14 +113,11 @@ function ProfileScreen({ userId }) {
   const handleDeletePost = async (postId) => {
     if (!window.confirm("Delete this post?")) return;
     try {
-      await axios.delete(`${API_URL}/api/posts/${postId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.delete(`${API_URL}/api/posts/${postId}`, { headers: { Authorization: `Bearer ${token}` } });
       setPosts(prev => prev.filter(p => p._id !== postId));
     } catch (err) { alert("Failed to delete post"); }
   };
 
-  // ✅ RESTORED: Logout Handler
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -108,7 +125,6 @@ function ProfileScreen({ userId }) {
     navigate('/login', { replace: true });
   };
 
-  // Helper for safe avatar URL
   const getAvatarUrl = () => {
     if (!user?.photos) return 'https://via.placeholder.com/100';
     const photo = user.photos[0];
@@ -121,6 +137,90 @@ function ProfileScreen({ userId }) {
   return (
     <div style={{ padding: '1rem', paddingBottom: '90px', position: 'relative' }}>
       
+      {/* ✅ INSTAGRAM-STYLE POST MODAL OVERLAY */}
+      {showPostModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px',
+            maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>New Post</h3>
+              <button onClick={() => setShowPostModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+            </div>
+            
+            <textarea 
+              value={newPostText}
+              onChange={e => setNewPostText(e.target.value)}
+              placeholder="What's on your mind?"
+              rows="4"
+              style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '0.8rem', resize: 'none', fontSize: '1rem', boxSizing: 'border-box' }}
+            />
+            
+            {newPostMedia && (
+              <div style={{ marginTop: '1rem', position: 'relative' }}>
+                <img src={URL.createObjectURL(newPostMedia)} alt="Preview" style={{ width: '100%', borderRadius: '8px', maxHeight: '200px', objectFit: 'cover' }} />
+                <button onClick={() => setNewPostMedia(null)} style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#fff', border: '1px solid #ddd', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer' }}>×</button>
+              </div>
+            )}
+            
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <label style={{ cursor: 'pointer', color: '#5b72f2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                📷 Add Photo
+                <input type="file" accept="image/*" onChange={e => setNewPostMedia(e.target.files[0])} style={{ display: 'none' }} />
+              </label>
+              
+              <button 
+                onClick={handleCreatePost}
+                disabled={posting || (!newPostText.trim() && !newPostMedia)}
+                style={{
+                  marginLeft: 'auto', background: '#5b72f2', color: '#fff', border: 'none',
+                  borderRadius: '20px', padding: '0.6rem 1.5rem', fontWeight: 600,
+                  cursor: posting ? 'wait' : 'pointer', opacity: posting ? 0.7 : 1
+                }}
+              >
+                {posting ? 'Posting...' : 'Share'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ FLOATING "+" BUTTON (Instagram Style) - Only on own profile */}
+      {isOwnProfile && (
+        <button 
+          onClick={() => setShowPostModal(true)}
+          style={{
+            position: 'fixed',
+            bottom: '90px',
+            left: '20px', // Opposite side of logout
+            background: '#5b72f2',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '50%',
+            width: '56px',
+            height: '56px',
+            fontSize: '2rem',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(91, 114, 242, 0.4)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 0.2s'
+          }}
+          onMouseOver={e => e.target.style.transform = 'scale(1.1)'}
+          onMouseOut={e => e.target.style.transform = 'scale(1)'}
+        >
+          +
+        </button>
+      )}
+
       {/* ✅ FIXED LOGOUT BUTTON: Bottom right, only on own profile */}
       {isOwnProfile && (
         <button 
@@ -148,54 +248,29 @@ function ProfileScreen({ userId }) {
         </button>
       )}
 
-      {/* ✅ RESTORED: Profile Picture Section */}
+      {/* Profile Picture Section */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
         <div style={{ position: 'relative' }}>
           <img 
             src={getAvatarUrl()} 
             alt={user.name}
-            style={{ 
-              width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', 
-              border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' 
-            }}
+            style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
           />
-          {/* ✅ Change Photo Button (Only on own profile) */}
           {isOwnProfile && (
-            <label 
-              style={{
-                position: 'absolute', bottom: 0, right: 0,
-                background: '#5b72f2', color: '#fff',
-                borderRadius: '50%', width: 32, height: 32,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: uploadingPhoto ? 'wait' : 'pointer',
-                border: '2px solid #fff', fontSize: '1rem'
-              }}
-            >
+            <label style={{ position: 'absolute', bottom: 0, right: 0, background: '#5b72f2', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploadingPhoto ? 'wait' : 'pointer', border: '2px solid #fff', fontSize: '1rem' }}>
               📷
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={handlePhotoUpload} 
-                disabled={uploadingPhoto}
-                style={{ display: 'none' }} 
-              />
+              <input type="file" accept="image/*" onChange={handlePhotoUpload} disabled={uploadingPhoto} style={{ display: 'none' }} />
             </label>
           )}
         </div>
-        
         <h2 style={{ margin: '0.8rem 0 0.3rem', textAlign: 'center' }}>{user.name}</h2>
         <p style={{ margin: 0, color: '#666', fontSize: '0.9rem', textAlign: 'center' }}>
           {user.age ? `${user.age} years old` : ''} 
           {user.location?.address ? ` • ${user.location.address}` : ''}
         </p>
-        
-        {/* Privacy Toggle (Only on own profile) */}
         {isOwnProfile && (
-          <button onClick={handleTogglePrivacy} style={{ 
-            marginTop: '0.8rem', background: user.isPrivate ? '#e53e3e' : '#10b981', color: '#fff', 
-            border: 'none', borderRadius: '20px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem'
-          }}>
-            {user.isPrivate ? '🔒 Private' : '🌍 Public'}
+          <button onClick={handleTogglePrivacy} style={{ marginTop: '0.8rem', background: user.isPrivate ? '#e53e3e' : '#10b981', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+            {user.isPrivate ? '🔒 Private' : ' Public'}
           </button>
         )}
       </div>
@@ -249,20 +324,8 @@ function ProfileScreen({ userId }) {
                   {post.text?.substring(0, 50)}...
                 </div>
               )}
-              
-              {/* Delete button overlay for own posts */}
               {isOwnProfile && (
-                <button 
-                  onClick={() => handleDeletePost(post._id)} 
-                  style={{ 
-                    position: 'absolute', top: '5px', right: '5px', 
-                    background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', 
-                    borderRadius: '50%', width: '24px', height: '24px', 
-                    cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}
-                >
-                  ×
-                </button>
+                <button onClick={() => handleDeletePost(post._id)} style={{ position: 'absolute', top: '5px', right: '5px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
               )}
             </div>
           ))}
