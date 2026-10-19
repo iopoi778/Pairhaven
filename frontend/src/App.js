@@ -183,9 +183,9 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {[
           { id: 'home', label: 'Home', icon: '🏠' },
           { id: 'matching', label: 'Match', icon: '💖' },
-          { id: 'messages', label: 'Chat', icon: '', count: navCounts?.chat },
+          { id: 'messages', label: 'Chat', icon: '📥', count: navCounts?.chat },
           { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
-          { id: 'profile', label: 'Profile', icon: '' }
+          { id: 'profile', label: 'Profile', icon: '👤' }
         ].map(tab => (
           <button 
             key={tab.id} 
