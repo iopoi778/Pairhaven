@@ -54,15 +54,27 @@ function MatchingScreen() {
         return;
       }
       
-      // Refresh list to update button states
+      // ✅ REFRESH LIST TO UPDATE BUTTON STATES INSTANTLY
       const res = await axios.get(`${API_URL}/api/users/potential-matches`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUsers(res.data || []);
       
     } catch (err) {
-      console.error("Action failed:", err);
-      alert(err.response?.data?.message || "Action failed");
+      // ✅ HANDLE "ALREADY MATCHED" AS A SUCCESS STATE FOR UI
+      if (err.response?.status === 400 && err.response?.data?.message === 'Already matched') {
+        console.log("User already matched, refreshing UI...");
+        const res = await axios.get(`${API_URL}/api/users/potential-matches`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUsers(res.data || []);
+      } else {
+        console.error("Action failed:", err);
+        // Only show alert for actual errors, not state mismatches
+        if (err.response?.status !== 400) {
+          alert(err.response?.data?.message || "Action failed");
+        }
+      }
     } finally {
       setActionLoading(null);
     }
@@ -70,14 +82,14 @@ function MatchingScreen() {
 
   const getButtonConfig = (targetUser) => {
     // ✅ SAFE CHECKS WITH OPTIONAL CHAINING
-    const isMatched = currentUser.matches?.includes(targetUser._id);
-    const hasSentRequest = currentUser.requestsSent?.includes(targetUser._id);
-    const hasReceivedRequest = currentUser.requestsReceived?.includes(targetUser._id);
+    const isMatched = (currentUser.matches || []).includes(targetUser._id);
+    const hasSentRequest = (currentUser.requestsSent || []).includes(targetUser._id);
+    const hasReceivedRequest = (currentUser.requestsReceived || []).includes(targetUser._id);
 
     // ✅ RULE: IF MATCHED, SHOW ONLY MESSAGE ICON
     if (isMatched) {
       return { 
-        label: '💬', // Just the icon as requested
+        label: '💬', 
         style: { background: '#5b72f2', color: '#fff', fontSize: '1.5rem' }, 
         action: 'chat',
         disabled: false 
