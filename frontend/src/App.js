@@ -51,16 +51,45 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
 function App() {
   const [navCounts, setNavCounts] = useState({ chat: 0, alerts: 0 });
 
+  // ✅ ENHANCED FETCH WITH DEBUG LOGGING
   const fetchNavCounts = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
+    
     try {
-      const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, { headers: { Authorization: `Bearer ${token}` } });
-      const totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-      const notifRes = await axios.get(`${API_URL}/api/notifications`, { headers: { Authorization: `Bearer ${token}` } });
+      console.log("🔍 Fetching nav counts...");
+      
+      // ✅ CHAT COUNTS
+      const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
+      
+      console.log(" Conversations response:", msgRes.data);
+      
+      const totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => {
+        const count = c.unreadCount || 0;
+        console.log(`   - ${c.user?.name}: ${count} unread`);
+        return sum + count;
+      }, 0);
+      
+      console.log(`✅ Total unread messages: ${totalUnreadMsgs}`);
+
+      // ✅ ALERT COUNTS
+      const notifRes = await axios.get(`${API_URL}/api/notifications`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
+      
+      console.log("🔔 Notifications response:", notifRes.data);
+      
       const unreadNotifs = (notifRes.data || []).filter(n => !n.read).length;
+      
+      console.log(`✅ Total unread notifications: ${unreadNotifs}`);
+
       setNavCounts({ chat: totalUnreadMsgs, alerts: unreadNotifs });
-    } catch (err) { console.error("Failed to fetch nav counts", err); }
+      
+    } catch (err) { 
+      console.error("❌ FAILED to fetch nav counts:", err.response?.status, err.response?.data || err.message); 
+    }
   };
 
   useEffect(() => {
@@ -107,7 +136,7 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
     }
   };
 
-  // ✅ RENDER BADGE FUNCTION - PLACED BEFORE RETURN STATEMENT
+  // ✅ RENDER BADGE FUNCTION
   const renderBadge = (count) => {
     if (!count || count <= 0) return null;
     return (
