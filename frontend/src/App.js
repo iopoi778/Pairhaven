@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ProfileScreen from './pages/ProfileScreen';
 import MatchingScreen from './pages/MatchingScreen';
@@ -19,10 +19,20 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
-// Wrapper to pass userId param to ProfileScreen
+// ✅ FIXED: Single Profile Wrapper that manually parses HashRouter URL
 function ProfileRouteWrapper() {
-  const { userId } = useParams();
-  return <ProfileScreen userId={userId} />;
+  // Get hash path (e.g., "#/profile/12345")
+  const hashPath = window.location.hash.replace('#', '') || '/';
+  const parts = hashPath.split('/').filter(Boolean); // ['profile', '12345']
+  const userId = parts[1] || null;
+  
+  if (!userId) return <Navigate to="/" replace />;
+  
+  return (
+    <DashboardLayout activeTabOverride="profile">
+      <ProfileScreen userId={userId} />
+    </DashboardLayout>
+  );
 }
 
 function App() {
@@ -33,7 +43,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           
-          {/* ✅ FIXED: Dynamic Profile Route for HashRouter */}
+          {/* ✅ Dynamic Profile Route - MUST be before catch-all */}
           <Route 
             path="/profile/*" 
             element={
@@ -43,7 +53,7 @@ function App() {
             } 
           />
 
-          {/* Default Self Profile & Dashboard */}
+          {/* Default Dashboard & Self Profile */}
           <Route path="/*" element={
             <ProtectedRoute>
               <DashboardLayout />
@@ -55,38 +65,22 @@ function App() {
   );
 }
 
-// ✅ NEW: Wrapper that manually parses userId from window.location.hash
-function ProfileRouteWrapper() {
-  // HashRouter stores path after #/
-  const hash = window.location.hash;
-  const parts = hash.replace('#/', '').split('/');
-  const userId = parts[1]; // /profile/USERID -> parts[1] is USERID
-  
-  return (
-    <DashboardLayout activeTabOverride="profile">
-      <ProfileScreen userId={userId} />
-    </DashboardLayout>
-  );
-}
-
 function DashboardLayout({ activeTabOverride, children }) {
   const [activeTab, setActiveTab] = useState('home');
   const navigate = useNavigate();
 
-  // If viewing someone else's profile via URL, override tab state
   const currentTab = activeTabOverride || activeTab;
 
   const renderContent = () => {
-    // If children are passed (for /profile/:userId route), render them directly
     if (children) return children;
 
     switch (currentTab) {
-      case 'home': return <HomeFeed onNavigateToProfile={(id) => navigate(`/profile/${id}`)} />;
+      case 'home': return <HomeFeed onNavigateToProfile={(id) => window.location.hash = `/profile/${id}`} />;
       case 'matching': return <MatchingScreen />;
       case 'messages': return <ChatScreen />;
       case 'notifications': return <NotificationsScreen />;
       case 'profile': return <ProfileScreen />;
-      default: return <HomeFeed onNavigateToProfile={(id) => navigate(`/profile/${id}`)} />;
+      default: return <HomeFeed onNavigateToProfile={(id) => window.location.hash = `/profile/${id}`} />;
     }
   };
 
@@ -97,7 +91,6 @@ function DashboardLayout({ activeTabOverride, children }) {
     navigate('/login', { replace: true });
   };
 
-  // Sync nav bar highlight when viewing external profiles
   useEffect(() => {
     if (activeTabOverride) setActiveTab(activeTabOverride);
   }, [activeTabOverride]);
@@ -118,7 +111,7 @@ function DashboardLayout({ activeTabOverride, children }) {
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px' }}>
         {[
           { id: 'home', label: 'Home', icon: '' },
-          { id: 'matching', label: 'Match', icon: '💖' },
+          { id: 'matching', label: 'Match', icon: '' },
           { id: 'messages', label: 'Chat', icon: '💬' },
           { id: 'notifications', label: 'Alerts', icon: '🔔' },
           { id: 'profile', label: 'Profile', icon: '👤' }
@@ -127,7 +120,7 @@ function DashboardLayout({ activeTabOverride, children }) {
             key={tab.id}
             onClick={() => {
               setActiveTab(tab.id);
-              if (tab.id === 'profile') navigate('/'); // Reset to self profile
+              if (tab.id === 'profile') window.location.hash = '/';
             }}
             style={{
               border: currentTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent',
@@ -151,7 +144,6 @@ function DashboardLayout({ activeTabOverride, children }) {
 
 function HomeFeed({ onNavigateToProfile }) {
   const [posts, setPosts] = useState([]);
-  const navigate = useNavigate(); // ✅ Add this import at top of file
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -185,9 +177,9 @@ function HomeFeed({ onNavigateToProfile }) {
         posts.map(post => (
           <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
             
-            {/* ✅ FIXED: Direct hash navigation for HashRouter */}
+            {/* ✅ Clickable Author Header */}
             <div 
-              onClick={() => window.location.hash = `/profile/${post.author?._id}`}
+              onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)}
               style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}
             >
               <img 
