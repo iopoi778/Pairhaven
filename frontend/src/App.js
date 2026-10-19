@@ -19,30 +19,43 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
-// ✅ FIXED: Manual hash parsing for HashRouter compatibility
-function ProfileRouteWrapper() {
+// ✅ FIXED: Robust HashRouter parsing for profiles
+function ProfileRouteWrapper({ onUpdateCounts }) {
   const navigate = useNavigate();
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  // Parse hash manually: #/profile/USERID
   const hashPath = window.location.hash.replace('#', '') || '/';
   const parts = hashPath.split('/').filter(Boolean);
   
-  // If not a valid profile path, redirect to home
-  if (parts[0] !== 'profile' || !parts[1]) {
+  // If path is just /profile without ID, go to self
+  if (parts[0] === 'profile' && !parts[1]) {
     return <Navigate to="/" replace />;
   }
-  
+
+  // If it's NOT a profile route at all, redirect home
+  if (parts[0] !== 'profile') {
+    return <Navigate to="/" replace />;
+  }
+
   const userId = parts[1];
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   
-  // If viewing own profile, redirect to self-profile route
+  // If viewing OWN profile, redirect to main dashboard self-profile
   if (userId === currentUser._id) {
     return <Navigate to="/" replace />;
   }
+
+  // Fetch counts when entering another person's profile
+  useEffect(() => {
+    if (onUpdateCounts) onUpdateCounts();
+  }, [userId]);
 
   return (
     <DashboardLayout 
       activeTabOverride="profile" 
       showBackButton={true}
       onBack={() => navigate(-1)}
+      navCounts={null} // Will be passed from parent if needed, but usually handled by parent state
     >
       <ProfileScreen userId={userId} />
     </DashboardLayout>
@@ -50,6 +63,40 @@ function ProfileRouteWrapper() {
 }
 
 function App() {
+  const [navCounts, setNavCounts] = useState({ chat: 0, alerts: 0 });
+
+  // Function to fetch unread counts
+  const fetchNavCounts = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      // Fetch unread messages count
+      const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+
+      // Fetch unread notifications count (assuming backend returns array)
+      const notifRes = await axios.get(`${API_URL}/api/notifications`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const unreadNotifs = (notifRes.data || []).filter(n => !n.read).length;
+
+      setNavCounts({ chat: totalUnreadMsgs, alerts: unreadNotifs });
+    } catch (err) {
+      console.error("Failed to fetch nav counts", err);
+    }
+  };
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchNavCounts();
+    // Optional: Poll every 30 seconds for new counts
+    const interval = setInterval(fetchNavCounts, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <Router>
       <div style={{ fontFamily: 'Arial, sans-serif', minHeight: '100vh', background: '#f2f2f2' }}>
@@ -57,20 +104,20 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           
-          {/* ✅ Dynamic Profile Route - MUST be before catch-all */}
+          {/* ✅ Dynamic Profile Route */}
           <Route 
             path="/profile/*" 
             element={
               <ProtectedRoute>
-                <ProfileRouteWrapper />
+                <ProfileRouteWrapper onUpdateCounts={fetchNavCounts} />
               </ProtectedRoute>
             } 
           />
 
-          {/* Default Self Profile & Dashboard */}
+          {/* Default Dashboard & Self Profile */}
           <Route path="/*" element={
             <ProtectedRoute>
-              <DashboardLayout />
+              <DashboardLayout navCounts={navCounts} onUpdateCounts={fetchNavCounts} />
             </ProtectedRoute>
           } />
         </Routes>
@@ -79,11 +126,16 @@ function App() {
   );
 }
 
-function DashboardLayout({ activeTabOverride, children, showBackButton, onBack }) {
+function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, navCounts, onUpdateCounts }) {
   const [activeTab, setActiveTab] = useState('home');
   const navigate = useNavigate();
 
   const currentTab = activeTabOverride || activeTab;
+
+  // Refresh counts when tab changes
+  useEffect(() => {
+    if (onUpdateCounts) onUpdateCounts();
+  }, [currentTab]);
 
   const renderContent = () => {
     if (children) return children;
@@ -109,36 +161,44 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack }
     if (activeTabOverride) setActiveTab(activeTabOverride);
   }, [activeTabOverride]);
 
+  // Helper to render badge
+  const renderBadge = (count) => {
+    if (!count || count <= 0) return null;
+    return (
+      <span style={{
+        position: 'absolute', top: '-5px', right: '-5px',
+        background: '#e53e3e', color: '#fff', fontSize: '0.65rem',
+        borderRadius: '50%', width: '16px', height: '16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontWeight: 700
+      }}>
+        {count > 9 ? '9+' : count}
+      </span>
+    );
+  };
+
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* ✅ Back Button for External Profiles */}
           {showBackButton && (
-            <button 
-              onClick={onBack}
-              style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: 0 }}
-            >
-              ←
-            </button>
+            <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: 0 }}>←</button>
           )}
           <h2 style={{ margin: 0, color: '#5b72f2', fontWeight: 700 }}>PairHaven</h2>
         </div>
-        <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}>
-          Logout
-        </button>
+        <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}>Logout</button>
       </header>
 
       <main style={{ padding: '1rem', minHeight: 'calc(100vh - 120px)', background: '#f6f6f6' }}>
         {renderContent()}
       </main>
 
-      <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px' }}>
+      <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
           { id: 'home', label: 'Home', icon: '' },
           { id: 'matching', label: 'Match', icon: '' },
-          { id: 'messages', label: 'Chat', icon: '💬' },
-          { id: 'notifications', label: 'Alerts', icon: '🔔' },
+          { id: 'messages', label: 'Chat', icon: '', count: navCounts?.chat },
+          { id: 'notifications', label: 'Alerts', icon: '', count: navCounts?.alerts },
           { id: 'profile', label: 'Profile', icon: '' }
         ].map(tab => (
           <button
@@ -155,11 +215,13 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack }
               minWidth: '70px',
               textAlign: 'center',
               color: currentTab === tab.id ? '#5b72f2' : '#666',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              position: 'relative' // For badge positioning
             }}
           >
             <div style={{ fontSize: '1.3rem' }}>{tab.icon}</div>
             <div style={{ fontSize: '0.72rem', marginTop: '0.15rem' }}>{tab.label}</div>
+            {renderBadge(tab.count)}
           </button>
         ))}
       </nav>
@@ -190,13 +252,11 @@ function HomeFeed({ onNavigateToProfile }) {
     setPosts(prev => [newPost, ...prev]);
   };
 
-  // ✅ Safe avatar URL helper
   const getAvatarUrl = (author) => {
     if (!author) return 'https://via.placeholder.com/36';
     if (author.photos && Array.isArray(author.photos) && author.photos[0]) {
       return typeof author.photos[0] === 'string' ? author.photos[0] : author.photos[0].url;
     }
-    if (author.photoUrl) return author.photoUrl;
     return 'https://via.placeholder.com/36';
   };
 
@@ -205,56 +265,23 @@ function HomeFeed({ onNavigateToProfile }) {
       <h2 style={{ margin: '0 0 1rem' }}>Your Feed</h2>
       <PostComposer onPosted={handleNewPost} />
       {posts.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: '12px', padding: '1.2rem', textAlign: 'center', color: '#666' }}>
-          No posts yet.
-        </div>
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '1.2rem', textAlign: 'center', color: '#666' }}>No posts yet.</div>
       ) : (
         posts.map(post => {
-          // ✅ Detect video by URL pattern if mediaType is missing
-          const isVideo = post.mediaType === 'video' || 
-                          (post.mediaUrl && post.mediaUrl.includes('/video/upload'));
-          
+          const isVideo = post.mediaType === 'video' || (post.mediaUrl && post.mediaUrl.includes('/video/upload'));
           const avatarSrc = getAvatarUrl(post.author);
 
           return (
             <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-              
-              {/* CLICKABLE AUTHOR HEADER */}
-              <div 
-                onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}
-              >
-                <img 
-                  src={avatarSrc} 
-                  alt={post.author?.name}
-                  style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', background: '#eee' }}
-                  onError={(e) => { e.target.src = 'https://via.placeholder.com/36'; }}
-                />
+              <div onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
+                <img src={avatarSrc} alt={post.author?.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', background: '#eee' }} onError={(e) => { e.target.src = 'https://via.placeholder.com/36'; }} />
                 <div>
                   <div style={{ fontWeight: 700 }}>{post.author?.name || 'User'}</div>
                   <div style={{ fontSize: 12, color: '#666' }}>{new Date(post.createdAt).toLocaleString()}</div>
                 </div>
               </div>
-
-              {post.text ? <div style={{ marginBottom: 8 }}>{post.text}</div> : null}
-
-              {/* MEDIA DISPLAY */}
-              {post.mediaUrl && (
-                isVideo ? (
-                  <video 
-                    src={post.mediaUrl} 
-                    controls 
-                    style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} 
-                  />
-                ) : (
-                  <img 
-                    src={post.mediaUrl} 
-                    alt="Post content" 
-                    style={{ width: '100%', borderRadius: 10 }} 
-                    onError={(e) => { e.target.style.display = 'none'; }}
-                  />
-                )
-              )}
+              {post.text && <div style={{ marginBottom: 8 }}>{post.text}</div>}
+              {post.mediaUrl && (isVideo ? <video src={post.mediaUrl} controls style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} /> : <img src={post.mediaUrl} alt="" style={{ width: '100%', borderRadius: 10 }} />)}
             </div>
           );
         })
@@ -266,55 +293,28 @@ function HomeFeed({ onNavigateToProfile }) {
 function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
-    const email = e.target.email.value;
-    const password = e.target.password.value;
-
     try {
-      const res = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-
+      const res = await fetch(`${API_URL}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: e.target.email.value, password: e.target.password.value }) });
       const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.message || 'Login failed');
-        return;
-      }
-
+      if (!res.ok) { alert(data.message || 'Login failed'); return; }
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       navigate('/', { replace: true });
-    } catch (err) {
-      console.error(err);
-      alert('Server error. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); alert('Server error.'); } finally { setLoading(false); }
   };
-
   return (
     <div style={{ maxWidth: 400, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
       <h2 style={{ textAlign: 'center', color: '#5b72f2' }}>Welcome Back</h2>
       <form onSubmit={handleSubmit}>
-        <input name="email" type="email" placeholder="Email" required autoComplete="email" style={inputStyle} />
-        <input name="password" type="password" placeholder="Password" required autoComplete="current-password" style={inputStyle} />
-        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>
-          {loading ? 'Logging in...' : 'Log In'}
-        </button>
+        <input name="email" type="email" placeholder="Email" required style={inputStyle} />
+        <input name="password" type="password" placeholder="Password" required style={inputStyle} />
+        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>{loading ? 'Logging in...' : 'Log In'}</button>
       </form>
-
-      <p style={{ textAlign: 'center', marginTop: '1rem' }}>
-        New here?{' '}
-        <span onClick={() => navigate('/register')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Create Account</span>
-      </p>
+      <p style={{ textAlign: 'center', marginTop: '1rem' }}>New here? <span onClick={() => navigate('/register')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Create Account</span></p>
     </div>
   );
 }
@@ -322,45 +322,23 @@ function LoginPage() {
 function RegisterPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     const formData = new FormData(e.target);
-
     try {
       if (navigator.geolocation) {
         try {
-          const pos = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 5000, maximumAge: 0 });
-          });
-          formData.append('location', JSON.stringify({
-            type: 'Point',
-            coordinates: [pos.coords.longitude, pos.coords.latitude]
-          }));
-        } catch (geoErr) {
-          console.warn('Geolocation skipped:', geoErr.message);
-          formData.append('location', JSON.stringify({ type: 'Point', coordinates: [0, 0] }));
-        }
+          const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 5000 }));
+          formData.append('location', JSON.stringify({ type: 'Point', coordinates: [pos.coords.longitude, pos.coords.latitude] }));
+        } catch (geoErr) { formData.append('location', JSON.stringify({ type: 'Point', coordinates: [0, 0] })); }
       }
-
       const res = await fetch(`${API_URL}/api/auth/register`, { method: 'POST', body: formData });
       const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.message || 'Registration failed');
-        return;
-      }
-
+      if (!res.ok) { alert(data.message || 'Registration failed'); return; }
       try {
-        const loginRes = await fetch(`${API_URL}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.get('email'), password: formData.get('password') })
-        });
+        const loginRes = await fetch(`${API_URL}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: formData.get('email'), password: formData.get('password') }) });
         const loginData = await loginRes.json();
-
         if (loginRes.ok) {
           localStorage.setItem('token', loginData.token);
           localStorage.setItem('user', JSON.stringify(loginData.user));
@@ -368,70 +346,33 @@ function RegisterPage() {
           navigate('/', { replace: true });
           return;
         }
-      } catch (loginErr) {
-        console.warn('Auto-login failed', loginErr);
-      }
-
+      } catch (err) {}
       alert('Registered! Please log in.');
       navigate('/login', { replace: true });
-    } catch (err) {
-      console.error(err);
-      alert('Server error. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { alert('Server error.'); } finally { setLoading(false); }
   };
-
   return (
     <div style={{ maxWidth: 420, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
       <h2 style={{ textAlign: 'center', color: '#5b72f2' }}>Join PairHaven</h2>
       <form onSubmit={handleSubmit}>
-        <input name="name" placeholder="Full Name" required autoComplete="name" style={inputStyle} />
-        <input name="email" type="email" placeholder="Email" required autoComplete="email" style={inputStyle} />
-        <input name="phone" placeholder="Phone" required autoComplete="tel" style={inputStyle} />
-        <input name="password" type="password" placeholder="Password" required autoComplete="new-password" style={inputStyle} />
+        <input name="name" placeholder="Full Name" required style={inputStyle} />
+        <input name="email" type="email" placeholder="Email" required style={inputStyle} />
+        <input name="phone" placeholder="Phone" required style={inputStyle} />
+        <input name="password" type="password" placeholder="Password" required style={inputStyle} />
         <div style={{ display: 'flex', gap: '1rem' }}>
           <input name="age" type="number" placeholder="Age" required style={{ ...inputStyle, flex: 1 }} />
-          <select name="gender" required style={{ ...inputStyle, flex: 1 }}>
-            <option value="">Gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-          </select>
+          <select name="gender" required style={{ ...inputStyle, flex: 1 }}><option value="">Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select>
         </div>
         <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
         <input name="photos" type="file" multiple accept="image/*" required style={{ marginBottom: '1rem', width: '100%' }} />
-        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>
-          {loading ? 'Signing up...' : 'Sign Up'}
-        </button>
+        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>{loading ? 'Signing up...' : 'Sign Up'}</button>
       </form>
-      <p style={{ textAlign: 'center', marginTop: '1rem' }}>
-        Already have an account?{' '}
-        <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
-      </p>
+      <p style={{ textAlign: 'center', marginTop: '1rem' }}>Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span></p>
     </div>
   );
 }
 
-const inputStyle = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '0.8rem',
-  borderRadius: '8px',
-  border: '1px solid #dfe3ea',
-  marginBottom: '1rem',
-  fontSize: '1rem'
-};
-
-const primaryButtonStyle = {
-  width: '100%',
-  padding: '0.9rem',
-  border: 'none',
-  borderRadius: '8px',
-  background: '#5b72f2',
-  color: '#fff',
-  fontWeight: 700,
-  cursor: 'pointer'
-};
+const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '0.8rem', borderRadius: '8px', border: '1px solid #dfe3ea', marginBottom: '1rem', fontSize: '1rem' };
+const primaryButtonStyle = { width: '100%', padding: '0.9rem', border: 'none', borderRadius: '8px', background: '#5b72f2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
 
 export default App;
