@@ -1,215 +1,204 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
 function MatchingScreen() {
-  const [profiles, setProfiles] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // Persistent history of actions keyed by userId
-  const [actionHistory, setActionHistory] = useState({});
+  const [actionLoading, setActionLoading] = useState(null); // Stores userId of loading action
+  const navigate = useNavigate();
   
   const token = localStorage.getItem('token');
-  const currentProfile = profiles[currentIndex];
-  const currentUserId = currentProfile?._id;
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
-  // Get current state from history (defaults to false)
-  const hasFollowed = actionHistory[currentUserId]?.followed || false;
-  const hasLiked = actionHistory[currentUserId]?.liked || false;
-
-  // Check follow status ONLY when loading a new profile for the first time
   useEffect(() => {
-    if (!currentUserId || actionHistory[currentUserId]) return; // Skip if already tracked
-    
-    const checkFollowStatus = async () => {
+    const fetchPotentialMatches = async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/users/profile/${currentUserId}`, {
+        // Fetch users excluding yourself (adjust endpoint as needed)
+        const res = await axios.get(`${API_URL}/api/users/potential-matches`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUsers(res.data || []);
+      } catch (err) {
+        console.error("Failed to load matches", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (token) fetchPotentialMatches();
+  }, [token]);
+
+  // ✅ SMART ACTION HANDLER
+  const handleMatchAction = async (targetUser, actionType) => {
+    setActionLoading(targetUser._id);
+    
+    try {
+      if (actionType === 'send_request') {
+        await axios.post(`${API_URL}/api/users/request/${targetUser._id}`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        alert(`Match request sent to ${targetUser.name}!`);
+        
+      } else if (actionType === 'accept') {
+        await axios.post(`${API_URL}/api/users/accept-request/${targetUser._id}`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        alert(`You matched with ${targetUser.name}! You can now chat.`);
+        
+      } else if (actionType === 'decline') {
+        await axios.delete(`${API_URL}/api/users/request/${targetUser._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
-        if (res.data.isFollowing) {
-          updateHistory(currentUserId, 'followed', true);
-        }
-      } catch (err) {
-        console.error("Could not check follow status", err);
+      } else if (actionType === 'chat') {
+        // Navigate to chat and open conversation with this user
+        localStorage.setItem('activeTab', 'messages');
+        localStorage.setItem('chatWithUserId', targetUser._id); // Optional: auto-select chat
+        window.location.hash = '/';
+        return; // Don't reset loading state yet
       }
-    };
-
-    checkFollowStatus();
-  }, [currentUserId]); // Only runs when userId changes AND not yet in history
-
-  // Helper to update history without triggering re-checks
-  const updateHistory = (userId, action, value) => {
-    setActionHistory(prev => ({
-      ...prev,
-      [userId]: {
-        ...(prev[userId] || {}),
-        [action]: value
-      }
-    }));
-  };
-
-  useEffect(() => {
-    fetchProfiles();
-  }, []);
-
-  const fetchProfiles = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/matches/random`, {
+      
+      // Refresh user list to update button states
+      const res = await axios.get(`${API_URL}/api/users/potential-matches`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setProfiles(res.data);
-      setCurrentIndex(0);
+      setUsers(res.data || []);
+      
     } catch (err) {
-      console.error("Failed to load matches", err);
+      console.error("Action failed:", err);
+      alert(err.response?.data?.message || "Action failed");
     } finally {
-      setLoading(false);
+      setActionLoading(null);
     }
   };
 
-  // Handle Follow -> Auto Swipe Next + Persist State
-  const handleFollow = async () => {
-    if (!currentUserId || hasFollowed) return;
-    
-    try {
-      await axios.post(`${API_URL}/api/users/follow/${currentUserId}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      updateHistory(currentUserId, 'followed', true);
-      setCurrentIndex(prev => prev + 1); 
-      
-    } catch (err) {
-      if (err.response?.data?.message === 'Already following') {
-        updateHistory(currentUserId, 'followed', true);
-        setCurrentIndex(prev => prev + 1);
-      } else {
-        console.error("Follow failed", err);
-      }
+  // ✅ GET BUTTON CONFIG BASED ON RELATIONSHIP STATUS
+  const getButtonConfig = (targetUser) => {
+    const isMatched = currentUser.matches?.includes(targetUser._id);
+    const hasSentRequest = currentUser.requestsSent?.includes(targetUser._id);
+    const hasReceivedRequest = currentUser.requestsReceived?.includes(targetUser._id);
+
+    if (isMatched) {
+      return { 
+        label: '💬 Message', 
+        style: { background: '#5b72f2', color: '#fff' }, 
+        action: 'chat',
+        disabled: false 
+      };
     }
+    if (hasSentRequest) {
+      return { 
+        label: '⏳ Request Sent', 
+        style: { background: '#ccc', color: '#fff' }, 
+        action: null,
+        disabled: true 
+      };
+    }
+    if (hasReceivedRequest) {
+      // Return object with two buttons for accept/decline
+      return { dualButtons: true };
+    }
+    // Default: Send Request
+    return { 
+      label: '❤️ Send Match Request', 
+      style: { background: '#5b72f2', color: '#fff' }, 
+      action: 'send_request',
+      disabled: false 
+    };
   };
 
-  // Handle Like -> Auto Swipe Next + Persist State
-  const handleLike = async () => {
-    if (!currentUserId || hasLiked) return;
-    
-    try {
-      const res = await axios.post(`${API_URL}/api/users/like/${currentUserId}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      updateHistory(currentUserId, 'liked', true);
-      setCurrentIndex(prev => prev + 1);
-      
-      if (res.data.isMatch) {
-        alert(`It's a match with ${currentProfile.name}!`); 
-      }
-    } catch (err) {
-      if (err.response?.data?.message === 'Already liked') {
-        updateHistory(currentUserId, 'liked', true);
-        setCurrentIndex(prev => prev + 1);
-      } else {
-        console.error("Like failed", err);
-      }
-    }
-  };
-
-  const handlePass = () => {
-    if (currentIndex < profiles.length) {
-      setCurrentIndex(prev => prev + 1);
-    }
-  };
-
-  if (loading) return <div style={{padding:'2rem', textAlign:'center'}}>Loading...</div>;
-
-  if (profiles.length === 0 || currentIndex >= profiles.length) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <h3>Find Matches</h3>
-        <div style={{ background: '#eef2ff', borderRadius: '16px', padding: '4rem 2rem', margin: '1rem 0' }}>
-          <p>No more profiles to show right now.</p>
-        </div>
-        <button onClick={fetchProfiles} style={{marginTop:'1rem', padding:'0.5rem 1rem', background:'#5b72f2', color:'#fff', border:'none', borderRadius:'8px'}}>
-          Refresh
-        </button>
-      </div>
-    );
-  }
+  if (loading) return <div style={{padding:'3rem', textAlign:'center'}}>Loading potential matches...</div>;
 
   return (
-    <div style={{ padding: '1rem', textAlign: 'center', paddingBottom: '90px' }}>
-      <h3>Find Matches</h3>
+    <div style={{ padding: '1rem', paddingBottom: '90px' }}>
+      <h2 style={{ marginBottom: '1rem' }}>Discover People</h2>
       
-      {/* Profile Card */}
-      <div style={{ 
-        background: '#fff', borderRadius: '16px', overflow: 'hidden', 
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)', margin: '1rem auto', maxWidth: '400px'
-      }}>
-        <img 
-          src={currentProfile.photos?.[0]?.url || currentProfile.photos?.[0] || 'https://via.placeholder.com/400'} 
-          alt={currentProfile.name}
-          style={{ width: '100%', height: '400px', objectFit: 'cover' }}
-        />
-        <div style={{ padding: '1.5rem', textAlign: 'left' }}>
-          <h2 style={{ margin: '0 0 0.5rem' }}>{currentProfile.name}, {currentProfile.age}</h2>
-          <p style={{ color: '#666', margin: '0 0 1rem' }}>{currentProfile.bio || 'No bio yet.'}</p>
+      {users.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#666', padding: '3rem' }}>
+          No new people to discover right now.
         </div>
-      </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}>
+          {users.map(user => {
+            const btnConfig = getButtonConfig(user);
+            const isLoading = actionLoading === user._id;
 
-      {/* ACTION BUTTONS */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '1.5rem' }}>
-        
-        {/* CANCEL / PASS BUTTON */}
-        <button 
-          onClick={handlePass}
-          style={{ 
-            width: '60px', height: '60px', borderRadius: '50%', 
-            border: '2px solid #ef4444', background: '#fff', 
-            fontSize: '1.5rem', cursor: 'pointer', color: '#ef4444',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}
-        >
-          ✕
-        </button>
+            return (
+              <div key={user._id} style={{ 
+                background: '#fff', borderRadius: '12px', overflow: 'hidden', 
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' 
+              }}>
+                {/* User Photo */}
+                <div 
+                  onClick={() => window.location.hash = `/profile/${user._id}`}
+                  style={{ aspectRatio: '1', cursor: 'pointer', overflow: 'hidden' }}
+                >
+                  <img 
+                    src={user.photos?.[0]?.url || user.photos?.[0] || 'https://via.placeholder.com/200'} 
+                    alt={user.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </div>
 
-        {/* FOLLOW BUTTON - PERSISTENT STATE */}
-        <button 
-          onClick={handleFollow}
-          disabled={hasFollowed}
-          style={{ 
-            width: '60px', height: '60px', borderRadius: '50%', 
-            border: hasFollowed ? '2px solid #3b82f6' : '2px solid #cbd5e1', 
-            background: hasFollowed ? '#eff6ff' : '#fff', 
-            fontSize: '1.5rem', 
-            cursor: hasFollowed ? 'default' : 'pointer', 
-            color: hasFollowed ? '#3b82f6' : '#94a3b8',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'all 0.3s ease'
-          }}
-        >
-          {hasFollowed ? '✓' : '👤+'}
-        </button>
+                {/* User Info */}
+                <div style={{ padding: '0.8rem', flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{user.name}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '2px' }}>
+                    {user.age ? `${user.age} yrs` : ''}
+                    {user.location?.city ? ` • ${user.location.city}` : ''}
+                  </div>
+                </div>
 
-        {/* LIKE BUTTON - PERSISTENT STATE */}
-        <button 
-          onClick={handleLike}
-          disabled={hasLiked}
-          style={{ 
-            width: '60px', height: '60px', borderRadius: '50%', 
-            border: hasLiked ? '2px solid #e53e3e' : '2px solid #10b981', 
-            background: hasLiked ? '#fef2f2' : '#fff', 
-            fontSize: '1.5rem', 
-            cursor: hasLiked ? 'default' : 'pointer', 
-            color: hasLiked ? '#e53e3e' : '#10b981',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'all 0.3s ease'
-          }}
-        >
-          {hasLiked ? '❤️' : '♥'}
-        </button>
-      </div>
+                {/* ✅ DYNAMIC ACTION BUTTON(S) */}
+                <div style={{ padding: '0 0.8rem 0.8rem' }}>
+                  {btnConfig.dualButtons ? (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button 
+                        onClick={() => handleMatchAction(user, 'accept')}
+                        disabled={isLoading}
+                        style={{ 
+                          flex: 1, background: '#10b981', color: '#fff', border: 'none', 
+                          borderRadius: '8px', padding: '0.5rem', fontSize: '0.8rem', 
+                          cursor: isLoading ? 'wait' : 'pointer', fontWeight: 600 
+                        }}
+                      >
+                        {isLoading ? '...' : '✅ Accept'}
+                      </button>
+                      <button 
+                        onClick={() => handleMatchAction(user, 'decline')}
+                        disabled={isLoading}
+                        style={{ 
+                          flex: 1, background: '#e53e3e', color: '#fff', border: 'none', 
+                          borderRadius: '8px', padding: '0.5rem', fontSize: '0.8rem', 
+                          cursor: isLoading ? 'wait' : 'pointer', fontWeight: 600 
+                        }}
+                      >
+                        {isLoading ? '...' : '❌ Decline'}
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => handleMatchAction(user, btnConfig.action)}
+                      disabled={btnConfig.disabled || isLoading}
+                      style={{ 
+                        width: '100%', ...btnConfig.style, border: 'none', 
+                        borderRadius: '8px', padding: '0.6rem', fontSize: '0.85rem', 
+                        cursor: (btnConfig.disabled || isLoading) ? 'not-allowed' : 'pointer',
+                        fontWeight: 600, transition: 'opacity 0.2s',
+                        opacity: isLoading ? 0.7 : 1
+                      }}
+                    >
+                      {isLoading ? 'Processing...' : btnConfig.label}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
