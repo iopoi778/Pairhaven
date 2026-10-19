@@ -131,10 +131,22 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
 
   const currentTab = activeTabOverride || activeTab;
 
-  // Refresh counts when tab changes
+  // Refresh counts when tab changes AND handle localStorage tab signals from notifications
   useEffect(() => {
     if (onUpdateCounts) onUpdateCounts();
+    
+    // ✅ NEW: Check for tab signal from notifications
+    const savedTab = localStorage.getItem('activeTab');
+    if (savedTab) {
+      setActiveTab(savedTab);
+      localStorage.removeItem('activeTab'); // Clear after use
+    }
   }, [currentTab]);
+
+  // Sync override state
+  useEffect(() => {
+    if (activeTabOverride) setActiveTab(activeTabOverride);
+  }, [activeTabOverride]);
 
   const renderContent = () => {
     if (children) return children;
@@ -155,10 +167,6 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
     delete axios.defaults.headers.common['Authorization'];
     navigate('/login', { replace: true });
   };
-
-  useEffect(() => {
-    if (activeTabOverride) setActiveTab(activeTabOverride);
-  }, [activeTabOverride]);
 
   // Helper to render badge
   const renderBadge = (count) => {
@@ -192,13 +200,14 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {renderContent()}
       </main>
 
+      {/* ✅ NAV BAR WITH ICONS RESTORED */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
-          { id: 'home', label: 'Home', icon: '' },
-          { id: 'matching', label: 'Match', icon: '' },
-          { id: 'messages', label: 'Chat', icon: '', count: navCounts?.chat },
-          { id: 'notifications', label: 'Alerts', icon: '', count: navCounts?.alerts },
-          { id: 'profile', label: 'Profile', icon: '' }
+          { id: 'home', label: 'Home', icon: '🏠' },
+          { id: 'matching', label: 'Match', icon: '💖' },
+          { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
+          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
+          { id: 'profile', label: 'Profile', icon: '👤' }
         ].map(tab => (
           <button
             key={tab.id}
