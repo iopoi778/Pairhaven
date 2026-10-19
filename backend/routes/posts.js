@@ -4,26 +4,63 @@ const Post = require('../models/Post');
 const User = require('../models/User'); // ✅ ADDED: Required for feed filtering
 const auth = require('../middleware/auth');
 
-// ✅ FIXED GET /api/posts - Populates likes/loves AND calculates user status
-router.get('/', auth, async (req, res) => {
+// POST /api/posts/:postId/react - Handle Like/Love Toggle + Send Alert
+router.post('/:postId/react', auth, async (req, res) => {
   try {
-    const posts = await Post.find()
-      .populate('author', 'name photos')
-      .populate('likes', '_id')   // ✅ CRITICAL: Populate likes array
-      .populate('loves', '_id')   // ✅ CRITICAL: Populate loves array
-      .sort({ createdAt: -1 });
+    const { type } = req.body; // 'like' or 'love'
+    const post = await Post.findById(req.params.postId).populate('author', '_id name');
+    
+    if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    // Transform posts to include counts and boolean flags for current user
-    const formattedPosts = posts.map(post => {
-      const postObj = post.toObject();
-      return {
-        ...postObj,
-        likesCount: post.likes.length,
-        lovesCount: post.loves.length,
-        userLiked: post.likes.some(u => u._id.toString() === req.user.userId),
-        userLoved: post.loves.some(u => u._id.toString() === req.user.userId)
-      };
+    const userId = req.user.userId;
+    const currentUser = await User.findById(userId); // Get current user for notification message
+    
+    let isAdding = false;
+    
+    if (type === 'like') {
+      const idx = post.likes.indexOf(userId);
+      isAdding = idx === -1;
+      if (isAdding) {
+        post.likes.push(userId);
+      } else {
+        post.likes.splice(idx, 1);
+      }
+    } else if (type === 'love') {
+      const idx = post.loves.indexOf(userId);
+      isAdding = idx === -1;
+      if (isAdding) {
+        post.loves.push(userId);
+      } else {
+        post.loves.splice(idx, 1);
+      }
+    }
+
+    await post.save();
+
+    // ✅ SEND NOTIFICATION ONLY WHEN ADDING A REACTION (not removing)
+    if (isAdding && post.author._id.toString() !== userId) {
+      const actionText = type === 'like' ? 'liked your post' : 'loved your post';
+      
+      await Notification.create({
+        recipient: post.author._id,
+        sender: userId,
+        type: type, // 'like' or 'love'
+        message: `${currentUser.name} ${actionText}`,
+        post: post._id // Optional: Link back to the specific post
+      });
+    }
+
+    res.json({ 
+      likesCount: post.likes.length, 
+      lovesCount: post.loves.length,
+      userLiked: post.likes.includes(userId),
+      userLoved: post.loves.includes(userId)
     });
+  } catch (error) {
+    console.error('React error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 
     res.json(formattedPosts);
   } catch (error) {
