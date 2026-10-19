@@ -13,9 +13,22 @@ function ChatScreen() {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
   
-  // Get current user safely
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const myId = currentUser._id?.toString();
+  // ✅ AGGRESSIVE USER PARSING WITH FALLBACKS
+  const getMyId = () => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return null;
+      const user = JSON.parse(raw);
+      
+      // Check multiple possible ID locations
+      return (user._id || user.id || user.userId)?.toString();
+    } catch (e) {
+      console.error("Failed to parse user from localStorage", e);
+      return null;
+    }
+  };
+  
+  const myId = getMyId();
 
   // Fetch conversations
   useEffect(() => {
@@ -42,11 +55,14 @@ function ChatScreen() {
           headers: { Authorization: `Bearer ${token}` }
         });
         
-        // ✅ DEBUG LOG: Check what the backend actually sends
-        console.log(" Messages received:", res.data);
+        // ✅ CRITICAL DEBUG LOGS - CHECK YOUR BROWSER CONSOLE (F12)
+        console.log("🔍 MY ID:", myId);
+        console.log("📩 MESSAGES RECEIVED:", res.data);
         if (res.data.length > 0) {
-          console.log("🔍 First message sender:", res.data[0].sender);
-          console.log(" My ID:", myId);
+          const firstMsg = res.data[0];
+          console.log("📨 FIRST MSG SENDER OBJECT:", firstMsg.sender);
+          console.log("📨 FIRST MSG SENDER ID:", firstMsg.sender?._id?.toString());
+          console.log("✅ IS ME?", myId === firstMsg.sender?._id?.toString());
         }
         
         setMessages(res.data || []);
@@ -234,8 +250,16 @@ function ChatScreen() {
                 </div>
               ) : (
                 messages.map(msg => {
-                  // ✅ ROBUST ID COMPARISON
-                  const senderId = msg.sender?._id?.toString() || msg.sender?.toString();
+                  // ✅ ROBUST ID COMPARISON WITH MULTIPLE FALLBACKS
+                  const senderObj = msg.sender;
+                  let senderId = null;
+                  
+                  if (typeof senderObj === 'object' && senderObj !== null) {
+                    senderId = senderObj._id?.toString();
+                  } else if (typeof senderObj === 'string') {
+                    senderId = senderObj;
+                  }
+                  
                   const isMe = myId && senderId && myId === senderId;
 
                   return (
