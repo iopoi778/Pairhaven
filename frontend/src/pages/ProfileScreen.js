@@ -310,7 +310,7 @@ function ProfileScreen({ userId }) {
         )}
       </div>
 
-      {/* POSTS GRID */}
+            {/* POSTS GRID */}
       <h3 style={{ marginBottom: '1rem' }}>Posts</h3>
       {posts.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
@@ -318,28 +318,50 @@ function ProfileScreen({ userId }) {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-          {posts.map(post => (
-            <div key={post._id} style={{ aspectRatio: '1', overflow: 'hidden', background: '#f5f5f5', position: 'relative' }}>
-              {post.mediaUrl ? (
-                post.mediaType === 'video' ? (
-                  <video src={post.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <img src={post.mediaUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                )
-              ) : (
-                <div style={{ padding: '10px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', wordBreak: 'break-word' }}>
-                  {post.text?.substring(0, 50)}...
-                </div>
-              )}
-              {isOwnProfile && (
-                <button onClick={() => handleDeletePost(post._id)} style={{ position: 'absolute', top: '5px', right: '5px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-              )}
-            </div>
-          ))}
+          {posts.map(post => {
+            // ✅ CHECK FOR VALID MEDIA URL
+            const hasMedia = post.mediaUrl && post.mediaUrl !== 'null' && post.mediaUrl !== '';
+            const isVideo = hasMedia && (post.mediaType === 'video' || post.mediaUrl.includes('/video/upload'));
+
+            return (
+              <div key={post._id} style={{ aspectRatio: '1', overflow: 'hidden', background: '#f5f5f5', position: 'relative' }}>
+                {/* ✅ TEXT-ONLY POSTS: Show snippet instead of empty box */}
+                {!hasMedia && post.text && (
+                  <div style={{ 
+                    padding: '10px', fontSize: '0.7rem', display: 'flex', 
+                    alignItems: 'center', justifyContent: 'center', textAlign: 'center', 
+                    wordBreak: 'break-word', height: '100%', background: '#fff' 
+                  }}>
+                    {post.text.substring(0, 50)}{post.text.length > 50 ? '...' : ''}
+                  </div>
+                )}
+
+                {/* ✅ MEDIA POSTS: Show image/video */}
+                {hasMedia && (
+                  isVideo ? (
+                    <video src={post.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <img src={post.mediaUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div style="padding:10px;font-size:0.7rem;text-align:center">Image unavailable</div>'; }} 
+                    />
+                  )
+                )}
+
+                {/* Delete button for own posts */}
+                {isOwnProfile && (
+                  <button onClick={() => handleDeletePost(post._id)} style={{ 
+                    position: 'absolute', top: '5px', right: '5px', 
+                    background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', 
+                    borderRadius: '50%', width: '24px', height: '24px', 
+                    cursor: 'pointer', fontSize: '12px', display: 'flex', 
+                    alignItems: 'center', justifyContent: 'center' 
+                  }}>×</button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
-    </div>
-  );
 }
 
 export default ProfileScreen;
