@@ -5,7 +5,7 @@ import ProfileScreen from './pages/ProfileScreen';
 import MatchingScreen from './pages/MatchingScreen';
 import ChatScreen from './pages/chat';
 import NotificationsScreen from './pages/NotificationsScreen';
-import PostComposer from './components/PostComposer';
+// PostComposer import kept for safety, but component removed from UI
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -108,8 +108,6 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
     }
   };
 
-  // ✅ handleLogout REMOVED FROM HERE - MOVED TO PROFILE SCREEN
-
   const renderBadge = (count) => {
     if (!count || count <= 0) return null;
     return (
@@ -121,7 +119,7 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
 
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
-      {/* ✅ CLEAN HEADER: No Logout Button */}
+      {/* ✅ CLEAN HEADER */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {showBackButton && (
@@ -129,16 +127,16 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
           )}
           <h2 style={{ margin: 0, color: '#5b72f2', fontWeight: 700 }}>PairHaven</h2>
         </div>
-        {/* Logout button removed */}
       </header>
 
       <main style={{ padding: '1rem', minHeight: 'calc(100vh - 120px)', background: '#f6f6f6' }}>
         {renderContent()}
       </main>
 
+      {/* ✅ NAV BAR WITH ICONS & BADGES */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
-          { id: 'home', label: 'Home', icon: '🏠' },
+          { id: 'home', label: 'Home', icon: '' },
           { id: 'matching', label: 'Match', icon: '' },
           { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
           { id: 'notifications', label: 'Alerts', icon: '', count: navCounts?.alerts },
@@ -155,9 +153,10 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
   );
 }
 
-// ... Keep HomeFeed, LoginPage, RegisterPage exactly as they were ...
+// ✅ HOME FEED: PostComposer REMOVED
 function HomeFeed({ onNavigateToProfile }) {
   const [posts, setPosts] = useState([]);
+  
   useEffect(() => {
     const fetchPosts = async () => {
       const token = localStorage.getItem('token');
@@ -169,7 +168,10 @@ function HomeFeed({ onNavigateToProfile }) {
     };
     fetchPosts();
   }, []);
+
+  // handleNewPost kept for future compatibility, but not used in UI
   const handleNewPost = (newPost) => { setPosts(prev => [newPost, ...prev]); };
+  
   const getAvatarUrl = (author) => {
     if (!author) return 'https://via.placeholder.com/36';
     if (author.photos && Array.isArray(author.photos) && author.photos[0]) {
@@ -177,10 +179,13 @@ function HomeFeed({ onNavigateToProfile }) {
     }
     return 'https://via.placeholder.com/36';
   };
+
   return (
     <div style={{ padding: '0.5rem 0 3rem' }}>
       <h2 style={{ margin: '0 0 1rem' }}>Your Feed</h2>
-      <PostComposer onPosted={handleNewPost} />
+      
+      {/* ✅ PostComposer COMPLETELY REMOVED FROM HERE */}
+      
       {posts.length === 0 ? (
         <div style={{ background: '#fff', borderRadius: '12px', padding: '1.2rem', textAlign: 'center', color: '#666' }}>No posts yet.</div>
       ) : (
