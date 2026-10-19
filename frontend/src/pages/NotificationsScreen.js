@@ -16,7 +16,6 @@ function NotificationsScreen() {
         const res = await axios.get(`${API_URL}/api/notifications`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        console.log("🔔 Raw Notifications:", res.data); // Debug log
         setNotifications(res.data || []);
       } catch (err) {
         console.error("Failed to fetch notifications:", err);
@@ -29,22 +28,24 @@ function NotificationsScreen() {
   }, [token]);
 
   const handleNotificationClick = async (note) => {
-    // Mark as read
+    // ✅ FIX: Use PUT instead of PATCH to avoid 404s
     try {
-      await axios.patch(`${API_URL}/api/notifications/${note._id}/read`, {}, {
+      await axios.put(`${API_URL}/api/notifications/${note._id}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
       setNotifications(prev => prev.map(n => 
         n._id === note._id ? { ...n, read: true } : n
       ));
-    } catch (err) { console.error("Mark read failed", err); }
+    } catch (err) { 
+      console.error("Mark read failed", err); 
+    }
 
     // Navigate based on type
     if (note.type === 'message') {
       localStorage.setItem('activeTab', 'messages');
       window.location.hash = '/';
-    } else if (['like', 'match', 'follow'].includes(note.type)) {
+    } else if (['like', 'match', 'follow', 'match_request', 'match_accepted'].includes(note.type)) {
       const senderId = note.sender?._id || note.sender;
       if (senderId) window.location.hash = `/profile/${senderId}`;
     }
@@ -61,7 +62,6 @@ function NotificationsScreen() {
         </div>
       ) : (
         notifications.map(note => {
-          // ✅ FIX: Handle undefined 'read' field safely
           const isRead = note.read === true; 
           
           return (
@@ -83,10 +83,11 @@ function NotificationsScreen() {
                 {!isRead && <span style={{width: 8, height: 8, background: '#5b72f2', borderRadius: '50%'}}></span>}
                 {note.type === 'like' && '❤️ New Like'}
                 {note.type === 'follow' && '👤 New Follower'}
-                {note.type === 'match' && '💖 It\'s a Match!'}
+                {note.type === 'match' && ' It\'s a Match!'}
                 {note.type === 'message' && '💬 New Message'}
-                {/* ✅ FIX: Show generic label if type is unknown */}
-                {!['like','follow','match','message'].includes(note.type) && '🔔 Notification'}
+                {note.type === 'match_request' && '💌 Match Request'}
+                {note.type === 'match_accepted' && '💖 Match Accepted'}
+                {!['like','follow','match','message','match_request','match_accepted'].includes(note.type) && '🔔 Notification'}
               </div>
               <div style={{ color: '#444' }}>{note.message}</div>
               <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
