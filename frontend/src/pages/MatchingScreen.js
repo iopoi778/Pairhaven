@@ -11,46 +11,35 @@ function MatchingScreen() {
   const navigate = useNavigate();
   
   const token = localStorage.getItem('token');
-  
-  // ✅ STATE FOR FRESH USER DATA
-  const [freshUser, setFreshUser] = useState(
-    JSON.parse(localStorage.getItem('user') || '{}')
-  );
+  // Start with stored user, but we will refresh this immediately
+  const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user') || '{}'));
 
-  // ✅ REFRESH USER DATA ON MOUNT TO SYNC WITH DATABASE
   useEffect(() => {
-    const syncUserData = async () => {
+    const initData = async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/users/profile/me`, {
+        // ✅ CRITICAL FIX: Fetch FRESH user data to get updated matches array
+        const userRes = await axios.get(`${API_URL}/api/users/profile/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
-        // Update both state and localStorage
-        setFreshUser(res.data);
-        localStorage.setItem('user', JSON.stringify(res.data));
-      } catch (err) {
-        console.error("Failed to sync user data", err);
-      }
-    };
+        // Update both state and localStorage so other components stay in sync
+        const freshUser = userRes.data;
+        setCurrentUser(freshUser);
+        localStorage.setItem('user', JSON.stringify(freshUser));
 
-    if (token) syncUserData();
-  }, [token]);
-
-  // Fetch potential matches
-  useEffect(() => {
-    const fetchPotentialMatches = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/users/potential-matches`, {
+        // Now fetch potential matches with the correct relationship status
+        const matchesRes = await axios.get(`${API_URL}/api/users/potential-matches`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setUsers(res.data || []);
+        setUsers(matchesRes.data || []);
       } catch (err) {
-        console.error("Failed to load matches", err);
+        console.error("Failed to load matching data", err);
       } finally {
         setLoading(false);
       }
     };
-    if (token) fetchPotentialMatches();
+
+    if (token) initData();
   }, [token]);
 
   const handleMatchAction = async (targetUser, actionType) => {
@@ -61,44 +50,48 @@ function MatchingScreen() {
         await axios.post(`${API_URL}/api/users/request/${targetUser._id}`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
       } else if (actionType === 'accept') {
         await axios.post(`${API_URL}/api/users/accept-request/${targetUser._id}`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
       } else if (actionType === 'decline') {
         await axios.delete(`${API_URL}/api/users/request/${targetUser._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
       } else if (actionType === 'chat') {
         localStorage.setItem('activeTab', 'messages');
         window.location.hash = '/';
         return;
       }
       
-      // ✅ REFRESH BOTH USER DATA AND MATCHES LIST AFTER ACTION
-      const [userRes, matchesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/users/profile/me`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API_URL}/api/users/potential-matches`, { headers: { Authorization: `Bearer ${token}` } })
-      ]);
-
-      setFreshUser(userRes.data);
+      // ✅ REFRESH EVERYTHING AFTER ACTION TO PREVENT STALE STATE
+      const userRes = await axios.get(`${API_URL}/api/users/profile/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCurrentUser(userRes.data);
       localStorage.setItem('user', JSON.stringify(userRes.data));
+
+      const matchesRes = await axios.get(`${API_URL}/api/users/potential-matches`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setUsers(matchesRes.data || []);
       
     } catch (err) {
-      // Handle "Already Matched" gracefully
-      if (err.response?.status === 400 && err.response?.data?.message === 'Already matched') {
-        const [userRes, matchesRes] = await Promise.all([
-          axios.get(`${API_URL}/api/users/profile/me`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${API_URL}/api/users/potential-matches`, { headers: { Authorization: `Bearer ${token}` } })
-        ]);
-        setFreshUser(userRes.data);
+      // Handle "Already matched" gracefully without showing error alert
+      if (err.response?.status === 400 && err.response?.data?.message?.includes('Already matched')) {
+        console.log("Already matched, refreshing UI...");
+        const userRes = await axios.get(`${API_URL}/api/users/profile/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setCurrentUser(userRes.data);
         localStorage.setItem('user', JSON.stringify(userRes.data));
+        
+        const matchesRes = await axios.get(`${API_URL}/api/users/potential-matches`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         setUsers(matchesRes.data || []);
       } else {
+        console.error("Action failed:", err);
         if (err.response?.status !== 400) {
           alert(err.response?.data?.message || "Action failed");
         }
@@ -108,11 +101,11 @@ function MatchingScreen() {
     }
   };
 
-  // ✅ USE freshUser INSTEAD OF STALE localStorage USER
   const getButtonConfig = (targetUser) => {
-    const isMatched = (freshUser.matches || []).includes(targetUser._id);
-    const hasSentRequest = (freshUser.requestsSent || []).includes(targetUser._id);
-    const hasReceivedRequest = (freshUser.requestsReceived || []).includes(targetUser._id);
+    // ✅ USE FRESH currentUser STATE FOR CHECKS
+    const isMatched = (currentUser.matches || []).includes(targetUser._id);
+    const hasSentRequest = (currentUser.requestsSent || []).includes(targetUser._id);
+    const hasReceivedRequest = (currentUser.requestsReceived || []).includes(targetUser._id);
 
     if (isMatched) {
       return { 
