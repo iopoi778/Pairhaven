@@ -7,7 +7,18 @@ function MatchingScreen() {
   const [profiles, setProfiles] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  
+  // Track actions for the CURRENT profile only
+  const [hasFollowed, setHasFollowed] = useState(false);
+  const [hasLiked, setHasLiked] = useState(false);
+  
   const token = localStorage.getItem('token');
+
+  // Reset action states whenever we move to a new profile
+  useEffect(() => {
+    setHasFollowed(false);
+    setHasLiked(false);
+  }, [currentIndex]);
 
   useEffect(() => {
     fetchProfiles();
@@ -27,44 +38,45 @@ function MatchingScreen() {
     }
   };
 
-  // EXISTING: Handle Like (Heart Button)
-  const handleLike = async () => {
-    if (currentIndex >= profiles.length) return;
-    const profile = profiles[currentIndex];
-    
-    try {
-      await axios.post(`${API_URL}/api/users/like/${profile._id}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // Move to next profile after liking
-      setCurrentIndex(prev => prev + 1);
-    } catch (err) {
-      console.error("Like failed", err);
-      alert(err.response?.data?.message || "Failed to like");
-    }
-  };
-
-  // NEW: Handle Follow (Plus/Follow Button)
+  // Handle Follow -> Transforms to Checkmark
   const handleFollow = async () => {
-    if (currentIndex >= profiles.length) return;
+    if (currentIndex >= profiles.length || hasFollowed) return;
     const profile = profiles[currentIndex];
     
     try {
       await axios.post(`${API_URL}/api/users/follow/${profile._id}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      alert(`Successfully followed ${profile.name}!`);
-      // Optional: Move to next profile or stay on same one
-      // setCurrentIndex(prev => prev + 1); 
+      setHasFollowed(true); // Instantly update UI
     } catch (err) {
       console.error("Follow failed", err);
       alert(err.response?.data?.message || "Failed to follow");
     }
   };
 
-  // EXISTING: Handle Pass/Cancel (X Button)
+  // Handle Like -> Transforms to Match/Filled Heart
+  const handleLike = async () => {
+    if (currentIndex >= profiles.length || hasLiked) return;
+    const profile = profiles[currentIndex];
+    
+    try {
+      const res = await axios.post(`${API_URL}/api/users/like/${profile._id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setHasLiked(true); // Instantly update UI
+      
+      // If it's a mutual match, show alert
+      if (res.data.isMatch) {
+        alert(`It's a match with ${profile.name}! `);
+      }
+    } catch (err) {
+      console.error("Like failed", err);
+      alert(err.response?.data?.message || "Failed to like");
+    }
+  };
+
+  // Handle Pass/Cancel
   const handlePass = () => {
     if (currentIndex < profiles.length) {
       setCurrentIndex(prev => prev + 1);
@@ -110,10 +122,10 @@ function MatchingScreen() {
         </div>
       </div>
 
-      {/* ACTION BUTTONS: Cancel, Follow, Like */}
+      {/* DYNAMIC ACTION BUTTONS */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '1.5rem' }}>
         
-        {/* CANCEL / PASS BUTTON */}
+        {/* CANCEL / PASS BUTTON (Always visible) */}
         <button 
           onClick={handlePass}
           style={{ 
@@ -126,30 +138,40 @@ function MatchingScreen() {
           ✕
         </button>
 
-        {/* NEW: FOLLOW BUTTON */}
+        {/* FOLLOW BUTTON -> CHECKMARK */}
         <button 
           onClick={handleFollow}
+          disabled={hasFollowed}
           style={{ 
             width: '60px', height: '60px', borderRadius: '50%', 
-            border: '2px solid #3b82f6', background: '#fff', 
-            fontSize: '1.5rem', cursor: 'pointer', color: '#3b82f6',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
+            border: hasFollowed ? '2px solid #3b82f6' : '2px solid #cbd5e1', 
+            background: hasFollowed ? '#eff6ff' : '#fff', 
+            fontSize: '1.5rem', 
+            cursor: hasFollowed ? 'default' : 'pointer', 
+            color: hasFollowed ? '#3b82f6' : '#94a3b8',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.3s ease'
           }}
         >
-          👤+
+          {hasFollowed ? '✓' : '👤+'}
         </button>
 
-        {/* LIKE BUTTON */}
+        {/* LIKE BUTTON -> MATCH / FILLED HEART */}
         <button 
           onClick={handleLike}
+          disabled={hasLiked}
           style={{ 
             width: '60px', height: '60px', borderRadius: '50%', 
-            border: '2px solid #10b981', background: '#fff', 
-            fontSize: '1.5rem', cursor: 'pointer', color: '#10b981',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
+            border: hasLiked ? '2px solid #e53e3e' : '2px solid #10b981', 
+            background: hasLiked ? '#fef2f2' : '#fff', 
+            fontSize: '1.5rem', 
+            cursor: hasLiked ? 'default' : 'pointer', 
+            color: hasLiked ? '#e53e3e' : '#10b981',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.3s ease'
           }}
         >
-          ♥
+          {hasLiked ? '❤️' : '♥'}
         </button>
       </div>
     </div>
