@@ -307,7 +307,7 @@ function ProfileScreen({ userId }) {
         )}
       </div>
 
-      {/* ✅ FIXED POSTS GRID - HANDLES TEXT-ONLY POSTS */}
+      {/* ✅ FIXED POSTS GRID WITH PER-POST DEBUG LOGGING */}
       <h3 style={{ marginBottom: '1rem' }}>Posts</h3>
       {posts.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
@@ -315,10 +315,11 @@ function ProfileScreen({ userId }) {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-          {posts.map(post => {
-            // ✅ ROBUST CONTENT CHECKS
-            const hasText = post.text && post.text.trim().length > 0;
+          {posts.map((post, index) => {
+            // ✅ DETAILED CONTENT CHECKS
+            const hasText = typeof post.text === 'string' && post.text.trim().length > 0;
             const hasMedia = post.mediaUrl && 
+                            typeof post.mediaUrl === 'string' &&
                             post.mediaUrl !== 'null' && 
                             post.mediaUrl !== '' &&
                             post.mediaUrl !== undefined;
@@ -326,6 +327,16 @@ function ProfileScreen({ userId }) {
             
             // ✅ FALLBACK FOR EMPTY POSTS
             const isEmpty = !hasText && !hasMedia;
+
+            // ✅ DEBUG LOG FOR EACH POST
+            console.log(`Post ${index + 1}:`, {
+              id: post._id,
+              hasText,
+              textLength: post.text?.length || 0,
+              hasMedia,
+              mediaUrl: post.mediaUrl,
+              isEmpty
+            });
 
             return (
               <div key={post._id} style={{ aspectRatio: '1', overflow: 'hidden', background: '#f5f5f5', position: 'relative' }}>
@@ -337,7 +348,8 @@ function ProfileScreen({ userId }) {
                     alignItems: 'center', justifyContent: 'center', textAlign: 'center', 
                     height: '100%', background: '#fff', color: '#999' 
                   }}>
-                    Empty post
+                    Empty post<br/>
+                    <span style={{fontSize:'0.6rem'}}>(ID: {post._id.slice(-6)})</span>
                   </div>
                 )}
 
