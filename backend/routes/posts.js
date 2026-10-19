@@ -4,43 +4,27 @@ const Post = require('../models/Post');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const cloudinary = require('cloudinary').v2;
+const multer = require('multer');
 
-// ✅ SAFE MULTER SETUP WITH FALLBACK
-let upload;
-try {
-  const multer = require('multer');
-  const path = require('path');
-  const fs = require('fs');
+// ✅ CLOUDINARY CONFIGURATION
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-  const uploadDir = './uploads';
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
+// Multer memory storage (no local disk needed)
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    if (allowedTypes.test(file.mimetype)) return cb(null, true);
+    cb(new Error('Only image files are allowed'));
   }
-
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => {
-      const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const ext = path.extname(file.originalname);
-      cb(null, uniqueName + ext);
-    }
-  });
-
-  upload = multer({ 
-    storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-      const allowedTypes = /jpeg|jpg|png|gif|webp/;
-      const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-      const mimetype = allowedTypes.test(file.mimetype);
-      if (mimetype && extname) return cb(null, true);
-      cb(new Error('Only image files are allowed'));
-    }
-  });
-} catch (e) {
-  console.warn('Multer not available, file uploads disabled:', e.message);
-  upload = null;
-}
+});
 
 // GET /api/posts
 router.get('/', auth, async (req, res) => {
@@ -120,39 +104,29 @@ router.post('/:postId/react', auth, async (req, res) => {
   }
 });
 
-// ✅ FIXED POST CREATION - HANDLES MULTER ERRORS GRACEFULLY
-router.post('/', auth, async (req, res) => {
+// ✅ POST CREATION WITH CLOUDINARY UPLOAD
+router.post('/', auth, upload.single('media'), async (req, res) => {
   try {
-    // Apply multer middleware manually to catch errors
-    if (upload) {
-      await new Promise((resolve, reject) => {
-        upload.single('media')(req, res, (err) => {
-          if (err) {
-            console.error('Multer error:', err);
-            // Don't reject, just log - we'll handle missing file below
-          }
-          resolve();
-        });
-      });
-    }
-
     const { text, mediaUrl, mediaType } = req.body;
     const uploadedFile = req.file;
     
-    console.log('Post creation debug:', {
-      hasText: !!text,
-      textLength: text?.length,
-      hasUploadedFile: !!uploadedFile,
-      hasMediaUrl: !!mediaUrl,
-      mediaUrlType: typeof mediaUrl
-    });
-    
-    // Determine actual media URL and type
     let finalMediaUrl = null;
     let finalMediaType = null;
     
+    // Upload to Cloudinary if file provided
     if (uploadedFile) {
-      finalMediaUrl = `/uploads/${uploadedFile.filename}`;
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: 'pairhaven_posts' },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        stream.end(uploadedFile.buffer);
+      });
+      
+      finalMediaUrl = result.secure_url;
       finalMediaType = 'image';
     } else if (mediaUrl && typeof mediaUrl === 'string' && mediaUrl.trim().length > 0) {
       finalMediaUrl = mediaUrl.trim();
@@ -162,12 +136,9 @@ router.post('/', auth, async (req, res) => {
     const hasText = text && typeof text === 'string' && text.trim().length > 0;
     const hasMedia = finalMediaUrl !== null;
     
-    console.log('Validation result:', { hasText, hasMedia, finalMediaUrl });
-    
     if (!hasText && !hasMedia) {
       return res.status(400).json({ 
-        message: 'Post must contain text or media. Empty posts are not allowed.',
-        debug: { textProvided: !!text, mediaProvided: !!mediaUrl, fileUploaded: !!uploadedFile }
+        message: 'Post must contain text or media.' 
       });
     }
 
