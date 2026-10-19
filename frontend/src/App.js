@@ -165,6 +165,18 @@ function HomeFeed({ onNavigateToProfile }) {
     setPosts(prev => [newPost, ...prev]);
   };
 
+  // Helper to safely get avatar URL
+  const getAvatarUrl = (author) => {
+    if (!author) return 'https://via.placeholder.com/36';
+    // Try nested object first
+    if (author.photos && Array.isArray(author.photos) && author.photos[0]) {
+      return typeof author.photos[0] === 'string' ? author.photos[0] : author.photos[0].url;
+    }
+    // Try direct property
+    if (author.photoUrl) return author.photoUrl;
+    return 'https://via.placeholder.com/36';
+  };
+
   return (
     <div style={{ padding: '0.5rem 0 3rem' }}>
       <h2 style={{ margin: '0 0 1rem' }}>Your Feed</h2>
@@ -174,34 +186,56 @@ function HomeFeed({ onNavigateToProfile }) {
           No posts yet.
         </div>
       ) : (
-        posts.map(post => (
-          <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-            
-            {/* ✅ Clickable Author Header */}
-            <div 
-              onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}
-            >
-              <img 
-                src={post.author?.photos?.[0]?.url || post.author?.photos?.[0] || 'https://via.placeholder.com/36'} 
-                alt={post.author?.name}
-                style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }}
-              />
-              <div>
-                <div style={{ fontWeight: 700 }}>{post.author?.name || 'User'}</div>
-                <div style={{ fontSize: 12, color: '#666' }}>{new Date(post.createdAt).toLocaleString()}</div>
+        posts.map(post => {
+          // Determine if content is video
+          const isVideo = post.mediaType === 'video' || 
+                          (post.mediaUrl && post.mediaUrl.includes('/video/upload'));
+          
+          // Get safe avatar
+          const avatarSrc = getAvatarUrl(post.author);
+
+          return (
+            <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              
+              {/* CLICKABLE AUTHOR HEADER */}
+              <div 
+                onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}
+              >
+                <img 
+                  src={avatarSrc} 
+                  alt={post.author?.name}
+                  style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', background: '#eee' }}
+                  onError={(e) => { e.target.src = 'https://via.placeholder.com/36'; }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700 }}>{post.author?.name || 'User'}</div>
+                  <div style={{ fontSize: 12, color: '#666' }}>{new Date(post.createdAt).toLocaleString()}</div>
+                </div>
               </div>
+
+              {post.text ? <div style={{ marginBottom: 8 }}>{post.text}</div> : null}
+
+              {/* MEDIA DISPLAY WITH FALLBACKS */}
+              {post.mediaUrl && (
+                isVideo ? (
+                  <video 
+                    src={post.mediaUrl} 
+                    controls 
+                    style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} 
+                  />
+                ) : (
+                  <img 
+                    src={post.mediaUrl} 
+                    alt="Post content" 
+                    style={{ width: '100%', borderRadius: 10 }} 
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                )
+              )}
             </div>
-
-            {post.text ? <div style={{ marginBottom: 8 }}>{post.text}</div> : null}
-
-            {post.mediaType === 'video' && post.mediaUrl ? (
-              <video src={post.mediaUrl} controls style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000' }} />
-            ) : post.mediaUrl ? (
-              <img src={post.mediaUrl} alt="" style={{ width: '100%', borderRadius: 10 }} />
-            ) : null}
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
