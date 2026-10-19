@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Post = require('../models/Post');
-const User = require('../models/User'); // ✅ ADDED: Required for feed filtering
+const Notification = require('../models/Notification');
+const User = require('../models/User');
 const auth = require('../middleware/auth');
 
 // POST /api/posts/:postId/react - Handle Like/Love Toggle + Send Alert
