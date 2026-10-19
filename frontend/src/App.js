@@ -19,7 +19,7 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
-// ✅ FIXED: Robust HashRouter parsing for profiles
+// ✅ FIXED: useEffect moved BEFORE all conditional returns
 function ProfileRouteWrapper({ onUpdateCounts }) {
   const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -28,34 +28,34 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
   const hashPath = window.location.hash.replace('#', '') || '/';
   const parts = hashPath.split('/').filter(Boolean);
   
-  // If path is just /profile without ID, go to self
+  // ✅ HOOK MUST BE CALLED FIRST - unconditional execution
+  useEffect(() => {
+    // Only fetch counts if we are actually viewing a valid OTHER user's profile
+    if (parts[0] === 'profile' && parts[1] && parts[1] !== currentUser._id) {
+      if (onUpdateCounts) onUpdateCounts();
+    }
+  }, [hashPath]); 
+
+  // NOW it's safe to do conditional returns
   if (parts[0] === 'profile' && !parts[1]) {
     return <Navigate to="/" replace />;
   }
 
-  // If it's NOT a profile route at all, redirect home
   if (parts[0] !== 'profile') {
     return <Navigate to="/" replace />;
   }
 
   const userId = parts[1];
   
-  // If viewing OWN profile, redirect to main dashboard self-profile
   if (userId === currentUser._id) {
     return <Navigate to="/" replace />;
   }
-
-  // Fetch counts when entering another person's profile
-  useEffect(() => {
-    if (onUpdateCounts) onUpdateCounts();
-  }, [userId]);
 
   return (
     <DashboardLayout 
       activeTabOverride="profile" 
       showBackButton={true}
       onBack={() => navigate(-1)}
-      navCounts={null} // Will be passed from parent if needed, but usually handled by parent state
     >
       <ProfileScreen userId={userId} />
     </DashboardLayout>
@@ -77,7 +77,7 @@ function App() {
       });
       const totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
-      // Fetch unread notifications count (assuming backend returns array)
+      // Fetch unread notifications count
       const notifRes = await axios.get(`${API_URL}/api/notifications`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -92,7 +92,6 @@ function App() {
   // Initial fetch on mount
   useEffect(() => {
     fetchNavCounts();
-    // Optional: Poll every 30 seconds for new counts
     const interval = setInterval(fetchNavCounts, 30000);
     return () => clearInterval(interval);
   }, []);
