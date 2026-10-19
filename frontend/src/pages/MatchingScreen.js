@@ -11,8 +11,32 @@ function MatchingScreen() {
   const navigate = useNavigate();
   
   const token = localStorage.getItem('token');
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  // ✅ STATE FOR FRESH USER DATA
+  const [freshUser, setFreshUser] = useState(
+    JSON.parse(localStorage.getItem('user') || '{}')
+  );
 
+  // ✅ REFRESH USER DATA ON MOUNT TO SYNC WITH DATABASE
+  useEffect(() => {
+    const syncUserData = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/users/profile/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // Update both state and localStorage
+        setFreshUser(res.data);
+        localStorage.setItem('user', JSON.stringify(res.data));
+      } catch (err) {
+        console.error("Failed to sync user data", err);
+      }
+    };
+
+    if (token) syncUserData();
+  }, [token]);
+
+  // Fetch potential matches
   useEffect(() => {
     const fetchPotentialMatches = async () => {
       try {
@@ -54,23 +78,27 @@ function MatchingScreen() {
         return;
       }
       
-      // ✅ REFRESH LIST TO UPDATE BUTTON STATES INSTANTLY
-      const res = await axios.get(`${API_URL}/api/users/potential-matches`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setUsers(res.data || []);
+      // ✅ REFRESH BOTH USER DATA AND MATCHES LIST AFTER ACTION
+      const [userRes, matchesRes] = await Promise.all([
+        axios.get(`${API_URL}/api/users/profile/me`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API_URL}/api/users/potential-matches`, { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
+      setFreshUser(userRes.data);
+      localStorage.setItem('user', JSON.stringify(userRes.data));
+      setUsers(matchesRes.data || []);
       
     } catch (err) {
-      // ✅ HANDLE "ALREADY MATCHED" AS A SUCCESS STATE FOR UI
+      // Handle "Already Matched" gracefully
       if (err.response?.status === 400 && err.response?.data?.message === 'Already matched') {
-        console.log("User already matched, refreshing UI...");
-        const res = await axios.get(`${API_URL}/api/users/potential-matches`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setUsers(res.data || []);
+        const [userRes, matchesRes] = await Promise.all([
+          axios.get(`${API_URL}/api/users/profile/me`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_URL}/api/users/potential-matches`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        setFreshUser(userRes.data);
+        localStorage.setItem('user', JSON.stringify(userRes.data));
+        setUsers(matchesRes.data || []);
       } else {
-        console.error("Action failed:", err);
-        // Only show alert for actual errors, not state mismatches
         if (err.response?.status !== 400) {
           alert(err.response?.data?.message || "Action failed");
         }
@@ -80,13 +108,12 @@ function MatchingScreen() {
     }
   };
 
+  // ✅ USE freshUser INSTEAD OF STALE localStorage USER
   const getButtonConfig = (targetUser) => {
-    // ✅ SAFE CHECKS WITH OPTIONAL CHAINING
-    const isMatched = (currentUser.matches || []).includes(targetUser._id);
-    const hasSentRequest = (currentUser.requestsSent || []).includes(targetUser._id);
-    const hasReceivedRequest = (currentUser.requestsReceived || []).includes(targetUser._id);
+    const isMatched = (freshUser.matches || []).includes(targetUser._id);
+    const hasSentRequest = (freshUser.requestsSent || []).includes(targetUser._id);
+    const hasReceivedRequest = (freshUser.requestsReceived || []).includes(targetUser._id);
 
-    // ✅ RULE: IF MATCHED, SHOW ONLY MESSAGE ICON
     if (isMatched) {
       return { 
         label: '💬', 
