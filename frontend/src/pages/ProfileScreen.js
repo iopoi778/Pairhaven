@@ -36,6 +36,10 @@ function ProfileScreen({ userId }) {
         const postsRes = await axios.get(`${API_URL}/api/users/profile/${profileRes.data._id}/posts`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        
+        // ✅ DEBUG LOG TO SEE EXACTLY WHAT BACKEND RETURNS
+        console.log("📋 RAW POSTS DATA:", postsRes.data);
+        
         setPosts(postsRes.data);
       } catch (err) {
         console.error("Failed to load profile", err);
@@ -46,14 +50,13 @@ function ProfileScreen({ userId }) {
     if (token) fetchData();
   }, [userId, token]);
 
-  // ✅ NEW: Match Request Handlers
+  // Match Request Handlers
   const handleSendRequest = async () => {
     setActionLoading(true);
     try {
       await axios.post(`${API_URL}/api/users/request/${user._id}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Optimistic update
       setUser(prev => ({ 
         ...prev, 
         requestsSent: [...(prev.requestsSent || []), currentUser._id] 
@@ -72,7 +75,6 @@ function ProfileScreen({ userId }) {
       await axios.post(`${API_URL}/api/users/accept-request/${user._id}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Optimistic update
       setUser(prev => ({ 
         ...prev, 
         matches: [...(prev.matches || []), currentUser._id],
@@ -108,7 +110,6 @@ function ProfileScreen({ userId }) {
     window.location.hash = '/';
   };
 
-  // Existing handlers remain unchanged
   const handleCreatePost = async () => {
     if (!newPostText.trim() && !newPostMedia) return;
     setPosting(true);
@@ -228,7 +229,7 @@ function ProfileScreen({ userId }) {
       {/* LOGOUT BUTTON */}
       {isOwnProfile && (
         <button onClick={handleLogout} style={{ position: 'fixed', bottom: '90px', right: '20px', background: '#fff', color: '#e53e3e', border: '1px solid #fee2e2', borderRadius: '50px', padding: '0.6rem 1.2rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(229, 62, 62, 0.15)', zIndex: 100, display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span>🚪</span> Logout
+          <span></span> Logout
         </button>
       )}
 
@@ -249,15 +250,13 @@ function ProfileScreen({ userId }) {
           {user.location?.address ? ` • ${user.location.address}` : ''}
         </p>
         
-        {/* ✅ MATCH ACTION BUTTONS - REPLACES FOLLOWERS/FOLLOWING */}
+        {/* MATCH ACTION BUTTONS */}
         {!isOwnProfile && (
           <div style={{ display: 'flex', gap: '10px', marginTop: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            {/* PENDING REQUEST SENT BY ME */}
             {currentUser.requestsSent?.includes(user._id) && (
               <button disabled style={{ background: '#ccc', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: 'not-allowed', fontSize: '0.9rem' }}>⏳ Request Sent</button>
             )}
 
-            {/* RECEIVED REQUEST - SHOW ACCEPT/DECLINE */}
             {currentUser.requestsReceived?.includes(user._id) && (
               <>
                 <button onClick={handleAcceptRequest} disabled={actionLoading} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: actionLoading ? 'wait' : 'pointer', fontSize: '0.9rem' }}>✅ Accept Match</button>
@@ -265,12 +264,10 @@ function ProfileScreen({ userId }) {
               </>
             )}
 
-            {/* ALREADY MATCHED - SHOW CHAT BUTTON */}
             {currentUser.matches?.includes(user._id) && (
               <button onClick={handleOpenChat} style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>💬 Message</button>
             )}
 
-            {/* NO RELATIONSHIP YET - SHOW SEND REQUEST */}
             {!currentUser.requestsSent?.includes(user._id) && 
              !currentUser.requestsReceived?.includes(user._id) && 
              !currentUser.matches?.includes(user._id) && (
@@ -281,12 +278,12 @@ function ProfileScreen({ userId }) {
 
         {isOwnProfile && (
           <button onClick={handleTogglePrivacy} style={{ marginTop: '0.8rem', background: user.isPrivate ? '#e53e3e' : '#10b981', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-            {user.isPrivate ? '🔒 Private' : '🌍 Public'}
+            {user.isPrivate ? ' Private' : '🌍 Public'}
           </button>
         )}
       </div>
 
-      {/* ✅ UPDATED STATS ROW - REMOVED FOLLOWERS/FOLLOWING */}
+      {/* STATS ROW */}
       <div style={{ display: 'flex', justifyContent: 'space-around', padding: '1rem 0', borderTop: '1px solid #eee', borderBottom: '1px solid #eee', marginBottom: '1.5rem' }}>
         <div style={{textAlign:'center'}}><strong>{posts.length}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Posts</span></div>
         <div style={{textAlign:'center'}}><strong>{user.matchesCount || 0}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Matches</span></div>
@@ -310,7 +307,7 @@ function ProfileScreen({ userId }) {
         )}
       </div>
 
-            {/* POSTS GRID */}
+      {/* ✅ FIXED POSTS GRID - HANDLES TEXT-ONLY POSTS */}
       <h3 style={{ marginBottom: '1rem' }}>Posts</h3>
       {posts.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
@@ -319,14 +316,33 @@ function ProfileScreen({ userId }) {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
           {posts.map(post => {
-            // ✅ CHECK FOR VALID MEDIA URL
-            const hasMedia = post.mediaUrl && post.mediaUrl !== 'null' && post.mediaUrl !== '';
+            // ✅ ROBUST CONTENT CHECKS
+            const hasText = post.text && post.text.trim().length > 0;
+            const hasMedia = post.mediaUrl && 
+                            post.mediaUrl !== 'null' && 
+                            post.mediaUrl !== '' &&
+                            post.mediaUrl !== undefined;
             const isVideo = hasMedia && (post.mediaType === 'video' || post.mediaUrl.includes('/video/upload'));
+            
+            // ✅ FALLBACK FOR EMPTY POSTS
+            const isEmpty = !hasText && !hasMedia;
 
             return (
               <div key={post._id} style={{ aspectRatio: '1', overflow: 'hidden', background: '#f5f5f5', position: 'relative' }}>
-                {/* ✅ TEXT-ONLY POSTS: Show snippet instead of empty box */}
-                {!hasMedia && post.text && (
+                
+                {/* ✅ EMPTY POST PLACEHOLDER */}
+                {isEmpty && (
+                  <div style={{ 
+                    padding: '10px', fontSize: '0.7rem', display: 'flex', 
+                    alignItems: 'center', justifyContent: 'center', textAlign: 'center', 
+                    height: '100%', background: '#fff', color: '#999' 
+                  }}>
+                    Empty post
+                  </div>
+                )}
+
+                {/* ✅ TEXT-ONLY POSTS */}
+                {hasText && !hasMedia && (
                   <div style={{ 
                     padding: '10px', fontSize: '0.7rem', display: 'flex', 
                     alignItems: 'center', justifyContent: 'center', textAlign: 'center', 
@@ -336,13 +352,16 @@ function ProfileScreen({ userId }) {
                   </div>
                 )}
 
-                {/* ✅ MEDIA POSTS: Show image/video */}
+                {/* ✅ MEDIA POSTS */}
                 {hasMedia && (
                   isVideo ? (
                     <video src={post.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <img src={post.mediaUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div style="padding:10px;font-size:0.7rem;text-align:center">Image unavailable</div>'; }} 
+                      onError={(e) => { 
+                        e.target.style.display = 'none'; 
+                        e.target.parentElement.innerHTML = '<div style="padding:10px;font-size:0.7rem;text-align:center;color:#999">Image unavailable</div>'; 
+                      }} 
                     />
                   )
                 )}
@@ -362,6 +381,8 @@ function ProfileScreen({ userId }) {
           })}
         </div>
       )}
+    </div>
+  );
 }
 
 export default ProfileScreen;
