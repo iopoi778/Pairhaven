@@ -167,7 +167,7 @@ router.delete('/posts/:postId', auth, async (req, res) => {
   }
 });
 
-// ⚠️ TEMPORARY CLEANUP ROUTE - RUN ONCE THEN DELETE THIS BLOCK
+// ⚠️ TEMPORARY CLEANUP - DELETE AFTER USE
 router.get('/cleanup-empty-posts', auth, async (req, res) => {
   try {
     const result = await Post.deleteMany({
@@ -177,8 +177,10 @@ router.get('/cleanup-empty-posts', auth, async (req, res) => {
         { $or: [{ mediaUrl: { $exists: false } }, { mediaUrl: null }, { mediaUrl: '' }] }
       ]
     });
-    res.json({ deleted: result.deletedCount, message: 'Empty posts cleaned up' });
-  } catch (error) { res.status(500).json({ message: error.message }); }
+    res.json({ deleted: result.deletedCount, message: 'Empty posts removed' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 module.exports = router;
