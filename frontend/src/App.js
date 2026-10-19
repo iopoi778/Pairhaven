@@ -19,17 +19,31 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
-// ✅ FIXED: Single Profile Wrapper that manually parses HashRouter URL
+// ✅ FIXED: Manual hash parsing for HashRouter compatibility
 function ProfileRouteWrapper() {
-  // Get hash path (e.g., "#/profile/12345")
+  const navigate = useNavigate();
   const hashPath = window.location.hash.replace('#', '') || '/';
-  const parts = hashPath.split('/').filter(Boolean); // ['profile', '12345']
-  const userId = parts[1] || null;
+  const parts = hashPath.split('/').filter(Boolean);
   
-  if (!userId) return <Navigate to="/" replace />;
+  // If not a valid profile path, redirect to home
+  if (parts[0] !== 'profile' || !parts[1]) {
+    return <Navigate to="/" replace />;
+  }
   
+  const userId = parts[1];
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  // If viewing own profile, redirect to self-profile route
+  if (userId === currentUser._id) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
-    <DashboardLayout activeTabOverride="profile">
+    <DashboardLayout 
+      activeTabOverride="profile" 
+      showBackButton={true}
+      onBack={() => navigate(-1)}
+    >
       <ProfileScreen userId={userId} />
     </DashboardLayout>
   );
@@ -53,7 +67,7 @@ function App() {
             } 
           />
 
-          {/* Default Dashboard & Self Profile */}
+          {/* Default Self Profile & Dashboard */}
           <Route path="/*" element={
             <ProtectedRoute>
               <DashboardLayout />
@@ -65,7 +79,7 @@ function App() {
   );
 }
 
-function DashboardLayout({ activeTabOverride, children }) {
+function DashboardLayout({ activeTabOverride, children, showBackButton, onBack }) {
   const [activeTab, setActiveTab] = useState('home');
   const navigate = useNavigate();
 
@@ -98,7 +112,18 @@ function DashboardLayout({ activeTabOverride, children }) {
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
-        <h2 style={{ margin: 0, color: '#5b72f2', fontWeight: 700 }}>PairHaven</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* ✅ Back Button for External Profiles */}
+          {showBackButton && (
+            <button 
+              onClick={onBack}
+              style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: 0 }}
+            >
+              ←
+            </button>
+          )}
+          <h2 style={{ margin: 0, color: '#5b72f2', fontWeight: 700 }}>PairHaven</h2>
+        </div>
         <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontSize: '1rem' }}>
           Logout
         </button>
@@ -114,7 +139,7 @@ function DashboardLayout({ activeTabOverride, children }) {
           { id: 'matching', label: 'Match', icon: '' },
           { id: 'messages', label: 'Chat', icon: '💬' },
           { id: 'notifications', label: 'Alerts', icon: '🔔' },
-          { id: 'profile', label: 'Profile', icon: '👤' }
+          { id: 'profile', label: 'Profile', icon: '' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -165,14 +190,12 @@ function HomeFeed({ onNavigateToProfile }) {
     setPosts(prev => [newPost, ...prev]);
   };
 
-  // Helper to safely get avatar URL
+  // ✅ Safe avatar URL helper
   const getAvatarUrl = (author) => {
     if (!author) return 'https://via.placeholder.com/36';
-    // Try nested object first
     if (author.photos && Array.isArray(author.photos) && author.photos[0]) {
       return typeof author.photos[0] === 'string' ? author.photos[0] : author.photos[0].url;
     }
-    // Try direct property
     if (author.photoUrl) return author.photoUrl;
     return 'https://via.placeholder.com/36';
   };
@@ -187,11 +210,10 @@ function HomeFeed({ onNavigateToProfile }) {
         </div>
       ) : (
         posts.map(post => {
-          // Determine if content is video
+          // ✅ Detect video by URL pattern if mediaType is missing
           const isVideo = post.mediaType === 'video' || 
                           (post.mediaUrl && post.mediaUrl.includes('/video/upload'));
           
-          // Get safe avatar
           const avatarSrc = getAvatarUrl(post.author);
 
           return (
@@ -216,7 +238,7 @@ function HomeFeed({ onNavigateToProfile }) {
 
               {post.text ? <div style={{ marginBottom: 8 }}>{post.text}</div> : null}
 
-              {/* MEDIA DISPLAY WITH FALLBACKS */}
+              {/* MEDIA DISPLAY */}
               {post.mediaUrl && (
                 isVideo ? (
                   <video 
