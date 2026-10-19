@@ -5,24 +5,28 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 
-// ✅ FIXED GET /api/posts - Populates likes/loves AND calculates user status
+// GET /api/posts - FIX: Ensure all fields are returned
 router.get('/', auth, async (req, res) => {
   try {
     const posts = await Post.find()
-      .populate('author', 'name photos')
-      .populate('likes', '_id')   // ✅ CRITICAL: Populate likes array
-      .populate('loves', '_id')   // ✅ CRITICAL: Populate loves array
+      .populate('author', 'name photos') // Get author name and photo
+      .populate('likes', '_id')          // For reaction counts
+      .populate('loves', '_id')          // For reaction counts
       .sort({ createdAt: -1 });
 
-    // Transform posts to include counts and boolean flags for current user
+    // Transform to include safe counts and user status
     const formattedPosts = posts.map(post => {
       const postObj = post.toObject();
       return {
         ...postObj,
-        likesCount: post.likes.length,
-        lovesCount: post.loves.length,
-        userLiked: post.likes.some(u => u._id.toString() === req.user.userId),
-        userLoved: post.loves.some(u => u._id.toString() === req.user.userId)
+        // ✅ ENSURE THESE FIELDS EXIST
+        text: postObj.text || '',
+        mediaUrl: postObj.mediaUrl || null,
+        mediaType: postObj.mediaType || null,
+        likesCount: post.likes ? post.likes.length : 0,
+        lovesCount: post.loves ? post.loves.length : 0,
+        userLiked: post.likes ? post.likes.some(u => u._id.toString() === req.user.userId) : false,
+        userLoved: post.loves ? post.loves.some(u => u._id.toString() === req.user.userId) : false
       };
     });
 
