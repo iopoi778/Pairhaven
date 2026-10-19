@@ -37,9 +37,6 @@ function ProfileScreen({ userId }) {
           headers: { Authorization: `Bearer ${token}` }
         });
         
-        // ✅ DEBUG LOG TO SEE EXACTLY WHAT BACKEND RETURNS
-        console.log("📋 RAW POSTS DATA:", postsRes.data);
-        
         setPosts(postsRes.data);
       } catch (err) {
         console.error("Failed to load profile", err);
@@ -229,7 +226,7 @@ function ProfileScreen({ userId }) {
       {/* LOGOUT BUTTON */}
       {isOwnProfile && (
         <button onClick={handleLogout} style={{ position: 'fixed', bottom: '90px', right: '20px', background: '#fff', color: '#e53e3e', border: '1px solid #fee2e2', borderRadius: '50px', padding: '0.6rem 1.2rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(229, 62, 62, 0.15)', zIndex: 100, display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span></span> Logout
+          <span>🚪</span> Logout
         </button>
       )}
 
@@ -278,7 +275,7 @@ function ProfileScreen({ userId }) {
 
         {isOwnProfile && (
           <button onClick={handleTogglePrivacy} style={{ marginTop: '0.8rem', background: user.isPrivate ? '#e53e3e' : '#10b981', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-            {user.isPrivate ? ' Private' : '🌍 Public'}
+            {user.isPrivate ? '🔒 Private' : ' Public'}
           </button>
         )}
       </div>
@@ -307,42 +304,47 @@ function ProfileScreen({ userId }) {
         )}
       </div>
 
-      {
-        <h3 style={{ marginBottom: '1rem' }}>Posts</h3>
-{posts.length === 0 ? (
-  <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
-    {isOwnProfile ? "You haven't posted anything yet." : "No public posts to show."}
-  </div>
-) : (
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-    {posts.map(post => {
-      const hasText = post.text && post.text.trim().length > 0;
-      const hasMedia = post.mediaUrl && post.mediaUrl !== 'null';
-      const isVideo = hasMedia && (post.mediaType === 'video' || post.mediaUrl.includes('/video/upload'));
-
-      return (
-        <div key={post._id} style={{ aspectRatio: '1', overflow: 'hidden', background: '#f5f5f5', position: 'relative' }}>
-          {hasText && !hasMedia && (
-            <div style={{ padding: '10px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', wordBreak: 'break-word', height: '100%', background: '#fff' }}>
-              {post.text.substring(0, 50)}{post.text.length > 50 ? '...' : ''}
-            </div>
-          )}
-          {hasMedia && (
-            isVideo ? (
-              <video src={post.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <img src={post.mediaUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                onError={(e) => { e.target.style.display = 'none'; }} 
-              />
-            )
-          )}
-          {isOwnProfile && (
-            <button onClick={() => handleDeletePost(post._id)} style={{ 
-              position: 'absolute', top: '5px', right: '5px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' 
-            }}>×</button>
-          )}
+      {/* ✅ CLEAN POSTS GRID - SYNTAX VERIFIED */}
+      <h3 style={{ marginBottom: '1rem' }}>Posts</h3>
+      {posts.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
+          {isOwnProfile ? "You haven't posted anything yet." : "No public posts to show."}
         </div>
-      );
-    })}
-  </div>
-)}
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+          {posts.map(post => {
+            const hasText = post.text && post.text.trim().length > 0;
+            const hasMedia = post.mediaUrl && post.mediaUrl !== 'null';
+            const isVideo = hasMedia && (post.mediaType === 'video' || post.mediaUrl.includes('/video/upload'));
+
+            return (
+              <div key={post._id} style={{ aspectRatio: '1', overflow: 'hidden', background: '#f5f5f5', position: 'relative' }}>
+                {hasText && !hasMedia && (
+                  <div style={{ padding: '10px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', wordBreak: 'break-word', height: '100%', background: '#fff' }}>
+                    {post.text.substring(0, 50)}{post.text.length > 50 ? '...' : ''}
+                  </div>
+                )}
+                {hasMedia && (
+                  isVideo ? (
+                    <video src={post.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <img src={post.mediaUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      onError={(e) => { e.target.style.display = 'none'; }} 
+                    />
+                  )
+                )}
+                {isOwnProfile && (
+                  <button onClick={() => handleDeletePost(post._id)} style={{ 
+                    position: 'absolute', top: '5px', right: '5px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' 
+                  }}>×</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default ProfileScreen;
