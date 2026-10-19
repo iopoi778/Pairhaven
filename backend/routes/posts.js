@@ -5,7 +5,44 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 
-// GET /api/posts - Ensure all fields are returned
+// ✅ SAFE MULTER SETUP WITH FALLBACK
+let upload;
+try {
+  const multer = require('multer');
+  const path = require('path');
+  const fs = require('fs');
+
+  const uploadDir = './uploads';
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => {
+      const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      cb(null, uniqueName + ext);
+    }
+  });
+
+  upload = multer({ 
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = /jpeg|jpg|png|gif|webp/;
+      const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = allowedTypes.test(file.mimetype);
+      if (mimetype && extname) return cb(null, true);
+      cb(new Error('Only image files are allowed'));
+    }
+  });
+} catch (e) {
+  console.warn('Multer not available, file uploads disabled:', e.message);
+  upload = null;
+}
+
+// GET /api/posts
 router.get('/', auth, async (req, res) => {
   try {
     const posts = await Post.find()
@@ -33,7 +70,7 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// ✅ SINGLE REACT ROUTE WITH NOTIFICATION LOGIC
+// REACT ROUTE
 router.post('/:postId/react', auth, async (req, res) => {
   try {
     const { type } = req.body;
@@ -83,26 +120,62 @@ router.post('/:postId/react', auth, async (req, res) => {
   }
 });
 
-// ✅ STRICT POST CREATION - PREVENTS EMPTY POSTS
+// ✅ FIXED POST CREATION - HANDLES MULTER ERRORS GRACEFULLY
 router.post('/', auth, async (req, res) => {
   try {
+    // Apply multer middleware manually to catch errors
+    if (upload) {
+      await new Promise((resolve, reject) => {
+        upload.single('media')(req, res, (err) => {
+          if (err) {
+            console.error('Multer error:', err);
+            // Don't reject, just log - we'll handle missing file below
+          }
+          resolve();
+        });
+      });
+    }
+
     const { text, mediaUrl, mediaType } = req.body;
+    const uploadedFile = req.file;
     
-    // Validate content exists
+    console.log('Post creation debug:', {
+      hasText: !!text,
+      textLength: text?.length,
+      hasUploadedFile: !!uploadedFile,
+      hasMediaUrl: !!mediaUrl,
+      mediaUrlType: typeof mediaUrl
+    });
+    
+    // Determine actual media URL and type
+    let finalMediaUrl = null;
+    let finalMediaType = null;
+    
+    if (uploadedFile) {
+      finalMediaUrl = `/uploads/${uploadedFile.filename}`;
+      finalMediaType = 'image';
+    } else if (mediaUrl && typeof mediaUrl === 'string' && mediaUrl.trim().length > 0) {
+      finalMediaUrl = mediaUrl.trim();
+      finalMediaType = mediaType || 'image';
+    }
+    
     const hasText = text && typeof text === 'string' && text.trim().length > 0;
-    const hasMedia = mediaUrl && typeof mediaUrl === 'string' && mediaUrl.trim().length > 0;
+    const hasMedia = finalMediaUrl !== null;
+    
+    console.log('Validation result:', { hasText, hasMedia, finalMediaUrl });
     
     if (!hasText && !hasMedia) {
       return res.status(400).json({ 
-        message: 'Post must contain text or media. Empty posts are not allowed.' 
+        message: 'Post must contain text or media. Empty posts are not allowed.',
+        debug: { textProvided: !!text, mediaProvided: !!mediaUrl, fileUploaded: !!uploadedFile }
       });
     }
 
     const newPost = new Post({
       author: req.user.userId,
       text: hasText ? text.trim() : '',
-      mediaUrl: hasMedia ? mediaUrl.trim() : null,
-      mediaType: hasMedia ? (mediaType || 'image') : null,
+      mediaUrl: finalMediaUrl,
+      mediaType: finalMediaType,
       likes: [],
       loves: []
     });
@@ -120,23 +193,17 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// ✅ DELETE POST - FIXED AUTHORIZATION CHECK
+// DELETE POST
 router.delete('/:postId', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
     if (!post) return res.status(404).json({ message: 'Post not found' });
     
-    // ✅ SAFE COMPARISON: Convert both to strings before comparing
     const postAuthorId = post.author.toString();
     const currentUserId = req.user.userId.toString();
     
-    console.log(`Delete attempt: Post author=${postAuthorId}, Current user=${currentUserId}`);
-    
     if (postAuthorId !== currentUserId) {
-      return res.status(403).json({ 
-        message: 'Unauthorized',
-        debug: { postAuthor: postAuthorId, currentUser: currentUserId }
-      });
+      return res.status(403).json({ message: 'Unauthorized' });
     }
     
     await Post.findByIdAndDelete(req.params.postId);
@@ -147,7 +214,7 @@ router.delete('/:postId', auth, async (req, res) => {
   }
 });
 
-// GET /api/posts/feed - Smart Feed Filtering
+// FEED ROUTE
 router.get('/feed', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.userId);
@@ -192,7 +259,7 @@ router.get('/feed', auth, async (req, res) => {
   }
 });
 
-// Legacy like route (kept for backward compatibility)
+// LEGACY LIKE ROUTE
 router.post('/:postId/like', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
