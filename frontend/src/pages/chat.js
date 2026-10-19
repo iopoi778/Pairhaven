@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom'; // Added for navigation
+import { useNavigate } from 'react-router-dom';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
 function ChatScreen() {
-  const [conversations, setConversations] = useState([]); // Changed from 'matches' to 'conversations'
+  const [conversations, setConversations] = useState([]);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -16,11 +16,10 @@ function ChatScreen() {
   // Safe user parsing
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
-  // ✅ Fetch conversations WITH unread counts
+  // Fetch conversations WITH unread counts
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        // This endpoint should return matches + lastMessage + unreadCount
         const res = await axios.get(`${API_URL}/api/messages/conversations`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -43,7 +42,7 @@ function ChatScreen() {
         });
         setMessages(res.data || []);
         
-        // ✅ Auto-mark as read locally & refresh list
+        // Auto-mark as read locally & refresh list
         setConversations(prev => prev.map(c => 
           c.user._id === selectedMatch._id ? { ...c, unreadCount: 0 } : c
         ));
@@ -118,7 +117,7 @@ function ChatScreen() {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 78px)', background: '#fff' }}>
       
-      {/* ✅ PROFESSIONAL SIDEBAR WITH COUNTS */}
+      {/* PROFESSIONAL SIDEBAR WITH COUNTS */}
       <div style={{ width: '320px', borderRight: '1px solid #eee', overflowY: 'auto', background: '#fff', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '1.2rem', borderBottom: '1px solid #eee', fontWeight: 700, fontSize: '1.1rem' }}>Messages</div>
         
@@ -190,7 +189,7 @@ function ChatScreen() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff' }}>
         {selectedMatch ? (
           <>
-            {/* ✅ HEADER WITH CLICKABLE PROFILE PICTURE */}
+            {/* HEADER WITH CLICKABLE PROFILE PICTURE */}
             <div style={{ 
               padding: '1rem 1.5rem', borderBottom: '1px solid #eee', 
               background: '#fff', display: 'flex', alignItems: 'center', gap: '12px',
@@ -215,10 +214,10 @@ function ChatScreen() {
               </div>
             </div>
             
-            {/* MESSAGES SCROLL AREA */}
+            {/* MESSAGES SCROLL AREA - INSTAGRAM STYLE */}
             <div style={{ 
               flex: 1, padding: '1.5rem', overflowY: 'auto', 
-              background: '#f8f9fa', display: 'flex', flexDirection: 'column', gap: '0.6rem' 
+              background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '0.4rem' 
             }}>
               {messages.length === 0 ? (
                 <div style={{ textAlign: 'center', color: '#999', marginTop: '4rem' }}>
@@ -230,17 +229,17 @@ function ChatScreen() {
                 messages.map(msg => {
                   const isMe = msg.sender?._id === currentUser._id;
                   return (
-                    <div key={msg._id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                    <div key={msg._id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: '2px' }}>
                       <div style={{ 
-                        background: isMe ? '#5b72f2' : '#fff',
-                        color: isMe ? '#fff' : '#333',
-                        padding: '0.7rem 1rem',
-                        borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                        maxWidth: '70%',
-                        boxShadow: isMe ? 'none' : '0 1px 2px rgba(0,0,0,0.06)',
+                        background: isMe ? '#5b72f2' : '#f0f0f0',
+                        color: isMe ? '#fff' : '#000',
+                        padding: '10px 14px',
+                        borderRadius: isMe ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+                        maxWidth: '75%',
                         fontSize: '0.95rem',
-                        lineHeight: '1.45',
-                        wordBreak: 'break-word'
+                        lineHeight: '1.4',
+                        wordBreak: 'break-word',
+                        boxShadow: 'none'
                       }}>
                         {msg.content}
                         <div style={{ 
