@@ -7,14 +7,18 @@ const auth = require('../middleware/auth');
 const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 
-// ✅ CLOUDINARY CONFIGURATION
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+// ✅ SAFE CLOUDINARY CONFIGURATION
+if (process.env.CLOUDINARY_CLOUD_NAME) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+  });
+} else {
+  console.warn("⚠️ Cloudinary credentials missing. Image uploads will fail.");
+}
 
-// Multer memory storage (no local disk needed)
+// Multer memory storage
 const storage = multer.memoryStorage();
 const upload = multer({ 
   storage,
@@ -54,7 +58,7 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// REACT ROUTE
+// REACT ROUTE - FIXED TO PREVENT 500 ERRORS
 router.post('/:postId/react', auth, async (req, res) => {
   try {
     const { type } = req.body;
@@ -81,15 +85,21 @@ router.post('/:postId/react', auth, async (req, res) => {
 
     await post.save();
 
+    // ✅ SAFE NOTIFICATION CREATION
     if (isAdding && post.author._id.toString() !== userId) {
-      const actionText = type === 'like' ? 'liked your post' : 'loved your post';
-      await Notification.create({
-        recipient: post.author._id,
-        sender: userId,
-        type: type,
-        message: `${currentUser.name} ${actionText}`,
-        post: post._id
-      });
+      try {
+        const actionText = type === 'like' ? 'liked your post' : 'loved your post';
+        await Notification.create({
+          recipient: post.author._id,
+          sender: userId,
+          type: type,
+          message: `${currentUser.name} ${actionText}`,
+          post: post._id
+        });
+      } catch (notifErr) {
+        console.error('Failed to create notification:', notifErr);
+        // Don't crash the reaction if notification fails
+      }
     }
 
     res.json({ 
@@ -104,7 +114,7 @@ router.post('/:postId/react', auth, async (req, res) => {
   }
 });
 
-// ✅ POST CREATION WITH CLOUDINARY UPLOAD
+// POST CREATION - FIXED WITH BETTER ERROR HANDLING
 router.post('/', auth, upload.single('media'), async (req, res) => {
   try {
     const { text, mediaUrl, mediaType } = req.body;
@@ -115,6 +125,10 @@ router.post('/', auth, upload.single('media'), async (req, res) => {
     
     // Upload to Cloudinary if file provided
     if (uploadedFile) {
+      if (!process.env.CLOUDINARY_CLOUD_NAME) {
+        return res.status(500).json({ message: 'Server configuration error: Cloudinary not set up.' });
+      }
+
       const result = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
           { folder: 'pairhaven_posts' },
