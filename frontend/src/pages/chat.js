@@ -13,7 +13,7 @@ function ChatScreen() {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
   
-  // ✅ SAFE USER PARSING: Ensure we always have a valid object
+  // ✅ SAFE USER PARSING
   const getSafeUser = () => {
     try {
       return JSON.parse(localStorage.getItem('user')) || {};
@@ -221,7 +221,7 @@ function ChatScreen() {
               </div>
             </div>
             
-            {/* MESSAGES SCROLL AREA */}
+            {/* MESSAGES SCROLL AREA - FIXED ID COMPARISON */}
             <div style={{ 
               flex: 1, padding: '1.5rem', overflowY: 'auto', 
               background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '0.4rem' 
@@ -232,13 +232,18 @@ function ChatScreen() {
                 </div>
               ) : (
                 messages.map(msg => {
-                  // ✅ ROBUST ID COMPARISON: Convert both to strings to avoid Object vs String mismatch
-                  const senderId = msg.sender?._id?.toString() || msg.sender?.toString();
+                  // ✅ FIX: Convert BOTH IDs to strings to ensure accurate comparison
                   const myId = currentUser._id?.toString();
-                  const isMe = senderId === myId;
+                  const senderId = msg.sender?._id?.toString() || msg.sender?.toString();
+                  
+                  const isMe = myId && senderId && myId === senderId;
 
                   return (
-                    <div key={msg._id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: '2px' }}>
+                    <div key={msg._id} style={{ 
+                      display: 'flex', 
+                      justifyContent: isMe ? 'flex-end' : 'flex-start', 
+                      marginBottom: '4px' 
+                    }}>
                       <div style={{ 
                         // ✅ DISTINCT COLORS: Blue for me, Gray for them
                         background: isMe ? '#5b72f2' : '#f0f0f0',
@@ -254,8 +259,11 @@ function ChatScreen() {
                       }}>
                         {msg.content}
                         <div style={{ 
-                          fontSize: '0.65rem', opacity: 0.7, marginTop: '4px', 
-                          textAlign: 'right', fontWeight: 500 
+                          fontSize: '0.65rem', 
+                          opacity: isMe ? 0.8 : 0.6, 
+                          marginTop: '4px', 
+                          textAlign: 'right', 
+                          fontWeight: 500 
                         }}>
                           {new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </div>
