@@ -51,7 +51,7 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
 function App() {
   const [navCounts, setNavCounts] = useState({ chat: 0, alerts: 0 });
 
-  // ✅ ENHANCED FETCH WITH DEBUG LOGGING
+  // ✅ BULLETPROOF COUNT FETCHER
   const fetchNavCounts = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -59,36 +59,46 @@ function App() {
     try {
       console.log("🔍 Fetching nav counts...");
       
-      // ✅ CHAT COUNTS
-      const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, { 
-        headers: { Authorization: `Bearer ${token}` } 
-      });
-      
-      console.log(" Conversations response:", msgRes.data);
-      
-      const totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => {
-        const count = c.unreadCount || 0;
-        console.log(`   - ${c.user?.name}: ${count} unread`);
-        return sum + count;
-      }, 0);
-      
-      console.log(`✅ Total unread messages: ${totalUnreadMsgs}`);
+      // ✅ CHAT COUNTS - Handle missing unreadCount field
+      let totalUnreadMsgs = 0;
+      try {
+        const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, { 
+          headers: { Authorization: `Bearer ${token}` } 
+        });
+        
+        console.log(" Conversations:", msgRes.data);
+        
+        totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => {
+          // Fallback: if unreadCount is missing, check messages array length or default to 0
+          const count = c.unreadCount ?? (c.messages?.filter(m => !m.read).length ?? 0);
+          return sum + (count || 0);
+        }, 0);
+        
+        console.log(`✅ Total unread messages: ${totalUnreadMsgs}`);
+      } catch (err) {
+        console.error("❌ Chat count failed:", err.response?.status, err.message);
+      }
 
-      // ✅ ALERT COUNTS
-      const notifRes = await axios.get(`${API_URL}/api/notifications`, { 
-        headers: { Authorization: `Bearer ${token}` } 
-      });
-      
-      console.log("🔔 Notifications response:", notifRes.data);
-      
-      const unreadNotifs = (notifRes.data || []).filter(n => !n.read).length;
-      
-      console.log(`✅ Total unread notifications: ${unreadNotifs}`);
+      // ✅ ALERT COUNTS - Handle missing read field
+      let unreadNotifs = 0;
+      try {
+        const notifRes = await axios.get(`${API_URL}/api/notifications`, { 
+          headers: { Authorization: `Bearer ${token}` } 
+        });
+        
+        console.log(" Notifications:", notifRes.data);
+        
+        unreadNotifs = (notifRes.data || []).filter(n => n.read === false).length;
+        
+        console.log(`✅ Total unread notifications: ${unreadNotifs}`);
+      } catch (err) {
+        console.error("❌ Alert count failed:", err.response?.status, err.message);
+      }
 
       setNavCounts({ chat: totalUnreadMsgs, alerts: unreadNotifs });
       
     } catch (err) { 
-      console.error("❌ FAILED to fetch nav counts:", err.response?.status, err.response?.data || err.message); 
+      console.error("❌ CRITICAL: Failed to fetch nav counts:", err); 
     }
   };
 
@@ -168,14 +178,14 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {renderContent()}
       </main>
 
-      {/* ✅ NAV BAR WITH RESTORED ICONS & BADGES */}
+      {/* ✅ NAV BAR WITH ICONS & BADGES */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
           { id: 'home', label: 'Home', icon: '🏠' },
           { id: 'matching', label: 'Match', icon: '💖' },
           { id: 'messages', label: 'Chat', icon: '', count: navCounts?.chat },
           { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
-          { id: 'profile', label: 'Profile', icon: '👤' }
+          { id: 'profile', label: 'Profile', icon: '' }
         ].map(tab => (
           <button 
             key={tab.id} 
