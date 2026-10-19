@@ -4,23 +4,42 @@ const User = require('../models/User');
 const Post = require('../models/Post');
 const auth = require('../middleware/auth');
 
-// GET PROFILE
+// GET USER PROFILE - GUARANTEED ARRAY INITIALIZATION
 router.get('/profile/:id', auth, async (req, res) => {
   try {
     const targetId = req.params.id === 'me' ? req.user.userId : req.params.id;
     const user = await User.findById(targetId).select('-password');
+
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // ✅ CRITICAL: Force initialize ALL arrays to prevent undefined
+    const matches = Array.isArray(user.matches) ? user.matches : [];
+    const requestsSent = Array.isArray(user.requestsSent) ? user.requestsSent : [];
+    const requestsReceived = Array.isArray(user.requestsReceived) ? user.requestsReceived : [];
+
     res.json({
-      _id: user._id, name: user.name, photos: user.photos, location: user.location,
-      age: user.age, bio: user.bio, isPrivate: user.isPrivate || false,
-      matchesCount: (user.matches || []).length,
-      requestsSent: user.requestsSent || [],
-      requestsReceived: user.requestsReceived || [],
-      followersCount: 0, followingCount: 0,
+      _id: user._id,
+      name: user.name,
+      photos: user.photos,
+      location: user.location,
+      age: user.age,
+      bio: user.bio,
+      isPrivate: user.isPrivate || false,
+      
+      // ✅ ALWAYS ARRAYS, NEVER UNDEFINED
+      matches,
+      requestsSent,
+      requestsReceived,
+      matchesCount: matches.length,
+      
+      followersCount: 0,
+      followingCount: 0,
       isOwnProfile: targetId.toString() === req.user.userId.toString()
     });
-  } catch (error) { res.status(500).json({ message: error.message }); }
+  } catch (error) {
+    console.error('Profile error:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
 
 // POTENTIAL MATCHES
