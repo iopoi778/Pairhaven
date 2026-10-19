@@ -152,7 +152,7 @@ router.patch('/profile/me', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-// GET USER POSTS - FIX: Ensure text/media fields are returned
+// ✅ FIXED: GET USER POSTS WITH VALIDATION
 router.get('/profile/:userId/posts', auth, async (req, res) => {
   try {
     const targetUser = await User.findById(req.params.userId);
@@ -166,22 +166,53 @@ router.get('/profile/:userId/posts', auth, async (req, res) => {
 
     const posts = await Post.find({ author: req.params.userId })
       .sort({ createdAt: -1 })
-      .populate('author', 'name photos');
+      .populate('author', 'name photos')
+      .lean(); // ✅ USE LEAN FOR BETTER PERFORMANCE
 
     // ✅ TRANSFORM TO GUARANTEE CONTENT FIELDS EXIST
-    const safePosts = posts.map(post => {
-      const postObj = post.toObject();
-      return {
-        ...postObj,
-        text: postObj.text || '',
-        mediaUrl: postObj.mediaUrl || null,
-        mediaType: postObj.mediaType || null
-      };
-    });
+    const safePosts = posts.map(post => ({
+      ...post,
+      text: post.text?.trim() || '',
+      mediaUrl: post.mediaUrl || null,
+      mediaType: post.mediaType || null
+    }));
 
     res.json(safePosts);
   } catch (error) {
     console.error('Fetch user posts error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ✅ FIXED: CREATE POST WITH VALIDATION
+router.post('/', auth, async (req, res) => {
+  try {
+    const { text, mediaUrl, mediaType } = req.body;
+    
+    // ✅ VALIDATE: At least one of text or media must exist
+    if (!text?.trim() && !mediaUrl) {
+      return res.status(400).json({ message: 'Post must have text or media' });
+    }
+
+    const newPost = new Post({
+      author: req.user.userId,
+      text: text?.trim() || '',
+      mediaUrl: mediaUrl || null,
+      mediaType: mediaType || null,
+      likes: [],
+      loves: []
+    });
+    
+    await newPost.save();
+    
+    // ✅ RETURN FULL POST WITH POPULATED AUTHOR
+    const populated = await Post.findById(newPost._id)
+      .populate('author', 'name photos')
+      .lean();
+      
+    res.status(201).json(populated);
+  } catch (error) {
+    console.error('Create post error:', error);
     res.status(500).json({ message: error.message });
   }
 });
