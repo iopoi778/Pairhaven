@@ -16,6 +16,7 @@ function NotificationsScreen() {
         const res = await axios.get(`${API_URL}/api/notifications`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        console.log("🔔 Raw Notifications:", res.data); // Debug log
         setNotifications(res.data || []);
       } catch (err) {
         console.error("Failed to fetch notifications:", err);
@@ -27,34 +28,25 @@ function NotificationsScreen() {
     if (token) fetchNotifications();
   }, [token]);
 
-  // ✅ Handle Click & Mark as Read
   const handleNotificationClick = async (note) => {
-    // 1. Mark as read in backend immediately
+    // Mark as read
     try {
       await axios.patch(`${API_URL}/api/notifications/${note._id}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Update local state to remove unread styling instantly
       setNotifications(prev => prev.map(n => 
         n._id === note._id ? { ...n, read: true } : n
       ));
-    } catch (err) {
-      console.error("Failed to mark as read", err);
-    }
+    } catch (err) { console.error("Mark read failed", err); }
 
-    // 2. Navigate based on type
+    // Navigate based on type
     if (note.type === 'message') {
-      // ✅ MESSAGES: Signal DashboardLayout to switch to Chat tab
       localStorage.setItem('activeTab', 'messages');
-      window.location.hash = '/'; // Triggers re-render of DashboardLayout
-      
-    } else if (note.type === 'like' || note.type === 'match' || note.type === 'follow') {
-      // ✅ SOCIAL: Go to sender's profile
+      window.location.hash = '/';
+    } else if (['like', 'match', 'follow'].includes(note.type)) {
       const senderId = note.sender?._id || note.sender;
-      if (senderId) {
-        window.location.hash = `/profile/${senderId}`;
-      }
+      if (senderId) window.location.hash = `/profile/${senderId}`;
     }
   };
 
@@ -64,36 +56,45 @@ function NotificationsScreen() {
     <div style={{ padding: '1rem' }}>
       <h2>Alerts</h2>
       {notifications.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#666', marginTop: '2rem' }}>No new notifications.</div>
+        <div style={{ textAlign: 'center', color: '#666', marginTop: '2rem' }}>
+          No new notifications.
+        </div>
       ) : (
-        notifications.map(note => (
-          <div 
-            key={note._id} 
-            onClick={() => handleNotificationClick(note)}
-            style={{ 
-              background: note.read ? '#fff' : '#f0f7ff', // Light blue bg for unread
-              padding: '1rem', 
-              borderRadius: '8px', 
-              marginBottom: '0.8rem', 
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              cursor: 'pointer',
-              borderLeft: note.read ? '4px solid transparent' : '4px solid #5b72f2', // Blue bar for unread
-              transition: 'all 0.2s'
-            }}
-          >
-            <div style={{ fontWeight: 'bold', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {!note.read && <span style={{width: 8, height: 8, background: '#5b72f2', borderRadius: '50%'}}></span>}
-              {note.type === 'like' && '❤️ New Like'}
-              {note.type === 'follow' && '👤 New Follower'}
-              {note.type === 'match' && '💖 It\'s a Match!'}
-              {note.type === 'message' && ' New Message'}
+        notifications.map(note => {
+          // ✅ FIX: Handle undefined 'read' field safely
+          const isRead = note.read === true; 
+          
+          return (
+            <div 
+              key={note._id} 
+              onClick={() => handleNotificationClick(note)}
+              style={{ 
+                background: isRead ? '#fff' : '#f0f7ff',
+                padding: '1rem', 
+                borderRadius: '8px', 
+                marginBottom: '0.8rem', 
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                cursor: 'pointer',
+                borderLeft: isRead ? '4px solid transparent' : '4px solid #5b72f2',
+                transition: 'all 0.2s'
+              }}
+            >
+              <div style={{ fontWeight: 'bold', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {!isRead && <span style={{width: 8, height: 8, background: '#5b72f2', borderRadius: '50%'}}></span>}
+                {note.type === 'like' && '❤️ New Like'}
+                {note.type === 'follow' && '👤 New Follower'}
+                {note.type === 'match' && '💖 It\'s a Match!'}
+                {note.type === 'message' && '💬 New Message'}
+                {/* ✅ FIX: Show generic label if type is unknown */}
+                {!['like','follow','match','message'].includes(note.type) && '🔔 Notification'}
+              </div>
+              <div style={{ color: '#444' }}>{note.message}</div>
+              <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
+                {new Date(note.createdAt).toLocaleString()}
+              </div>
             </div>
-            <div style={{ color: '#444' }}>{note.message}</div>
-            <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
-              {new Date(note.createdAt).toLocaleString()}
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
