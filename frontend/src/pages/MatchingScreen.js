@@ -8,13 +8,13 @@ function MatchingScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   
-  // Track actions for the CURRENT profile only
+  // Track actions for the CURRENT profile
   const [hasFollowed, setHasFollowed] = useState(false);
   const [hasLiked, setHasLiked] = useState(false);
   
   const token = localStorage.getItem('token');
 
-  // Reset action states whenever we move to a new profile
+  // Reset states when moving to next profile
   useEffect(() => {
     setHasFollowed(false);
     setHasLiked(false);
@@ -23,6 +23,28 @@ function MatchingScreen() {
   useEffect(() => {
     fetchProfiles();
   }, []);
+
+  // Check if already following when profile loads
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (profiles.length === 0 || currentIndex >= profiles.length) return;
+      
+      try {
+        const currentProfileId = profiles[currentIndex]._id;
+        const res = await axios.get(`${API_URL}/api/users/profile/${currentProfileId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (res.data.isFollowing) {
+          setHasFollowed(true);
+        }
+      } catch (err) {
+        console.error("Could not check follow status", err);
+      }
+    };
+
+    checkFollowStatus();
+  }, [currentIndex, profiles, token]);
 
   const fetchProfiles = async () => {
     try {
@@ -38,7 +60,7 @@ function MatchingScreen() {
     }
   };
 
-  // Handle Follow -> Transforms to Checkmark
+  // Handle Follow -> Auto Swipe Next
   const handleFollow = async () => {
     if (currentIndex >= profiles.length || hasFollowed) return;
     const profile = profiles[currentIndex];
@@ -47,14 +69,23 @@ function MatchingScreen() {
       await axios.post(`${API_URL}/api/users/follow/${profile._id}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setHasFollowed(true); // Instantly update UI
+      
+      // Mark as followed AND auto-swipe
+      setHasFollowed(true);
+      setCurrentIndex(prev => prev + 1); 
+      
     } catch (err) {
-      console.error("Follow failed", err);
-      alert(err.response?.data?.message || "Failed to follow");
+      // If already following, just swipe anyway without error
+      if (err.response?.data?.message === 'Already following') {
+        setHasFollowed(true);
+        setCurrentIndex(prev => prev + 1);
+      } else {
+        console.error("Follow failed", err);
+      }
     }
   };
 
-  // Handle Like -> Transforms to Match/Filled Heart
+  // Handle Like -> Auto Swipe Next
   const handleLike = async () => {
     if (currentIndex >= profiles.length || hasLiked) return;
     const profile = profiles[currentIndex];
@@ -64,19 +95,25 @@ function MatchingScreen() {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      setHasLiked(true); // Instantly update UI
+      // Mark as liked AND auto-swipe
+      setHasLiked(true);
+      setCurrentIndex(prev => prev + 1);
       
-      // If it's a mutual match, show alert
+      // Optional: Keep mutual match alert but remove others
       if (res.data.isMatch) {
-        alert(`It's a match with ${profile.name}! `);
+        alert(`It's a match with ${profile.name}!`); 
       }
     } catch (err) {
-      console.error("Like failed", err);
-      alert(err.response?.data?.message || "Failed to like");
+      // If already liked, just swipe anyway
+      if (err.response?.data?.message === 'Already liked') {
+        setHasLiked(true);
+        setCurrentIndex(prev => prev + 1);
+      } else {
+        console.error("Like failed", err);
+      }
     }
   };
 
-  // Handle Pass/Cancel
   const handlePass = () => {
     if (currentIndex < profiles.length) {
       setCurrentIndex(prev => prev + 1);
@@ -85,7 +122,6 @@ function MatchingScreen() {
 
   if (loading) return <div style={{padding:'2rem', textAlign:'center'}}>Loading...</div>;
 
-  // Empty State
   if (profiles.length === 0 || currentIndex >= profiles.length) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
@@ -122,10 +158,10 @@ function MatchingScreen() {
         </div>
       </div>
 
-      {/* DYNAMIC ACTION BUTTONS */}
+      {/* ACTION BUTTONS */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '1.5rem' }}>
         
-        {/* CANCEL / PASS BUTTON (Always visible) */}
+        {/* CANCEL / PASS BUTTON */}
         <button 
           onClick={handlePass}
           style={{ 
@@ -138,7 +174,7 @@ function MatchingScreen() {
           ✕
         </button>
 
-        {/* FOLLOW BUTTON -> CHECKMARK */}
+        {/* FOLLOW BUTTON */}
         <button 
           onClick={handleFollow}
           disabled={hasFollowed}
@@ -156,7 +192,7 @@ function MatchingScreen() {
           {hasFollowed ? '✓' : '👤+'}
         </button>
 
-        {/* LIKE BUTTON -> MATCH / FILLED HEART */}
+        {/* LIKE BUTTON */}
         <button 
           onClick={handleLike}
           disabled={hasLiked}
