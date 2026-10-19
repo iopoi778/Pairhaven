@@ -133,25 +133,41 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {renderContent()}
       </main>
 
-      {/* ✅ NAV BAR WITH ICONS & BADGES */}
+            {/* ✅ NAV BAR WITH RESTORED ICONS & BADGES */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
-          { id: 'home', label: 'Home', icon: '' },
-          { id: 'matching', label: 'Match', icon: '' },
-          { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
-          { id: 'notifications', label: 'Alerts', icon: '', count: navCounts?.alerts },
-          { id: 'profile', label: 'Profile', icon: '👤' }
+          { id: 'home', label: 'Home', icon: '🏠' },                   
+          { id: 'matching', label: 'Match', icon: '💖' },              
+          { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },    // ✅ Chat Icon + Count
+          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts }, // ✅ Alerts Icon + Count
+          { id: 'profile', label: 'Profile', icon: '' }              // ✅ Profile Icon
         ].map(tab => (
-          <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (tab.id === 'profile') window.location.hash = '/'; }} style={{ border: currentTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent', background: currentTab === tab.id ? '#eef2ff' : 'transparent', borderRadius: '10px', padding: '0.5rem 0.8rem', minWidth: '70px', textAlign: 'center', color: currentTab === tab.id ? '#5b72f2' : '#666', cursor: 'pointer', position: 'relative' }}>
+          <button 
+            key={tab.id} 
+            onClick={() => { setActiveTab(tab.id); if (tab.id === 'profile') window.location.hash = '/'; }} 
+            style={{ 
+              border: currentTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent', 
+              background: currentTab === tab.id ? '#eef2ff' : 'transparent', 
+              borderRadius: '10px', 
+              padding: '0.5rem 0.8rem', 
+              minWidth: '70px', 
+              textAlign: 'center', 
+              color: currentTab === tab.id ? '#5b72f2' : '#666', 
+              cursor: 'pointer', 
+              position: 'relative' 
+            }}
+          >
+            {/* ✅ ICON RENDERING */}
             <div style={{ fontSize: '1.3rem' }}>{tab.icon}</div>
+            
+            {/* ✅ LABEL RENDERING */}
             <div style={{ fontSize: '0.72rem', marginTop: '0.15rem' }}>{tab.label}</div>
+            
+            {/* ✅ BADGE RENDERING (Only shows if count > 0) */}
             {renderBadge(tab.count)}
           </button>
         ))}
       </nav>
-    </div>
-  );
-}
 
 function HomeFeed({ onNavigateToProfile }) {
   const [posts, setPosts] = useState([]);
