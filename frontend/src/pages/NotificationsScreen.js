@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom'; // Added for navigation
+import { useNavigate } from 'react-router-dom';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -44,20 +44,17 @@ function NotificationsScreen() {
     }
 
     // 2. Navigate based on type
-    if (note.type === 'like' || note.type === 'match') {
-      // Navigate to sender's profile
-      if (note.sender) {
-        window.location.hash = `/profile/${note.sender._id || note.sender}`;
+    if (note.type === 'message') {
+      // ✅ MESSAGES: Signal DashboardLayout to switch to Chat tab
+      localStorage.setItem('activeTab', 'messages');
+      window.location.hash = '/'; // Triggers re-render of DashboardLayout
+      
+    } else if (note.type === 'like' || note.type === 'match' || note.type === 'follow') {
+      // ✅ SOCIAL: Go to sender's profile
+      const senderId = note.sender?._id || note.sender;
+      if (senderId) {
+        window.location.hash = `/profile/${senderId}`;
       }
-    } else if (note.type === 'follow') {
-      // Navigate to follower's profile
-      if (note.sender) {
-        window.location.hash = `/profile/${note.sender._id || note.sender}`;
-      }
-    } else if (note.type === 'message') {
-      // Navigate to Chat tab
-      navigate('/'); // Or specific chat route if you have one
-      // You might want to trigger a tab change here depending on your app structure
     }
   };
 
@@ -85,11 +82,11 @@ function NotificationsScreen() {
             }}
           >
             <div style={{ fontWeight: 'bold', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {!note.read && <span style={{width: 8, height: 8, background: '#5b72f2', borderRadius: '50'}}></span>}
+              {!note.read && <span style={{width: 8, height: 8, background: '#5b72f2', borderRadius: '50%'}}></span>}
               {note.type === 'like' && '❤️ New Like'}
               {note.type === 'follow' && '👤 New Follower'}
               {note.type === 'match' && '💖 It\'s a Match!'}
-              {note.type === 'message' && '💬 New Message'}
+              {note.type === 'message' && ' New Message'}
             </div>
             <div style={{ color: '#444' }}>{note.message}</div>
             <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
