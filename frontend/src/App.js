@@ -169,14 +169,14 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {renderContent()}
       </main>
 
-      {/* ✅ NAV BAR WITH ALL ICONS RESTORED & BADGES */}
+            {/* ✅ NAV BAR WITH ALL ICONS RESTORED & BADGES */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
           { id: 'home', label: 'Home', icon: '🏠' },
           { id: 'matching', label: 'Match', icon: '💖' },
-          { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },   // ✅ RESTORED Chat Icon
-          { id: 'notifications', label: 'Alerts', icon: '', count: navCounts?.alerts },
-          { id: 'profile', label: 'Profile', icon: '👤' }                        // ✅ RESTORED Profile Icon
+          { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
+          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts }, // ✅ FIXED: Alerts icon restored
+          { id: 'profile', label: 'Profile', icon: '👤' }
         ].map(tab => (
           <button 
             key={tab.id} 
