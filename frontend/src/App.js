@@ -51,46 +51,32 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
 function App() {
   const [navCounts, setNavCounts] = useState({ chat: 0, alerts: 0 });
 
-  // ✅ ROBUST COUNT FETCHER WITH FALLBACKS
   const fetchNavCounts = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
     
     try {
-      // ✅ CHAT COUNTS - Handle missing unreadCount field safely
       let totalUnreadMsgs = 0;
       try {
         const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, { 
           headers: { Authorization: `Bearer ${token}` } 
         });
-        
         totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => {
-          // Fallback: if unreadCount is missing, check messages array or default to 0
           const count = c.unreadCount ?? (c.messages?.filter(m => !m.read).length ?? 0);
           return sum + (count || 0);
         }, 0);
-      } catch (err) {
-        console.error(" Chat count failed:", err.response?.status, err.message);
-      }
+      } catch (err) { console.error("Chat count failed:", err.message); }
 
-      // ✅ ALERT COUNTS - Handle undefined 'read' field safely
       let unreadNotifs = 0;
       try {
         const notifRes = await axios.get(`${API_URL}/api/notifications`, { 
           headers: { Authorization: `Bearer ${token}` } 
         });
-        
-        // Filter strictly for read === false to avoid counting undefined as unread
         unreadNotifs = (notifRes.data || []).filter(n => n.read === false).length;
-      } catch (err) {
-        console.error("❌ Alert count failed:", err.response?.status, err.message);
-      }
+      } catch (err) { console.error("Alert count failed:", err.message); }
 
       setNavCounts({ chat: totalUnreadMsgs, alerts: unreadNotifs });
-      
-    } catch (err) { 
-      console.error("❌ CRITICAL: Failed to fetch nav counts:", err); 
-    }
+    } catch (err) { console.error("CRITICAL: Failed to fetch nav counts:", err); }
   };
 
   useEffect(() => {
@@ -137,7 +123,6 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
     }
   };
 
-  // ✅ RENDER BADGE FUNCTION - Placed before return
   const renderBadge = (count) => {
     if (!count || count <= 0) return null;
     return (
@@ -155,7 +140,6 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
 
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
-      {/* ✅ CLEAN HEADER */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {showBackButton && (
@@ -169,14 +153,13 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {renderContent()}
       </main>
 
-            {/* ✅ NAV BAR WITH ALL ICONS RESTORED & BADGES */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
           { id: 'home', label: 'Home', icon: '🏠' },
           { id: 'matching', label: 'Match', icon: '💖' },
-          { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
-          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts }, // ✅ FIXED: Alerts icon restored
-          { id: 'profile', label: 'Profile', icon: '👤' }
+          { id: 'messages', label: 'Chat', icon: '', count: navCounts?.chat },
+          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
+          { id: 'profile', label: 'Profile', icon: '' }
         ].map(tab => (
           <button 
             key={tab.id} 
@@ -330,9 +313,11 @@ function HomeFeed({ onNavigateToProfile }) {
   );
 }
 
+// ✅ NEW: ANIMATED LOGIN PAGE WITH ROMANTIC SLIDESHOW
 function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -346,15 +331,56 @@ function LoginPage() {
       navigate('/', { replace: true });
     } catch (err) { console.error(err); alert('Server error.'); } finally { setLoading(false); }
   };
+
   return (
-    <div style={{ maxWidth: 400, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
-      <h2 style={{ textAlign: 'center', color: '#5b72f2' }}>Welcome Back</h2>
-      <form onSubmit={handleSubmit}>
-        <input name="email" type="email" placeholder="Email" required style={inputStyle} />
-        <input name="password" type="password" placeholder="Password" required style={inputStyle} />
-        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>{loading ? 'Logging in...' : 'Log In'}</button>
-      </form>
-      <p style={{ textAlign: 'center', marginTop: '1rem' }}>New here? <span onClick={() => navigate('/register')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Create Account</span></p>
+    <div style={{ 
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+      overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' 
+    }}>
+      {/* ✅ BACKGROUND ANIMATION LAYER */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+        <style>{`
+          @keyframes fadeSlide {
+            0% { opacity: 0; transform: scale(1.05); }
+            10% { opacity: 1; transform: scale(1); }
+            33% { opacity: 1; transform: scale(1); }
+            43% { opacity: 0; transform: scale(1.05); }
+            100% { opacity: 0; }
+          }
+          .bg-slide {
+            position: absolute; inset: 0; 
+            background-size: cover; background-position: center;
+            opacity: 0; animation: fadeSlide 18s infinite;
+          }
+          .bg-1 { animation-delay: 0s; background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=2000&auto=format&fit=crop'); }
+          .bg-2 { animation-delay: 6s; background-image: url('https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?q=80&w=2000&auto=format&fit=crop'); }
+          .bg-3 { animation-delay: 12s; background-image: url('https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2000&auto=format&fit=crop'); }
+        `}</style>
+        <div className="bg-slide bg-1"></div>
+        <div className="bg-slide bg-2"></div>
+        <div className="bg-slide bg-3"></div>
+        {/* Dark overlay for readability */}
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }}></div>
+      </div>
+
+      {/* ✅ LOGIN FORM CARD */}
+      <div style={{ 
+        position: 'relative', zIndex: 1, width: '100%', maxWidth: 400, 
+        background: '#fff', padding: '2.5rem', borderRadius: '16px', 
+        boxShadow: '0 10px 40px rgba(0,0,0,0.2)', margin: '1rem' 
+      }}>
+        <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '1.5rem' }}>Welcome Back</h2>
+        <form onSubmit={handleSubmit}>
+          <input name="email" type="email" placeholder="Email" required autoComplete="email" style={inputStyle} />
+          <input name="password" type="password" placeholder="Password" required autoComplete="current-password" style={inputStyle} />
+          <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1, marginTop: '0.5rem' }} disabled={loading}>
+            {loading ? 'Logging in...' : 'Log In'}
+          </button>
+        </form>
+        <p style={{ textAlign: 'center', marginTop: '1.5rem', color: '#666' }}>
+          New here? <span onClick={() => navigate('/register')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}>Create Account</span>
+        </p>
+      </div>
     </div>
   );
 }
