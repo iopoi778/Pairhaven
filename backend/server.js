@@ -48,6 +48,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/users', profileRoutes);
 app.use('/api/uploads', uploadsRoutes);
