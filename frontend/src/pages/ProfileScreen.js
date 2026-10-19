@@ -307,94 +307,42 @@ function ProfileScreen({ userId }) {
         )}
       </div>
 
-      {/* ✅ FIXED POSTS GRID WITH PER-POST DEBUG LOGGING */}
-      <h3 style={{ marginBottom: '1rem' }}>Posts</h3>
-      {posts.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
-          {isOwnProfile ? "You haven't posted anything yet." : "No public posts to show."}
+      {
+        <h3 style={{ marginBottom: '1rem' }}>Posts</h3>
+{posts.length === 0 ? (
+  <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
+    {isOwnProfile ? "You haven't posted anything yet." : "No public posts to show."}
+  </div>
+) : (
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+    {posts.map(post => {
+      const hasText = post.text && post.text.trim().length > 0;
+      const hasMedia = post.mediaUrl && post.mediaUrl !== 'null';
+      const isVideo = hasMedia && (post.mediaType === 'video' || post.mediaUrl.includes('/video/upload'));
+
+      return (
+        <div key={post._id} style={{ aspectRatio: '1', overflow: 'hidden', background: '#f5f5f5', position: 'relative' }}>
+          {hasText && !hasMedia && (
+            <div style={{ padding: '10px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', wordBreak: 'break-word', height: '100%', background: '#fff' }}>
+              {post.text.substring(0, 50)}{post.text.length > 50 ? '...' : ''}
+            </div>
+          )}
+          {hasMedia && (
+            isVideo ? (
+              <video src={post.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <img src={post.mediaUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                onError={(e) => { e.target.style.display = 'none'; }} 
+              />
+            )
+          )}
+          {isOwnProfile && (
+            <button onClick={() => handleDeletePost(post._id)} style={{ 
+              position: 'absolute', top: '5px', right: '5px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' 
+            }}>×</button>
+          )}
         </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-          {posts.map((post, index) => {
-            // ✅ DETAILED CONTENT CHECKS
-            const hasText = typeof post.text === 'string' && post.text.trim().length > 0;
-            const hasMedia = post.mediaUrl && 
-                            typeof post.mediaUrl === 'string' &&
-                            post.mediaUrl !== 'null' && 
-                            post.mediaUrl !== '' &&
-                            post.mediaUrl !== undefined;
-            const isVideo = hasMedia && (post.mediaType === 'video' || post.mediaUrl.includes('/video/upload'));
-            
-            // ✅ FALLBACK FOR EMPTY POSTS
-            const isEmpty = !hasText && !hasMedia;
-
-            // ✅ DEBUG LOG FOR EACH POST
-            console.log(`Post ${index + 1}:`, {
-              id: post._id,
-              hasText,
-              textLength: post.text?.length || 0,
-              hasMedia,
-              mediaUrl: post.mediaUrl,
-              isEmpty
-            });
-
-            return (
-              <div key={post._id} style={{ aspectRatio: '1', overflow: 'hidden', background: '#f5f5f5', position: 'relative' }}>
-                
-                {/* ✅ EMPTY POST PLACEHOLDER */}
-                {isEmpty && (
-                  <div style={{ 
-                    padding: '10px', fontSize: '0.7rem', display: 'flex', 
-                    alignItems: 'center', justifyContent: 'center', textAlign: 'center', 
-                    height: '100%', background: '#fff', color: '#999' 
-                  }}>
-                    Empty post<br/>
-                    <span style={{fontSize:'0.6rem'}}>(ID: {post._id.slice(-6)})</span>
-                  </div>
-                )}
-
-                {/* ✅ TEXT-ONLY POSTS */}
-                {hasText && !hasMedia && (
-                  <div style={{ 
-                    padding: '10px', fontSize: '0.7rem', display: 'flex', 
-                    alignItems: 'center', justifyContent: 'center', textAlign: 'center', 
-                    wordBreak: 'break-word', height: '100%', background: '#fff' 
-                  }}>
-                    {post.text.substring(0, 50)}{post.text.length > 50 ? '...' : ''}
-                  </div>
-                )}
-
-                {/* ✅ MEDIA POSTS */}
-                {hasMedia && (
-                  isVideo ? (
-                    <video src={post.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <img src={post.mediaUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      onError={(e) => { 
-                        e.target.style.display = 'none'; 
-                        e.target.parentElement.innerHTML = '<div style="padding:10px;font-size:0.7rem;text-align:center;color:#999">Image unavailable</div>'; 
-                      }} 
-                    />
-                  )
-                )}
-
-                {/* Delete button for own posts */}
-                {isOwnProfile && (
-                  <button onClick={() => handleDeletePost(post._id)} style={{ 
-                    position: 'absolute', top: '5px', right: '5px', 
-                    background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', 
-                    borderRadius: '50%', width: '24px', height: '24px', 
-                    cursor: 'pointer', fontSize: '12px', display: 'flex', 
-                    alignItems: 'center', justifyContent: 'center' 
-                  }}>×</button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default ProfileScreen;
+      );
+    })}
+  </div>
+)}
