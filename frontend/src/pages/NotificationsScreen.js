@@ -1,51 +1,95 @@
-// frontend/src/pages/NotificationsScreen.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom'; // Added for navigation
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
 function NotificationsScreen() {
   const [notifications, setNotifications] = useState([]);
-  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const token = localStorage.getItem('token');
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchNotifications = async () => {
       try {
-        // Fetch Notifications
-        const notifRes = await axios.get(`${API_URL}/api/notifications`, {
+        const res = await axios.get(`${API_URL}/api/notifications`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setNotifications(notifRes.data || []);
-
-        // Fetch Unread Message Count
-        const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const totalUnread = (msgRes.data || []).reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
-        setUnreadMsgCount(totalUnread);
-
+        setNotifications(res.data || []);
       } catch (err) {
-        console.error("Failed to fetch data", err);
+        console.error("Failed to fetch notifications:", err);
+      } finally {
+        setLoading(false);
       }
     };
 
-    if (token) fetchData();
+    if (token) fetchNotifications();
   }, [token]);
+
+  // ✅ Handle Click & Mark as Read
+  const handleNotificationClick = async (note) => {
+    // 1. Mark as read in backend immediately
+    try {
+      await axios.patch(`${API_URL}/api/notifications/${note._id}/read`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Update local state to remove unread styling instantly
+      setNotifications(prev => prev.map(n => 
+        n._id === note._id ? { ...n, read: true } : n
+      ));
+    } catch (err) {
+      console.error("Failed to mark as read", err);
+    }
+
+    // 2. Navigate based on type
+    if (note.type === 'like' || note.type === 'match') {
+      // Navigate to sender's profile
+      if (note.sender) {
+        window.location.hash = `/profile/${note.sender._id || note.sender}`;
+      }
+    } else if (note.type === 'follow') {
+      // Navigate to follower's profile
+      if (note.sender) {
+        window.location.hash = `/profile/${note.sender._id || note.sender}`;
+      }
+    } else if (note.type === 'message') {
+      // Navigate to Chat tab
+      navigate('/'); // Or specific chat route if you have one
+      // You might want to trigger a tab change here depending on your app structure
+    }
+  };
+
+  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading alerts...</div>;
 
   return (
     <div style={{ padding: '1rem' }}>
-      <h2>Alerts {unreadMsgCount > 0 && <span style={{background:'#e53e3e', color:'#fff', borderRadius:'50%', padding:'2px 8px', fontSize:'0.8rem'}}>{unreadMsgCount}</span>}</h2>
-      
+      <h2>Alerts</h2>
       {notifications.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#666', marginTop: '2rem' }}>No new notifications.</div>
       ) : (
         notifications.map(note => (
-          <div key={note._id} style={{ background: '#fff', padding: '1rem', borderRadius: '8px', marginBottom: '0.8rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '0.3rem' }}>
+          <div 
+            key={note._id} 
+            onClick={() => handleNotificationClick(note)}
+            style={{ 
+              background: note.read ? '#fff' : '#f0f7ff', // Light blue bg for unread
+              padding: '1rem', 
+              borderRadius: '8px', 
+              marginBottom: '0.8rem', 
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              cursor: 'pointer',
+              borderLeft: note.read ? '4px solid transparent' : '4px solid #5b72f2', // Blue bar for unread
+              transition: 'all 0.2s'
+            }}
+          >
+            <div style={{ fontWeight: 'bold', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {!note.read && <span style={{width: 8, height: 8, background: '#5b72f2', borderRadius: '50'}}></span>}
               {note.type === 'like' && '❤️ New Like'}
               {note.type === 'follow' && '👤 New Follower'}
               {note.type === 'match' && '💖 It\'s a Match!'}
+              {note.type === 'message' && '💬 New Message'}
             </div>
             <div style={{ color: '#444' }}>{note.message}</div>
             <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
