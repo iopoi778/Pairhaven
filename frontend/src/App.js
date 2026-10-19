@@ -312,7 +312,7 @@ function HomeFeed({ onNavigateToProfile }) {
                   <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{post.likesCount}</span>
                 </button>
                 <button onClick={() => handleReact(post._id, 'love')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '6px', color: post.userLoved ? '#ff6b6b' : '#666' }}>
-                  <span style={{ fontSize: '1.4rem' }}>{post.userLoved ? '💖' : ''}</span>
+                  <span style={{ fontSize: '1.4rem' }}>{post.userLoved ? '💖' : '👍'}</span>
                   <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{post.lovesCount}</span>
                 </button>
               </div>
