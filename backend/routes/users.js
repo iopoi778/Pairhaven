@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const Post = require('../models/Post'); // Ensure this model exists
+const Post = require('../models/Post');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
 
@@ -38,13 +38,13 @@ router.get('/profile/:id', auth, async (req, res) => {
       bio: user.bio,
       interests: user.interests,
       verificationStatus: user.verificationStatus,
-      isPrivate: user.isPrivate || false, // NEW: Privacy setting
+      isPrivate: user.isPrivate || false,
       followersCount: followers.length,
       followingCount: following.length,
       likesReceivedCount: likesReceived.length,
       matchesCount: matches.length,
       isFollowing: followers.some(f => f._id.toString() === req.user.userId),
-      showFollowingCount: isOwnProfile, // NEW: Hide following for friends
+      showFollowingCount: isOwnProfile,
       followers,
       following
     });
@@ -54,7 +54,7 @@ router.get('/profile/:id', auth, async (req, res) => {
   }
 });
 
-// PATCH UPDATE PROFILE (Bio, Privacy) - NEW ROUTE
+// PATCH UPDATE PROFILE (Bio, Privacy)
 router.patch('/profile/me', auth, async (req, res) => {
   try {
     const { bio, isPrivate } = req.body;
@@ -79,14 +79,16 @@ router.patch('/profile/me', auth, async (req, res) => {
   }
 });
 
-// GET USER POSTS (Respects Privacy) - NEW ROUTE
+// GET USER POSTS (Respects Privacy)
 router.get('/profile/:userId/posts', auth, async (req, res) => {
   try {
-    const targetUser = await User.findById(req.params.userId);
+    // Populate followers to correctly check ObjectIds against req.user.userId
+    const targetUser = await User.findById(req.params.userId).populate('followers', '_id');
     if (!targetUser) return res.status(404).json({ message: 'User not found' });
 
     // If private and viewer is NOT a follower, return empty array
-    if (targetUser.isPrivate && !targetUser.followers?.includes(req.user.userId)) {
+    const isFollower = targetUser.followers.some(f => f._id.toString() === req.user.userId);
+    if (targetUser.isPrivate && !isFollower) {
       return res.json([]);
     }
 
@@ -101,7 +103,7 @@ router.get('/profile/:userId/posts', auth, async (req, res) => {
   }
 });
 
-// DELETE POST - NEW ROUTE
+// DELETE POST
 router.delete('/posts/:postId', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
