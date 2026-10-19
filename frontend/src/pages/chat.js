@@ -13,10 +13,17 @@ function ChatScreen() {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
   
-  // Safe user parsing
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  // ✅ SAFE USER PARSING: Ensure we always have a valid object
+  const getSafeUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem('user')) || {};
+    } catch (e) {
+      return {};
+    }
+  };
+  const currentUser = getSafeUser();
 
-  // Fetch conversations WITH unread counts
+  // Fetch conversations
   useEffect(() => {
     const fetchConversations = async () => {
       try {
@@ -42,7 +49,7 @@ function ChatScreen() {
         });
         setMessages(res.data || []);
         
-        // Auto-mark as read locally & refresh list
+        // Auto-mark as read locally
         setConversations(prev => prev.map(c => 
           c.user._id === selectedMatch._id ? { ...c, unreadCount: 0 } : c
         ));
@@ -75,7 +82,7 @@ function ChatScreen() {
       setMessages(prev => [...prev, res.data]);
       setNewMessage('');
       
-      // Update conversation list with new last message
+      // Update conversation list
       setConversations(prev => prev.map(c => 
         c.user._id === selectedMatch._id 
           ? { ...c, lastMessage: res.data, unreadCount: 0 } 
@@ -97,7 +104,7 @@ function ChatScreen() {
     return 'https://via.placeholder.com/45';
   };
 
-  // Format time ago for sidebar
+  // Format time ago
   const getTimeAgo = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -117,7 +124,7 @@ function ChatScreen() {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 78px)', background: '#fff' }}>
       
-      {/* PROFESSIONAL SIDEBAR WITH COUNTS */}
+      {/* SIDEBAR */}
       <div style={{ width: '320px', borderRight: '1px solid #eee', overflowY: 'auto', background: '#fff', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '1.2rem', borderBottom: '1px solid #eee', fontWeight: 700, fontSize: '1.1rem' }}>Messages</div>
         
@@ -214,26 +221,30 @@ function ChatScreen() {
               </div>
             </div>
             
-            {/* MESSAGES SCROLL AREA - INSTAGRAM STYLE */}
+            {/* MESSAGES SCROLL AREA */}
             <div style={{ 
               flex: 1, padding: '1.5rem', overflowY: 'auto', 
               background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '0.4rem' 
             }}>
               {messages.length === 0 ? (
                 <div style={{ textAlign: 'center', color: '#999', marginTop: '4rem' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}></div>
                   <p style={{ fontWeight: 600 }}>Say hello to {selectedMatch.name}!</p>
-                  <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>This is the beginning of your conversation.</p>
                 </div>
               ) : (
                 messages.map(msg => {
-                  const isMe = msg.sender?._id === currentUser._id;
+                  // ✅ ROBUST ID COMPARISON: Convert both to strings to avoid Object vs String mismatch
+                  const senderId = msg.sender?._id?.toString() || msg.sender?.toString();
+                  const myId = currentUser._id?.toString();
+                  const isMe = senderId === myId;
+
                   return (
                     <div key={msg._id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: '2px' }}>
                       <div style={{ 
+                        // ✅ DISTINCT COLORS: Blue for me, Gray for them
                         background: isMe ? '#5b72f2' : '#f0f0f0',
                         color: isMe ? '#fff' : '#000',
                         padding: '10px 14px',
+                        // ✅ TAIL EFFECT: Sharp corner points to sender
                         borderRadius: isMe ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
                         maxWidth: '75%',
                         fontSize: '0.95rem',
@@ -298,7 +309,6 @@ function ChatScreen() {
           }}>
             <div style={{ fontSize: '4rem', marginBottom: '1rem', opacity: 0.5 }}>💬</div>
             <p style={{ fontWeight: 600, fontSize: '1.1rem', color: '#666' }}>Select a conversation</p>
-            <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>Choose a match from the sidebar to start chatting</p>
           </div>
         )}
       </div>
