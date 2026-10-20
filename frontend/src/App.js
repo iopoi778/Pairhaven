@@ -384,6 +384,9 @@ function LoginPage() {
             {loading ? 'Logging in...' : 'Log In'}
           </button>
         </form>
+
+        <SocialAuthButtons />
+
         <p style={{ textAlign: 'center', marginTop: '1.5rem', color: '#666', fontSize: '0.95rem' }}>
           New here? <span onClick={() => navigate('/register')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}>Create Account</span>
         </p>
@@ -475,20 +478,19 @@ function RegisterPage() {
           {loading ? 'Signing up...' : 'Sign Up'}
         </button>
       </form>
+
+      <SocialAuthButtons />
+
       <p style={{ textAlign: 'center', marginTop: '1rem' }}>
         Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
       </p>
     </div>
   );
 }
-function SocialAuthButtons() {
-  const navigate = useNavigate();
 
-  // Placeholder handlers — connect these to Firebase, Google/Apple SDKs, or OAuth popups
+function SocialAuthButtons() {
   const handleGoogleLogin = async () => {
     try {
-      // Example: Integrating with Firebase or custom Google OAuth popup
-      // const googleUser = ... 
       alert("Google Sign-In integration hook goes here.");
     } catch (err) {
       console.error("Google sign-in error", err);
@@ -497,7 +499,6 @@ function SocialAuthButtons() {
 
   const handleAppleLogin = async () => {
     try {
-      // Example: Integrating with Apple Sign-In SDK
       alert("Apple Sign-In integration hook goes here.");
     } catch (err) {
       console.error("Apple sign-in error", err);
@@ -543,6 +544,7 @@ const socialButtonStyle = {
   justifyContent: 'center',
   boxSizing: 'border-box'
 };
+
 const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '0.8rem', borderRadius: '8px', border: '1px solid #dfe3ea', marginBottom: '1rem', fontSize: '1rem' };
 const primaryButtonStyle = { width: '100%', padding: '0.9rem', border: 'none', borderRadius: '8px', background: '#5b72f2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
 
