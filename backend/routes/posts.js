@@ -58,7 +58,7 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// REACT ROUTE - FIXED TO PREVENT 500 ERRORS
+// REACT ROUTE - WITH NOTIFICATION
 router.post('/:postId/react', auth, async (req, res) => {
   try {
     const { type } = req.body;
@@ -85,7 +85,7 @@ router.post('/:postId/react', auth, async (req, res) => {
 
     await post.save();
 
-    // ✅ SAFE NOTIFICATION CREATION
+    // ✅ SAFE NOTIFICATION CREATION FOR LIKES/LOVES
     if (isAdding && post.author._id.toString() !== userId) {
       try {
         const actionText = type === 'like' ? 'liked your post' : 'loved your post';
@@ -94,7 +94,8 @@ router.post('/:postId/react', auth, async (req, res) => {
           sender: userId,
           type: type,
           message: `${currentUser.name} ${actionText}`,
-          post: post._id
+          post: post._id,
+          read: false
         });
       } catch (notifErr) {
         console.error('Failed to create notification:', notifErr);
