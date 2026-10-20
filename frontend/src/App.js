@@ -421,7 +421,6 @@ function RegisterPage() {
   };
 
   const handleFinalRegistration = async () => {
-    // ✅ Ensure at least 2 photos match the backend requirement
     if (selectedPhotos.length < 2) {
       alert("Please upload at least 2 photos to continue.");
       return;
@@ -430,38 +429,61 @@ function RegisterPage() {
     setLoading(true);
     const payload = new FormData();
     
+    // Append text fields
     Object.keys(formData).forEach(key => {
       payload.append(key, formData[key]);
     });
 
-    // ✅ Append each photo file individually using the 'photos' field name expected by multer
+    // Append photos with field name 'photos' (try changing to 'photo' if your backend expects singular)
     selectedPhotos.forEach(photo => {
       payload.append('photos', photo);
     });
 
+    // Handle location safely (sending individual coordinates or omitting if backend parses IP)
     if (navigator.geolocation) {
       try {
         const pos = await new Promise((resolve, reject) => 
           navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 5000 })
         );
-        payload.append('location', JSON.stringify({ type: 'Point', coordinates: [pos.coords.longitude, pos.coords.latitude] }));
+        // If your backend expects separate coordinates or a parsed object, adjust here. 
+        // Sending longitude and latitude as separate fields is often safer for custom backends:
+        payload.append('longitude', pos.coords.longitude);
+        payload.append('latitude', pos.coords.latitude);
       } catch (geoErr) {
-        payload.append('location', JSON.stringify({ type: 'Point', coordinates: [0, 0] }));
+        payload.append('longitude', 0);
+        payload.append('latitude', 0);
       }
     }
 
     try {
       const res = await fetch(`${API_URL}/api/auth/register`, { method: 'POST', body: payload });
-      const data = await res.json();
-      if (!res.ok) { alert(data.message || 'Registration failed'); setLoading(false); return; }
+      
+      // Safely read response text first to prevent JSON parse crashes on 500 errors
+      const responseText = await res.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        data = { message: responseText || 'Internal Server Error' };
+      }
 
-      // Auto login
+      if (!res.ok) { 
+        alert(data.message || 'Registration failed'); 
+        setLoading(false); 
+        return; 
+      }
+
+      // Auto login after successful registration
       const loginRes = await fetch(`${API_URL}/api/auth/login`, { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ email: formData.email, password: formData.password }) 
       });
-      const loginData = await loginRes.json();
+      
+      const loginText = await loginRes.text();
+      let loginData;
+      try { loginData = JSON.parse(loginText); } catch(e) { loginData = {}; }
+
       if (loginRes.ok) {
         localStorage.setItem('token', loginData.token);
         localStorage.setItem('user', JSON.stringify(loginData.user));
@@ -471,7 +493,8 @@ function RegisterPage() {
         navigate('/login', { replace: true });
       }
     } catch (err) {
-      alert('Server error during registration.');
+      console.error("Registration error:", err);
+      alert('Server connection error. Please check your network.');
     } finally {
       setLoading(false);
     }
