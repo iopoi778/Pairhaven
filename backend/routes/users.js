@@ -106,6 +106,52 @@ router.delete('/request/:userId', auth, async (req, res) => {
     res.json({ message: 'Request removed' });
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
+// DELETE /api/users/match/:id
+router.delete('/match/:id', authMiddleware, async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const currentUser = await User.findById(req.user.id);
+    const targetUser = await User.findById(targetUserId);
+
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Remove each other from matches arrays
+    currentUser.matches = currentUser.matches.filter(id => id.toString() !== targetUserId);
+    targetUser.matches = targetUser.matches.filter(id => id.toString() !== currentUser._id.toString());
+
+    await currentUser.save();
+    await targetUser.save();
+
+    res.status(200).json({ message: "Unmatched successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error unmatching", error: err.message });
+  }
+});
+// POST /api/users/block/:id
+router.post('/block/:id', authMiddleware, async (req, res) => {
+  try {
+    const userIdToBlock = req.params.id;
+    const currentUser = await User.findById(req.user.id);
+
+    // Add to blocked users array if not already blocked
+    if (!currentUser.blockedUsers.includes(userIdToBlock)) {
+      currentUser.blockedUsers.push(userIdToBlock);
+      
+      // Also remove from matches/requests if present
+      currentUser.matches = currentUser.matches.filter(id => id.toString() !== userIdToBlock);
+      currentUser.requestsSent = currentUser.requestsSent.filter(id => id.toString() !== userIdToBlock);
+      currentUser.requestsReceived = currentUser.requestsReceived.filter(id => id.toString() !== userIdToBlock);
+      
+      await currentUser.save();
+    }
+
+    res.status(200).json({ message: "User blocked successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error blocking user", error: err.message });
+  }
+});
 
 // PATCH PROFILE
 router.patch('/profile/me', auth, async (req, res) => {
