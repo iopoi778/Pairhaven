@@ -237,7 +237,20 @@ router.post('/', auth, async (req, res) => {
     res.status(201).json(populated);
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
+// DELETE CURRENT USER PROFILE
+router.delete('/profile/me', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Delete user posts and the user document
+    await Post.deleteMany({ author: userId });
+    await User.findByIdAndDelete(userId);
 
+    res.status(200).json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 // DELETE POST - FIX 404 ERROR
 router.delete('/posts/:postId', auth, async (req, res) => {
   try {
