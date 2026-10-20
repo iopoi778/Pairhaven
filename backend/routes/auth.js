@@ -159,5 +159,78 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 });
+// Add these routes to your existing Express auth router
 
+// 🌐 Google Auth Route
+router.post('/google', async (req, res) => {
+  try {
+    const { email, name, googleId, photo } = req.body;
+    
+    let user = await User.findOne({ email });
+    if (!user) {
+      // Create a new user if they don't exist
+      user = new User({
+        name,
+        email,
+        googleId,
+        photos: photo ? [{ url: photo, isPrimary: true }] : [],
+        verificationStatus: 'verified',
+        location: { type: 'Point', coordinates: [0, 0] }
+      });
+      await user.save();
+    }
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    return res.json({
+      message: 'Google login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        photos: user.photos,
+        verificationStatus: user.verificationStatus,
+        location: user.location
+      }
+    });
+  } catch (error) {
+    console.error('Google auth error', error);
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+// 🍎 Apple Auth Route
+router.post('/apple', async (req, res) => {
+  try {
+    const { email, name, appleId } = req.body;
+    
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = new User({
+        name: name || 'Apple User',
+        email,
+        appleId,
+        verificationStatus: 'verified',
+        location: { type: 'Point', coordinates: [0, 0] }
+      });
+      await user.save();
+    }
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    return res.json({
+      message: 'Apple login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        verificationStatus: user.verificationStatus,
+        location: user.location
+      }
+    });
+  } catch (error) {
+    console.error('Apple auth error', error);
+    return res.status(500).json({ message: error.message });
+  }
+});
 module.exports = router;
