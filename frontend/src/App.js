@@ -15,13 +15,7 @@ if (initialToken) {
 
 const ProtectedRoute = ({ children }) => {
   const authToken = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-
   if (!authToken) return <Navigate to="/login" replace />;
-  // If user hasn't verified email/phone, redirect to verification screen
-  if (user && (user.isVerified === false)) {
-    return <Navigate to="/verify" replace />;
-  }
   return children;
 };
 
@@ -106,7 +100,6 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/verify" element={<VerificationPage />} />
           <Route path="/profile/*" element={<ProtectedRoute><ProfileRouteWrapper onUpdateCounts={fetchNavCounts} /></ProtectedRoute>} />
           <Route path="/*" element={<ProtectedRoute><DashboardLayout navCounts={navCounts} onUpdateCounts={fetchNavCounts} /></ProtectedRoute>} />
         </Routes>
@@ -339,7 +332,7 @@ function LoginPage() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-      navigate(data.user.isVerified ? '/' : '/verify', { replace: true });
+      navigate('/', { replace: true });
     } catch (err) { 
       alert('Server error.'); 
     } finally { 
@@ -411,7 +404,6 @@ function RegisterPage() {
   const handleFilesChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
-      // Append new files up to 6 max
       setSelectedPhotos(prev => [...prev, ...files].slice(0, 6));
     }
   };
@@ -429,24 +421,19 @@ function RegisterPage() {
     setLoading(true);
     const payload = new FormData();
     
-    // Append text fields
     Object.keys(formData).forEach(key => {
       payload.append(key, formData[key]);
     });
 
-    // Append photos with field name 'photos' (try changing to 'photo' if your backend expects singular)
     selectedPhotos.forEach(photo => {
       payload.append('photos', photo);
     });
 
-    // Handle location safely (sending individual coordinates or omitting if backend parses IP)
     if (navigator.geolocation) {
       try {
         const pos = await new Promise((resolve, reject) => 
           navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 5000 })
         );
-        // If your backend expects separate coordinates or a parsed object, adjust here. 
-        // Sending longitude and latitude as separate fields is often safer for custom backends:
         payload.append('longitude', pos.coords.longitude);
         payload.append('latitude', pos.coords.latitude);
       } catch (geoErr) {
@@ -457,15 +444,9 @@ function RegisterPage() {
 
     try {
       const res = await fetch(`${API_URL}/api/auth/register`, { method: 'POST', body: payload });
-      
-      // Safely read response text first to prevent JSON parse crashes on 500 errors
       const responseText = await res.text();
       let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        data = { message: responseText || 'Internal Server Error' };
-      }
+      try { data = JSON.parse(responseText); } catch (e) { data = { message: responseText || 'Internal Server Error' }; }
 
       if (!res.ok) { 
         alert(data.message || 'Registration failed'); 
@@ -473,7 +454,7 @@ function RegisterPage() {
         return; 
       }
 
-      // Auto login after successful registration
+      // Auto login after successful registration & redirect directly to root dashboard/profile
       const loginRes = await fetch(`${API_URL}/api/auth/login`, { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
@@ -488,7 +469,7 @@ function RegisterPage() {
         localStorage.setItem('token', loginData.token);
         localStorage.setItem('user', JSON.stringify(loginData.user));
         axios.defaults.headers.common['Authorization'] = `Bearer ${loginData.token}`;
-        navigate('/verify', { replace: true });
+        navigate('/', { replace: true });
       } else {
         navigate('/login', { replace: true });
       }
@@ -583,69 +564,6 @@ function RegisterPage() {
   );
 }
 
-function VerificationPage() {
-  const navigate = useNavigate();
-  const [emailCode, setEmailCode] = useState('');
-  const [loading, setLoading] = useState(false);
-  const token = localStorage.getItem('token');
-
-  const handleSendCode = async () => {
-    try {
-      await axios.post(`${API_URL}/api/auth/send-verification`, {}, { headers: { Authorization: `Bearer ${token}` } });
-      alert("Verification code sent to your email!");
-    } catch (err) {
-      alert("Failed to send verification code. Please try again.");
-    }
-  };
-
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await axios.post(`${API_URL}/api/auth/verify`, { emailCode }, { headers: { Authorization: `Bearer ${token}` } });
-      
-      // Update local storage user state to verified
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      user.isVerified = true;
-      localStorage.setItem('user', JSON.stringify(user));
-
-      alert("Email verified successfully!");
-      navigate('/', { replace: true });
-    } catch (err) {
-      alert(err.response?.data?.message || "Invalid verification code.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div style={{ maxWidth: 400, margin: '4rem auto', background: '#fff', padding: '2rem', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)' }}>
-      <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '0.5rem' }}>Verify Your Email</h2>
-      <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-        Please enter the verification code sent to your email address to unlock matching and messaging.
-      </p>
-
-      <button onClick={handleSendCode} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontWeight: 600, display: 'block', margin: '0 auto 1rem', fontSize: '0.9rem' }}>
-        ✉️ Send / Resend Code
-      </button>
-
-      <form onSubmit={handleVerify}>
-        <input 
-          type="text" 
-          placeholder="Enter 6-digit Email Code" 
-          required 
-          value={emailCode} 
-          onChange={e => setEmailCode(e.target.value)} 
-          style={inputStyle} 
-        />
-        <button type="submit" disabled={loading || !emailCode.trim()} style={{ ...primaryButtonStyle, opacity: (loading || !emailCode.trim()) ? 0.7 : 1 }}>
-          {loading ? 'Verifying...' : 'Verify Email & Proceed'}
-        </button>
-      </form>
-    </div>
-  );
-}
-
 function SocialAuthButtons() {
   const navigate = useNavigate();
 
@@ -676,7 +594,7 @@ function SocialAuthButtons() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-      navigate(data.user.isVerified ? '/' : '/verify', { replace: true });
+      navigate('/', { replace: true });
     } catch (err) {
       alert("Google login error.");
     }
@@ -708,7 +626,7 @@ function SocialAuthButtons() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-      navigate(data.user.isVerified ? '/' : '/verify', { replace: true });
+      navigate('/', { replace: true });
     } catch (err) {
       alert("Apple login error.");
     }
