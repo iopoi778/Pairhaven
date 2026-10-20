@@ -376,8 +376,17 @@ function LoginPage() {
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1: Age verification, 2: Details, 3: Profile pictures
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '', age: '', gender: '', bio: '' });
+  const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    email: '', 
+    phone: '', 
+    password: '', 
+    age: '', 
+    gender: '', 
+    city: '', // ✅ Added city field
+    bio: '' 
+  });
   const [selectedPhotos, setSelectedPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -396,10 +405,10 @@ function RegisterPage() {
       password: data.get('password'),
       age,
       gender: data.get('gender'),
+      city: data.get('city'), // ✅ Captured city value
       bio: data.get('bio')
     });
-    setStep(3); // Move to multi-photo selection step
-  };
+    setStep(3);
 
   const handleFilesChange = (e) => {
     const files = Array.from(e.target.files);
@@ -518,6 +527,8 @@ function RegisterPage() {
                 <option value="other">Other</option>
               </select>
             </div>
+            {/* ✅ Added City Input Field */}
+            <input name="city" placeholder="City (e.g., New York, London)" required style={inputStyle} />
             <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
             <button type="submit" style={primaryButtonStyle}>Next: Add Pictures</button>
           </form>
