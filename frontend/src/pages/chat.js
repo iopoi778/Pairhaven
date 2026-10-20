@@ -321,7 +321,16 @@ function CallModal({ appId, channelName, callType, onClose }) {
 
 function CallRoom({ appId, channelName, callType, onClose }) {
   const isVideo = callType === 'video';
-  useJoin({ appid: appId, channel: channelName, token: null });
+  
+  // ✅ REPLACE THIS LINE
+  // useJoin({ appid: appId, channel: channelName, token: null });
+  
+  // ✅ WITH THIS (Uses the env variable defined at top of file)
+  useJoin({ 
+    appid: appId, 
+    channel: channelName, 
+    token: AGORA_TEMP_TOKEN 
+  });
 
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(true);
   const { localCameraTrack } = useLocalCameraTrack(isVideo);
@@ -346,7 +355,7 @@ function CallRoom({ appId, channelName, callType, onClose }) {
         </div>
       ) : (
         <div style={{ padding: '2rem 0', fontSize: '1.2rem', color: '#5b72f2' }}>
-          🎙️ Voice Call Active...
+          ️ Voice Call Active...
         </div>
       )}
       <button onClick={onClose} style={endCallButtonStyle}>🛑 End Call</button>
