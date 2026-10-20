@@ -22,7 +22,7 @@ const ProtectedRoute = ({ children }) => {
 function ProfileRouteWrapper({ onUpdateCounts }) {
   const navigate = useNavigate();
   
-  // ✅ SAFE USER PARSING TO PREVENT CRASHES
+  // ✅ SAFE USER PARSING
   const getCurrentUser = () => {
     try {
       return JSON.parse(localStorage.getItem('user')) || {};
@@ -167,8 +167,8 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
           { id: 'home', label: 'Home', icon: '🏠' },
           { id: 'matching', label: 'Match', icon: '💖' },
           { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
-          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
-          { id: 'profile', label: 'Profile', icon: '👤' }
+          { id: 'notifications', label: 'Alerts', icon: '', count: navCounts?.alerts },
+          { id: 'profile', label: 'Profile', icon: '' }
         ].map(tab => (
           <button 
             key={tab.id} 
@@ -207,7 +207,6 @@ function HomeFeed({ onNavigateToProfile }) {
           headers: { Authorization: `Bearer ${currentToken}` } 
         });
         
-        // ✅ SAFE MAPPING WITH DEFAULTS FOR CONTENT FIELDS
         const safePosts = (res.data || []).map(post => ({
           ...post,
           text: post.text || '',
@@ -272,7 +271,6 @@ function HomeFeed({ onNavigateToProfile }) {
         <div style={{ background: '#fff', borderRadius: '12px', padding: '1.2rem', textAlign: 'center', color: '#666' }}>No posts yet.</div>
       ) : (
         posts.map(post => {
-          // ✅ CHECK FOR VALID MEDIA URL BEFORE RENDERING
           const hasMedia = post.mediaUrl && post.mediaUrl !== 'null' && post.mediaUrl !== '';
           const isVideo = hasMedia && (post.mediaType === 'video' || post.mediaUrl.includes('/video/upload'));
           const avatarSrc = getAvatarUrl(post.author);
@@ -280,7 +278,6 @@ function HomeFeed({ onNavigateToProfile }) {
           return (
             <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
               
-              {/* Author Header */}
               <div onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
                 <img src={avatarSrc} alt={post.author?.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', background: '#eee' }} onError={(e) => { e.target.src = 'https://via.placeholder.com/36'; }} />
                 <div>
@@ -289,14 +286,12 @@ function HomeFeed({ onNavigateToProfile }) {
                 </div>
               </div>
 
-              {/* ✅ TEXT CONTENT - ALWAYS SHOW IF EXISTS */}
               {post.text && post.text.trim() !== '' && (
                 <div style={{ marginBottom: hasMedia ? 8 : 0, lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
                   {post.text}
                 </div>
               )}
 
-              {/* ✅ MEDIA CONTENT - ONLY SHOW IF VALID URL */}
               {hasMedia && (
                 isVideo ? (
                   <video src={post.mediaUrl} controls style={{ width: '100%', maxHeight: 420, borderRadius: 10, background: '#000', marginTop: 8 }} />
@@ -305,14 +300,13 @@ function HomeFeed({ onNavigateToProfile }) {
                 )
               )}
 
-              {/* Reaction Bar */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f5f5f5' }}>
                 <button onClick={() => handleReact(post._id, 'like')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '6px', color: post.userLiked ? '#e53e3e' : '#666' }}>
                   <span style={{ fontSize: '1.4rem' }}>{post.userLiked ? '❤️' : '🤍'}</span>
                   <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{post.likesCount}</span>
                 </button>
                 <button onClick={() => handleReact(post._id, 'love')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '6px', color: post.userLoved ? '#ff6b6b' : '#666' }}>
-                  <span style={{ fontSize: '1.4rem' }}>{post.userLoved ? '💖' : '👍'}</span>
+                  <span style={{ fontSize: '1.4rem' }}>{post.userLoved ? '💖' : ''}</span>
                   <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{post.lovesCount}</span>
                 </button>
               </div>
