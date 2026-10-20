@@ -481,7 +481,68 @@ function RegisterPage() {
     </div>
   );
 }
+function SocialAuthButtons() {
+  const navigate = useNavigate();
 
+  // Placeholder handlers — connect these to Firebase, Google/Apple SDKs, or OAuth popups
+  const handleGoogleLogin = async () => {
+    try {
+      // Example: Integrating with Firebase or custom Google OAuth popup
+      // const googleUser = ... 
+      alert("Google Sign-In integration hook goes here.");
+    } catch (err) {
+      console.error("Google sign-in error", err);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    try {
+      // Example: Integrating with Apple Sign-In SDK
+      alert("Apple Sign-In integration hook goes here.");
+    } catch (err) {
+      console.error("Apple sign-in error", err);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', textAlign: 'center', margin: '1rem 0', color: '#888' }}>
+        <div style={{ flex: 1, borderBottom: '1px solid #dfe3ea' }}></div>
+        <span style={{ padding: '0 10px', fontSize: '0.85rem' }}>OR</span>
+        <div style={{ flex: 1, borderBottom: '1px solid #dfe3ea' }}></div>
+      </div>
+
+      <button 
+        type="button" 
+        onClick={handleGoogleLogin} 
+        style={{ ...socialButtonStyle, background: '#fff', color: '#444', border: '1px solid #dfe3ea', marginBottom: '0.8rem' }}
+      >
+        <span style={{ marginRight: '10px' }}>🌐</span> Continue with Google
+      </button>
+
+      <button 
+        type="button" 
+        onClick={handleAppleLogin} 
+        style={{ ...socialButtonStyle, background: '#000', color: '#fff' }}
+      >
+        <span style={{ marginRight: '10px' }}>🍎</span> Continue with Apple
+      </button>
+    </div>
+  );
+}
+
+const socialButtonStyle = {
+  width: '100%',
+  padding: '0.8rem',
+  borderRadius: '8px',
+  fontWeight: 600,
+  fontSize: '0.95rem',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxSizing: 'border-box'
+};
 const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '0.8rem', borderRadius: '8px', border: '1px solid #dfe3ea', marginBottom: '1rem', fontSize: '1rem' };
 const primaryButtonStyle = { width: '100%', padding: '0.9rem', border: 'none', borderRadius: '8px', background: '#5b72f2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
 
