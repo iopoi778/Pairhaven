@@ -1,14 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import AgoraRTC, {
+  AgoraRTCProvider,
+  useJoin,
+  useLocalCameraTrack,
+  useLocalMicrophoneTrack,
+  usePublish,
+  useRemoteUsers,
+  RemoteUser,
+  LocalVideoTrack
+} from 'agora-rtc-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
+const AGORA_APP_ID = process.env.REACT_APP_AGORA_APP_ID || 'YOUR_AGORA_APP_ID'; // Replace with your Agora App ID
+
+// Create Agora Client Instance
+const agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
 function ChatScreen() {
   const [conversations, setConversations] = useState([]);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [activeCall, setActiveCall] = useState(null); // 'audio' | 'video' | null
+  
   const messagesEndRef = useRef(null);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
@@ -45,14 +61,6 @@ function ChatScreen() {
         const res = await axios.get(`${API_URL}/api/messages/conversation/${selectedMatch._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
-        // DEBUG LOGS
-        console.log(" MY ID:", myId);
-        if (res.data?.length > 0) {
-          const s = res.data[0].sender;
-          console.log("📨 SENDER:", s);
-          console.log("✅ IS ME?", myId === (s?._id || s)?.toString());
-        }
         
         setMessages(res.data || []);
         setConversations(prev => prev.map(c => 
@@ -101,6 +109,12 @@ function ChatScreen() {
     return `${Math.floor(diff/1440)}d`;
   };
 
+  // Generate unique channel name for call between the two users
+  const getChannelName = () => {
+    if (!myId || !selectedMatch?._id) return 'call_channel';
+    return [myId, selectedMatch._id].sort().join('_');
+  };
+
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 78px)', background: '#fff' }}>
       {/* SIDEBAR */}
@@ -138,19 +152,40 @@ function ChatScreen() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff' }}>
         {selectedMatch ? (
           <>
-            <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <img src={getAvatarUrl(selectedMatch.photos)} alt="" onClick={() => window.location.hash = `/profile/${selectedMatch._id}`} style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', cursor: 'pointer', border: '2px solid #f0f0f0' }} />
-              <div>
-                <div style={{ fontWeight: 700 }}>{selectedMatch.name}</div>
-                <div style={{ fontSize: '0.75rem', color: '#888' }}>{selectedMatch.age ? `${selectedMatch.age} yrs` : 'Online'}</div>
+            {/* CHAT HEADER WITH VOICE/VIDEO CALL BUTTONS */}
+            <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <img src={getAvatarUrl(selectedMatch.photos)} alt="" onClick={() => window.location.hash = `/profile/${selectedMatch._id}`} style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', cursor: 'pointer', border: '2px solid #f0f0f0' }} />
+                <div>
+                  <div style={{ fontWeight: 700 }}>{selectedMatch.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#888' }}>{selectedMatch.age ? `${selectedMatch.age} yrs` : 'Online'}</div>
+                </div>
+              </div>
+
+              {/* 📞 CALL BUTTONS */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={() => setActiveCall('audio')} 
+                  title="Voice Call" 
+                  style={callButtonStyle}
+                >
+                  📞
+                </button>
+                <button 
+                  onClick={() => setActiveCall('video')} 
+                  title="Video Call" 
+                  style={callButtonStyle}
+                >
+                  📹
+                </button>
               </div>
             </div>
             
+            {/* MESSAGES BODY */}
             <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               {messages.length === 0 ? (
                 <div style={{ textAlign: 'center', color: '#999', marginTop: '4rem' }}>Say hello to {selectedMatch.name}!</div>
               ) : messages.map(msg => {
-                // ✅ ROBUST COMPARISON
                 const s = msg.sender;
                 const senderId = (typeof s === 'object' && s !== null) ? s._id?.toString() : s?.toString();
                 const isMe = myId && senderId && myId === senderId;
@@ -173,6 +208,7 @@ function ChatScreen() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* MESSAGE INPUT */}
             <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #eee', display: 'flex', gap: '10px' }}>
               <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()} placeholder="Type a message..." style={{ flex: 1, padding: '0.8rem 1.2rem', borderRadius: '24px', border: '1px solid #e2e8f0', outline: 'none', background: '#f8f9fa' }} />
               <button onClick={handleSend} disabled={!newMessage.trim()} style={{ background: newMessage.trim() ? '#5b72f2' : '#cbd5e1', color: '#fff', border: 'none', borderRadius: '24px', padding: '0.8rem 1.5rem', fontWeight: 600, cursor: newMessage.trim() ? 'pointer' : 'default' }}>Send</button>
@@ -185,8 +221,107 @@ function ChatScreen() {
           </div>
         )}
       </div>
+
+      {/* CALL MODAL OVERLAY */}
+      {activeCall && (
+        <CallModal 
+          appId={AGORA_APP_ID}
+          channelName={getChannelName()}
+          callType={activeCall}
+          onClose={() => setActiveCall(null)}
+        />
+      )}
     </div>
   );
 }
+
+// Sub-component to manage Agora Call Room
+function CallModal({ appId, channelName, callType, onClose }) {
+  return (
+    <AgoraRTCProvider client={agoraClient}>
+      <div style={modalOverlayStyle}>
+        <div style={modalContentStyle}>
+          <h3>{callType === 'video' ? '📹 Video Call' : '📞 Voice Call'}</h3>
+          <CallRoom appId={appId} channelName={channelName} callType={callType} onClose={onClose} />
+        </div>
+      </div>
+    </AgoraRTCProvider>
+  );
+}
+
+function CallRoom({ appId, channelName, callType, onClose }) {
+  const isVideo = callType === 'video';
+
+  useJoin({ appid: appId, channel: channelName, token: null });
+
+  const { localMicrophoneTrack } = useLocalMicrophoneTrack(true);
+  const { localCameraTrack } = useLocalCameraTrack(isVideo);
+
+  usePublish([localMicrophoneTrack, localCameraTrack].filter(Boolean));
+  const remoteUsers = useRemoteUsers();
+
+  return (
+    <div style={{ textAlign: 'center' }}>
+      {isVideo ? (
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <div style={videoBoxStyle}>
+            <p style={labelStyle}>You</p>
+            {localCameraTrack && <LocalVideoTrack track={localCameraTrack} play style={{ width: '100%', height: '100%', borderRadius: '10px' }} />}
+          </div>
+
+          {remoteUsers.map(user => (
+            <div key={user.uid} style={videoBoxStyle}>
+              <p style={labelStyle}>Connected User</p>
+              <RemoteUser user={user} style={{ width: '100%', height: '100%', borderRadius: '10px' }} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ padding: '2rem 0', fontSize: '1.2rem', color: '#5b72f2' }}>
+          🎙️ Voice Call Active...
+        </div>
+      )}
+
+      <button onClick={onClose} style={endCallButtonStyle}>
+        🛑 End Call
+      </button>
+    </div>
+  );
+}
+
+// Styling Constants
+const callButtonStyle = {
+  background: '#eef2ff',
+  border: '1px solid #5b72f2',
+  borderRadius: '50%',
+  width: '38px',
+  height: '38px',
+  fontSize: '1.1rem',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
+const modalOverlayStyle = {
+  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999,
+  display: 'flex', alignItems: 'center', justifyContent: 'center'
+};
+
+const modalContentStyle = {
+  background: '#fff', padding: '1.5rem', borderRadius: '16px', width: '90%', maxWidth: '500px', textAlign: 'center'
+};
+
+const videoBoxStyle = {
+  width: '180px', height: '240px', background: '#222', borderRadius: '10px', position: 'relative', overflow: 'hidden'
+};
+
+const labelStyle = {
+  position: 'absolute', bottom: '5px', left: '8px', color: '#fff', margin: 0, fontSize: '0.75rem', zIndex: 10, background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: '4px'
+};
+
+const endCallButtonStyle = {
+  background: '#e53e3e', color: '#fff', border: 'none', padding: '0.8rem 1.8rem', borderRadius: '30px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', marginTop: '1rem'
+};
 
 export default ChatScreen;
