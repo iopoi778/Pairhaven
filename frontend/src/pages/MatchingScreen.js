@@ -72,7 +72,7 @@ function MatchingScreen() {
     fetchPotentialMatches(filters);
   }, [freshUser, token]);
 
-  // ✅ Enhanced Helper to render Location and Country cleanly
+  // ✅ Helper to render Location and Country cleanly
   const renderLocation = (loc) => {
     if (!loc) return 'Nearby';
     if (typeof loc === 'object') {
@@ -149,8 +149,6 @@ function MatchingScreen() {
     
     const isMatched = (freshUser.matches || []).includes(targetUser._id);
     const hasSentRequest = (freshUser.requestsSent || []).includes(targetUser._id);
-    
-    // ✅ Check if target user has sent a request to current user, OR if targetUser's data indicates a received request
     const hasReceivedRequest = (freshUser.requestsReceived || []).includes(targetUser._id) || targetUser.hasReceivedRequest;
 
     if (isMatched) {
@@ -161,7 +159,6 @@ function MatchingScreen() {
       };
     }
     
-    // ✅ If they sent us a request, prioritize showing Accept/Decline options
     if (hasReceivedRequest) {
       return { dualButtons: true };
     }
@@ -352,7 +349,6 @@ function MatchingScreen() {
                   />
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', padding: '2rem 1.2rem 1rem', color: '#fff' }}>
                     <div style={{ fontSize: '1.6rem', fontWeight: 700 }}>{currentUser.name}, {currentUser.age || ''}</div>
-                    {/* ✅ Display Full Location & Country */}
                     <div style={{ fontSize: '0.9rem', opacity: 0.9, marginTop: '2px' }}>📍 {renderLocation(currentUser.location)}</div>
                   </div>
                 </div>
@@ -395,6 +391,7 @@ function MatchingScreen() {
                   >
                     💬
                   </button>
+                  {/* ✅ Restored Unmatch Button */}
                   <button 
                     onClick={() => handleMatchAction(currentUser, 'unmatch')}
                     disabled={actionLoading === currentUser._id}
@@ -406,7 +403,6 @@ function MatchingScreen() {
                 </>
               ) : getButtonConfig(currentUser).dualButtons ? (
                 <>
-                  {/* ✅ Show Accept & Decline Buttons when they sent a request */}
                   <button 
                     onClick={() => handleMatchAction(currentUser, 'accept')}
                     disabled={actionLoading === currentUser._id}
@@ -450,7 +446,6 @@ function MatchingScreen() {
 
                     <div style={{ padding: '0.6rem', flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{user.name}</div>
-                      {/* ✅ Display City and Country in Grid Subtext */}
                       <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '2px' }}>{user.age ? `${user.age} yrs` : ''} • {renderLocation(user.location)}</div>
                     </div>
 
@@ -458,6 +453,7 @@ function MatchingScreen() {
                       {btnConfig.isMatched ? (
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <button onClick={() => handleMatchAction(user, 'chat')} disabled={isLoading} style={{ flex: 1, background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.4rem', fontSize: '0.8rem', cursor: 'pointer' }}>💬 Chat</button>
+                          {/* ✅ Restored Unmatch Button in Grid */}
                           <button onClick={() => handleMatchAction(user, 'unmatch')} disabled={isLoading} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', padding: '0.4rem', fontSize: '0.8rem', cursor: 'pointer' }}>💔</button>
                         </div>
                       ) : btnConfig.dualButtons ? (
