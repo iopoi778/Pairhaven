@@ -5,8 +5,10 @@ module.exports = function(io) {
     console.log('User connected:', socket.id);
 
     socket.on('join', (userId) => {
-      userSockets.set(userId, socket.id);
-      console.log(`User ${userId} joined socket ${socket.id}`);
+      if (userId) {
+        userSockets.set(userId.toString(), socket.id);
+        console.log(`✅ User ${userId} registered with socket ID ${socket.id}`);
+      }
     });
 
     socket.on('sendMessage', async (data) => {
@@ -28,7 +30,7 @@ module.exports = function(io) {
           metadata: { messageId: msg._id }
         });
 
-        const receiverSocketId = userSockets.get(data.receiverId);
+        const receiverSocketId = userSockets.get(data.receiverId?.toString());
         if (receiverSocketId) {
           io.to(receiverSocketId).emit('newMessage', {
             ...msg.toObject(),
@@ -48,7 +50,7 @@ module.exports = function(io) {
     });
 
     socket.on('typing', (data) => {
-      const receiverSocketId = userSockets.get(data.receiverId);
+      const receiverSocketId = userSockets.get(data.receiverId?.toString());
       if (receiverSocketId) {
         io.to(receiverSocketId).emit('userTyping', {
           userId: data.senderId,
@@ -57,24 +59,23 @@ module.exports = function(io) {
       }
     });
 
-    // ✅ HANDLE START CALL SIGNAL
+    // ✅ ROBUST CALL SIGNAL HANDLER
     socket.on('start-call', (data) => {
-      // data: { recipientId, callerId, callerName, callType, channelName }
-      const receiverSocketId = userSockets.get(data.recipientId);
+      const { recipientId } = data;
+      const receiverSocketId = userSockets.get(recipientId?.toString());
+      
       if (receiverSocketId) {
-        console.log(`📞 Call initiated to user ${data.recipientId} at socket ${receiverSocketId}`);
+        console.log(`📞 Forwarding call to user ${recipientId} at socket ${receiverSocketId}`);
         io.to(receiverSocketId).emit('incoming-call', data);
       } else {
-        console.log(`❌ Call failed: User ${data.recipientId} is offline or not registered in socket map.`);
+        console.log(`⚠️ User ${recipientId} not found in userSockets map. Active sessions:`, Array.from(userSockets.keys()));
       }
     });
 
-    // ✅ HANDLE END CALL SIGNAL
     socket.on('end-call', (data) => {
-      // data: { recipientId }
-      const receiverSocketId = userSockets.get(data.recipientId);
+      const { recipientId } = data;
+      const receiverSocketId = userSockets.get(recipientId?.toString());
       if (receiverSocketId) {
-        console.log(`🛑 Call ended for user ${data.recipientId}`);
         io.to(receiverSocketId).emit('call-ended', data);
       }
     });
@@ -83,7 +84,7 @@ module.exports = function(io) {
       for (const [userId, socketId] of userSockets.entries()) {
         if (socketId === socket.id) {
           userSockets.delete(userId);
-          console.log(`User ${userId} disconnected from socket ${socket.id}`);
+          console.log(`🔌 User ${userId} disconnected`);
           break;
         }
       }
