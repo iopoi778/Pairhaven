@@ -54,11 +54,12 @@ function ProfileScreen({ userId }) {
     if (token) fetchData();
   }, [userId, token]);
 
-  // Safe Location Helper (prevents React Error #31)
+  // Safe Location Helper (prevents React Error #31 & formats Location + Country)
   const renderLocation = (loc) => {
     if (!loc) return 'Location not specified';
     if (typeof loc === 'object') {
-      return loc.address || loc.name || 'Location specified';
+      const parts = [loc.address || loc.city || loc.name, loc.country].filter(Boolean);
+      return parts.length > 0 ? parts.join(', ') : 'Location specified';
     }
     return loc;
   };
@@ -152,6 +153,7 @@ function ProfileScreen({ userId }) {
     }
   };
 
+  // ✅ Multiple Photo Management Upload Handler
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -162,12 +164,28 @@ function ProfileScreen({ userId }) {
       const res = await axios.patch(`${API_URL}/api/users/profile/me/photo`, formData, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
       });
-      setUser(prev => ({ ...prev, photos: [res.data.photoUrl] }));
-      alert("Profile picture updated!");
+      // Assuming backend returns updated photos array or photoUrl
+      const updatedPhotos = res.data.photos || [...(user.photos || []), res.data.photoUrl];
+      setUser(prev => ({ ...prev, photos: updatedPhotos }));
+      alert("Photo added successfully!");
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to update photo");
+      alert(err.response?.data?.message || "Failed to upload photo");
     } finally {
       setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = async (photoIndex) => {
+    if (!window.confirm("Remove this photo?")) return;
+    try {
+      const updatedPhotos = user.photos.filter((_, idx) => idx !== photoIndex);
+      // Optional: sync with backend if your API supports updating photo array directly
+      await axios.patch(`${API_URL}/api/users/profile/me`, { photos: updatedPhotos }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(prev => ({ ...prev, photos: updatedPhotos }));
+    } catch (err) {
+      alert("Failed to remove photo");
     }
   };
 
@@ -241,14 +259,15 @@ function ProfileScreen({ userId }) {
     navigate('/login', { replace: true });
   };
 
-  const getAvatarUrl = () => {
-    if (!user?.photos) return 'https://via.placeholder.com/100';
-    const photo = user.photos[0];
-    return typeof photo === 'string' ? photo : photo.url;
+  const getPhotoUrl = (p) => {
+    if (!p) return 'https://via.placeholder.com/150';
+    return typeof p === 'string' ? p : p.url;
   };
 
   if (loading) return <div style={{padding:'3rem', textAlign:'center', color: '#666'}}>Loading profile...</div>;
   if (!user) return <div style={{padding:'3rem', textAlign:'center', color: '#666'}}>User not found.</div>;
+
+  const photosList = Array.isArray(user.photos) ? user.photos : [];
 
   return (
     <div style={{ padding: '1rem', paddingBottom: '100px', maxWidth: '500px', margin: '0 auto', position: 'relative' }}>
@@ -266,10 +285,10 @@ function ProfileScreen({ userId }) {
         </div>
       )}
 
-      {/* SETTINGS / ACCOUNT MODAL */}
+      {/* SETTINGS MODAL */}
       {showSettingsModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
-          <div style={{ background: '#fff', width: '100%', maxWidth: '500px', borderTopLeftRadius: '20px', borderTopRightRadius: '20px', padding: '1.5rem', animation: 'slideUp 0.3s ease' }}>
+          <div style={{ background: '#fff', width: '100%', maxWidth: '500px', borderTopLeftRadius: '20px', borderTopRightRadius: '20px', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
               <h3 style={{ margin: 0 }}>Account Settings</h3>
               <button onClick={() => setShowSettingsModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
@@ -282,14 +301,12 @@ function ProfileScreen({ userId }) {
               >
                 🔒 Change Password
               </button>
-
               <button 
                 onClick={handleLogout}
                 style={{ width: '100%', padding: '0.8rem', background: '#f8f9fa', border: '1px solid #e2e8f0', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', textAlign: 'left', color: '#e53e3e' }}
               >
                 🚪 Logout
               </button>
-
               <button 
                 onClick={handleDeleteAccount}
                 style={{ width: '100%', padding: '0.8rem', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', textAlign: 'left', color: '#dc2626', marginTop: '0.5rem' }}
@@ -368,7 +385,7 @@ function ProfileScreen({ userId }) {
       {/* PROFILE CARD HERO SECTION */}
       <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', marginBottom: '1.5rem', textAlign: 'center', position: 'relative' }}>
         <div style={{ position: 'relative', display: 'inline-block', marginBottom: '0.8rem' }}>
-          <img src={getAvatarUrl()} alt={user.name} style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: '3px solid #f0f2f5', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
+          <img src={getPhotoUrl(photosList[0])} alt={user.name} style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: '3px solid #f0f2f5', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
           {isOwnProfile && (
             <label style={{ position: 'absolute', bottom: 0, right: 0, background: '#5b72f2', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploadingPhoto ? 'wait' : 'pointer', border: '2px solid #fff', fontSize: '0.9rem' }}>
               📷
@@ -423,6 +440,42 @@ function ProfileScreen({ userId }) {
       <div style={{ display: 'flex', justifyContent: 'space-around', background: '#fff', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem' }}>
         <div style={{textAlign:'center'}}><strong style={{fontSize:'1.1rem'}}>{posts.length}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Posts</span></div>
         <div style={{textAlign:'center'}}><strong style={{fontSize:'1.1rem'}}>{user.matchesCount || 0}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Matches</span></div>
+      </div>
+
+      {/* ✅ PICTURE GALLERY / PHOTOS SECTION */}
+      <div style={{ background: '#fff', padding: '1.2rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+          <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#444' }}>Photos ({photosList.length})</h4>
+          {isOwnProfile && (
+            <label style={{ color: '#5b72f2', fontSize: '0.85rem', fontWeight: 600, cursor: uploadingPhoto ? 'wait' : 'pointer' }}>
+              + Add Photo
+              <input type="file" accept="image/*" onChange={handlePhotoUpload} disabled={uploadingPhoto} style={{ display: 'none' }} />
+            </label>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+          {photosList.map((photo, index) => (
+            <div key={index} style={{ aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', background: '#eee', position: 'relative' }}>
+              <img src={getPhotoUrl(photo)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {isOwnProfile && photosList.length > 1 && (
+                <button 
+                  onClick={() => handleRemovePhoto(index)}
+                  style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+          {isOwnProfile && photosList.length < 6 && (
+            <label style={{ aspectRatio: '1', borderRadius: '8px', border: '2px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: uploadingPhoto ? 'wait' : 'pointer', color: '#64748b', background: '#f8fafc' }}>
+              <span style={{ fontSize: '1.2rem' }}>+</span>
+              <span style={{ fontSize: '0.7rem' }}>Add</span>
+              <input type="file" accept="image/*" onChange={handlePhotoUpload} disabled={uploadingPhoto} style={{ display: 'none' }} />
+            </label>
+          )}
+        </div>
       </div>
 
       {/* BIO SECTION */}
