@@ -21,6 +21,23 @@ async function createWelcomeNotification(userId, name) {
   }
 }
 
+// DELETE CURRENT USER PROFILE
+router.delete('/profile/me', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Delete user posts, notifications, or related data if necessary
+    await Post.deleteMany({ author: userId });
+    
+    // Delete the user
+    await User.findByIdAndDelete(userId);
+
+    res.status(200).json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.post('/register', uploadPhotos.array('photos', 5), async (req, res) => {
   try {
     const { name, email, phone, password, age, gender, bio, interests } = req.body;
