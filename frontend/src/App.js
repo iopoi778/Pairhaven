@@ -167,10 +167,10 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
           { id: 'home', label: 'Home', icon: '🏠' },
-          { id: 'matching', label: 'Match', icon: '' },
+          { id: 'matching', label: 'Match', icon: '💖' },
           { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
-          { id: 'notifications', label: 'Alerts', icon: '', count: navCounts?.alerts },
-          { id: 'profile', label: 'Profile', icon: '' }
+          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
+          { id: 'profile', label: 'Profile', icon: '👤' }
         ].map(tab => (
           <button 
             key={tab.id} 
