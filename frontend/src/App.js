@@ -384,7 +384,7 @@ function RegisterPage() {
     password: '', 
     age: '', 
     gender: '', 
-    city: '', // ✅ Added city field
+    city: '', 
     bio: '' 
   });
   const [selectedPhotos, setSelectedPhotos] = useState([]);
@@ -405,10 +405,11 @@ function RegisterPage() {
       password: data.get('password'),
       age,
       gender: data.get('gender'),
-      city: data.get('city'), // ✅ Captured city value
+      city: data.get('city'),
       bio: data.get('bio')
     });
     setStep(3);
+  }; // ✅ Fixed missing closing brace here
 
   const handleFilesChange = (e) => {
     const files = Array.from(e.target.files);
@@ -438,19 +439,6 @@ function RegisterPage() {
       payload.append('photos', photo);
     });
 
-    if (navigator.geolocation) {
-      try {
-        const pos = await new Promise((resolve, reject) => 
-          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 5000 })
-        );
-        payload.append('longitude', pos.coords.longitude);
-        payload.append('latitude', pos.coords.latitude);
-      } catch (geoErr) {
-        payload.append('longitude', 0);
-        payload.append('latitude', 0);
-      }
-    }
-
     try {
       const res = await fetch(`${API_URL}/api/auth/register`, { method: 'POST', body: payload });
       const responseText = await res.text();
@@ -463,7 +451,6 @@ function RegisterPage() {
         return; 
       }
 
-      // Auto login after successful registration & redirect directly to root dashboard/profile
       const loginRes = await fetch(`${API_URL}/api/auth/login`, { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
@@ -527,7 +514,6 @@ function RegisterPage() {
                 <option value="other">Other</option>
               </select>
             </div>
-            {/* ✅ Added City Input Field */}
             <input name="city" placeholder="City (e.g., New York, London)" required style={inputStyle} />
             <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
             <button type="submit" style={primaryButtonStyle}>Next: Add Pictures</button>
