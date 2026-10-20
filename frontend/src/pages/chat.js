@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import io from 'socket.io-client';
 import AgoraRTC, {
   AgoraRTCProvider,
   useJoin,
@@ -24,14 +25,15 @@ function ChatScreen() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [activeCall, setActiveCall] = useState(null); // 'audio' | 'video' | null
+  const [incomingCall, setIncomingCall] = useState(null); // Incoming call details if ringing
   
-  // ✅ Menu & Modal States
   const [showMenu, setShowMenu] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
   
   const messagesEndRef = useRef(null);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const socketRef = useRef(null);
   
   const getMyId = () => {
     try {
@@ -43,6 +45,28 @@ function ChatScreen() {
   };
   
   const myId = getMyId();
+
+  // ✅ INITIALIZE SOCKET.IO CONNECTION & LISTEN FOR CALLS
+  useEffect(() => {
+    if (!myId) return;
+
+    socketRef.current = io(API_URL);
+    socketRef.current.emit('join', myId); // Join user's personal room
+
+    socketRef.current.on('incoming-call', (data) => {
+      // Triggered when someone calls this user
+      setIncomingCall(data);
+    });
+
+    socketRef.current.on('call-ended', () => {
+      setIncomingCall(null);
+      setActiveCall(null);
+    });
+
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect();
+    };
+  }, [myId]);
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -65,7 +89,6 @@ function ChatScreen() {
         const res = await axios.get(`${API_URL}/api/messages/conversation/${selectedMatch._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
         setMessages(res.data || []);
         setConversations(prev => prev.map(c => 
           c.user._id === selectedMatch._id ? { ...c, unreadCount: 0 } : c
@@ -75,7 +98,6 @@ function ChatScreen() {
         setMessages([]);
       }
     };
-    
     fetchConversation();
   }, [selectedMatch, token, myId]);
 
@@ -98,10 +120,9 @@ function ChatScreen() {
     } catch (err) { alert(err.response?.data?.message || "Send failed"); }
   };
 
-  // ✅ BLOCK USER HANDLER
   const handleBlockUser = async () => {
     if (!selectedMatch) return;
-    if (!window.confirm(`Are you sure you want to block ${selectedMatch.name}? They will no longer be able to message or call you.`)) return;
+    if (!window.confirm(`Are you sure you want to block ${selectedMatch.name}?`)) return;
 
     try {
       await axios.post(`${API_URL}/api/users/block/${selectedMatch._id}`, {}, {
@@ -110,7 +131,6 @@ function ChatScreen() {
       alert("User blocked successfully.");
       setSelectedMatch(null);
       setShowMenu(false);
-      // Refresh conversations list
       const res = await axios.get(`${API_URL}/api/messages/conversations`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -120,7 +140,6 @@ function ChatScreen() {
     }
   };
 
-  // ✅ SEND VIRTUAL GIFT HANDLER
   const handleSendGift = async (giftName) => {
     try {
       await axios.post(`${API_URL}/api/messages/send`, {
@@ -129,7 +148,6 @@ function ChatScreen() {
 
       setShowGiftModal(false);
       setShowMenu(true);
-      // Refresh conversation
       const res = await axios.get(`${API_URL}/api/messages/conversation/${selectedMatch._id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -159,6 +177,24 @@ function ChatScreen() {
     return [myId, selectedMatch._id].sort().join('_');
   };
 
+  // ✅ INITIATE CALL & NOTIFY THE OTHER USER VIA SOCKET
+  const startCall = (type) => {
+    if (!selectedMatch) return;
+    const channelName = getChannelName();
+    
+    // Emit signal to receiver
+    if (socketRef.current) {
+      socketRef.current.emit('start-call', {
+        recipientId: selectedMatch._id,
+        callerId: myId,
+        callerName: JSON.parse(localStorage.getItem('user'))?.name || 'User',
+        callType: type,
+        channelName
+      });
+    }
+    setActiveCall(type);
+  };
+
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 78px)', background: '#fff', position: 'relative' }}>
       
@@ -181,7 +217,7 @@ function ChatScreen() {
                 <img src={getAvatarUrl(conv.user.photos)} alt="" style={{ width: 50, height: 50, borderRadius: '50%', objectFit: 'cover' }} />
                 {hasUnread && <span style={{ position: 'absolute', top: '-2px', right: '-2px', background: '#e53e3e', color: '#fff', fontSize: '0.65rem', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>{conv.unreadCount > 9 ? '9+' : conv.unreadCount}</span>}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ flex: 1, minWidth: '0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                   <div style={{ fontWeight: hasUnread ? 700 : 600 }}>{conv.user.name}</div>
                   <div style={{ fontSize: '0.7rem', color: hasUnread ? '#5b72f2' : '#999' }}>{getTimeAgo(conv.lastMessage?.createdAt)}</div>
@@ -207,26 +243,18 @@ function ChatScreen() {
                 </div>
               </div>
 
-              {/* HEADER ACTIONS & 3-DOT MENU */}
+              {/* CALL BUTTONS */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
-                <button onClick={() => setActiveCall('audio')} title="Voice Call" style={callButtonStyle}>📞</button>
-                <button onClick={() => setActiveCall('video')} title="Video Call" style={callButtonStyle}>📹</button>
+                <button onClick={() => startCall('audio')} title="Voice Call" style={callButtonStyle}>📞</button>
+                <button onClick={() => startCall('video')} title="Video Call" style={callButtonStyle}>📹</button>
                 
-                {/* 3 DOT MENU BUTTON */}
-                <button 
-                  onClick={() => setShowMenu(!showMenu)} 
-                  title="More Options" 
-                  style={{ ...callButtonStyle, background: showMenu ? '#eef2ff' : '#fff', fontWeight: 900 }}
-                >
+                <button onClick={() => setShowMenu(!showMenu)} title="More Options" style={{ ...callButtonStyle, background: showMenu ? '#eef2ff' : '#fff', fontWeight: 900 }}>
                   ⋮
                 </button>
 
-                {/* 3 DOT DROPDOWN */}
                 {showMenu && (
-                  <div style={{ position: 'absolute', top: '45px', right: 0, background: '#fff', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', borderRadius: '12px', width: '180px', zIndex: 100, overflow: 'hidden', border: '1px solid #eee' }}>
-                    <button onClick={() => { setShowMenu(false); setActiveCall('audio'); }} style={menuItemStyle}>📞 Voice Call coming soon</button>
-                    <button onClick={() => { setShowMenu(false); setActiveCall('video'); }} style={menuItemStyle}>📹 Video Call coming soon</button>
-                    <button onClick={() => { setShowMenu(false); setShowGiftModal(true); }} style={menuItemStyle}>🎁 Send Gift comming soon</button>
+                  <div style={{ position: 'absolute', top: '45px', right: 0, background: '#fff', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', borderRadius: '12px', width: '160px', zIndex: 100, overflow: 'hidden', border: '1px solid #eee' }}>
+                    <button onClick={() => { setShowMenu(false); setShowGiftModal(true); }} style={menuItemStyle}>🎁 Send Gift</button>
                     <div style={{ height: '1px', background: '#eee', margin: '4px 0' }} />
                     <button onClick={handleBlockUser} style={{ ...menuItemStyle, color: '#e53e3e', fontWeight: 600 }}>🚫 Block User</button>
                   </div>
@@ -275,14 +303,40 @@ function ChatScreen() {
         )}
       </div>
 
+      {/* 📞 INCOMING CALL RINGING MODAL */}
+      {incomingCall && !activeCall && (
+        <div style={modalOverlayStyle}>
+          <div style={modalContentStyle}>
+            <h3>Incoming {incomingCall.callType === 'video' ? 'Video' : 'Voice'} Call 📞</h3>
+            <p style={{ margin: '1rem 0', color: '#555' }}><b>{incomingCall.callerName}</b> is calling you...</p>
+            <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+              <button 
+                onClick={() => setIncomingCall(null)} 
+                style={{ background: '#e53e3e', color: '#fff', border: 'none', padding: '0.7rem 1.5rem', borderRadius: '20px', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Decline
+              </button>
+              <button 
+                onClick={() => {
+                  setActiveCall(incomingCall.callType);
+                  setIncomingCall(null);
+                }} 
+                style={{ background: '#38a169', color: '#fff', border: 'none', padding: '0.7rem 1.5rem', borderRadius: '20px', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Accept
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* GIFT MODAL */}
       {showGiftModal && (
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
             <h3>Send a Gift to {selectedMatch?.name} 🎁</h3>
-            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>Choose a virtual gift to brighten their day!</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
-              {['🌹 Rose', '☕ Coffee', '🍫 Chocolate', '🧸 Teddy Bear', '💍 Ring', '💎 Diamond'].map(gift => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', margin: '1rem 0' }}>
+              {['🌹 Rose', '☕ Coffee', '🍫 Chocolate', '🧸 Teddy', '💍 Ring', '💎 Diamond'].map(gift => (
                 <button key={gift} onClick={() => handleSendGift(gift)} style={{ padding: '0.8rem', background: '#f8f9fa', border: '1px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>
                   {gift}
                 </button>
@@ -293,13 +347,19 @@ function ChatScreen() {
         </div>
       )}
 
-      {/* CALL MODAL OVERLAY */}
+      {/* ACTIVE CALL MODAL */}
       {activeCall && (
         <CallModal 
           appId={AGORA_APP_ID}
-          channelName={getChannelName()}
+          channelName={incomingCall ? incomingCall.channelName : getChannelName()}
           callType={activeCall}
-          onClose={() => setActiveCall(null)}
+          onClose={() => {
+            if (incomingCall && socketRef.current) {
+              socketRef.current.emit('end-call', { recipientId: incomingCall.callerId });
+            }
+            setActiveCall(null);
+            setIncomingCall(null);
+          }}
         />
       )}
     </div>
@@ -322,10 +382,6 @@ function CallModal({ appId, channelName, callType, onClose }) {
 function CallRoom({ appId, channelName, callType, onClose }) {
   const isVideo = callType === 'video';
   
-  // ✅ REPLACE THIS LINE
-  // useJoin({ appid: appId, channel: channelName, token: null });
-  
-  // ✅ WITH THIS (Uses the env variable defined at top of file)
   useJoin({ 
     appid: appId, 
     channel: channelName, 
@@ -355,7 +411,7 @@ function CallRoom({ appId, channelName, callType, onClose }) {
         </div>
       ) : (
         <div style={{ padding: '2rem 0', fontSize: '1.2rem', color: '#5b72f2' }}>
-          ️ Voice Call Active...
+          🎙️ Voice Call Active...
         </div>
       )}
       <button onClick={onClose} style={endCallButtonStyle}>🛑 End Call</button>
@@ -365,39 +421,23 @@ function CallRoom({ appId, channelName, callType, onClose }) {
 
 // Styling Constants
 const callButtonStyle = {
-  background: '#eef2ff',
-  border: '1px solid #5b72f2',
-  borderRadius: '50%',
-  width: '38px',
-  height: '38px',
-  fontSize: '1.1rem',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center'
+  background: '#eef2ff', border: '1px solid #5b72f2', borderRadius: '50%', width: '38px', height: '38px', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
 };
-
 const menuItemStyle = {
   width: '100%', padding: '0.75rem 1rem', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '0.9rem', color: '#333'
 };
-
 const modalOverlayStyle = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999,
-  display: 'flex', alignItems: 'center', justifyContent: 'center'
+  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'
 };
-
 const modalContentStyle = {
   background: '#fff', padding: '1.5rem', borderRadius: '16px', width: '90%', maxWidth: '400px', textAlign: 'center'
 };
-
 const videoBoxStyle = {
   width: '180px', height: '240px', background: '#222', borderRadius: '10px', position: 'relative', overflow: 'hidden'
 };
-
 const labelStyle = {
   position: 'absolute', bottom: '5px', left: '8px', color: '#fff', margin: 0, fontSize: '0.75rem', zIndex: 10, background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: '4px'
 };
-
 const endCallButtonStyle = {
   background: '#e53e3e', color: '#fff', border: 'none', padding: '0.8rem 1.8rem', borderRadius: '30px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', marginTop: '1rem'
 };
