@@ -223,9 +223,9 @@ function ChatScreen() {
                 {/* 3 DOT DROPDOWN */}
                 {showMenu && (
                   <div style={{ position: 'absolute', top: '45px', right: 0, background: '#fff', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', borderRadius: '12px', width: '180px', zIndex: 100, overflow: 'hidden', border: '1px solid #eee' }}>
-                    <button onClick={() => { setShowMenu(false); setActiveCall('audio'); }} style={menuItemStyle}>📞 Voice Call coming soon</button>
-                    <button onClick={() => { setShowMenu(false); setActiveCall('video'); }} style={menuItemStyle}>📹 Video Call coming soon</button>
-                    <button onClick={() => { setShowMenu(false); setShowGiftModal(true); }} style={menuItemStyle}>🎁 Send Gift comming soon</button>
+                    <button onClick={() => { setShowMenu(false); setActiveCall('audio'); }} style={menuItemStyle}>📞 Voice Call</button>
+                    <button onClick={() => { setShowMenu(false); setActiveCall('video'); }} style={menuItemStyle}>📹 Video Call</button>
+                    <button onClick={() => { setShowMenu(false); setShowGiftModal(true); }} style={menuItemStyle}>🎁 Send Gift</button>
                     <div style={{ height: '1px', background: '#eee', margin: '4px 0' }} />
                     <button onClick={handleBlockUser} style={{ ...menuItemStyle, color: '#e53e3e', fontWeight: 600 }}>🚫 Block User</button>
                   </div>
