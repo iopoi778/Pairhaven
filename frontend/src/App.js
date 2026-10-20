@@ -586,16 +586,15 @@ function RegisterPage() {
 function VerificationPage() {
   const navigate = useNavigate();
   const [emailCode, setEmailCode] = useState('');
-  const [phoneCode, setPhoneCode] = useState('');
   const [loading, setLoading] = useState(false);
   const token = localStorage.getItem('token');
 
-  const handleSendCodes = async () => {
+  const handleSendCode = async () => {
     try {
       await axios.post(`${API_URL}/api/auth/send-verification`, {}, { headers: { Authorization: `Bearer ${token}` } });
-      alert("Verification codes sent to your email and phone!");
+      alert("Verification code sent to your email!");
     } catch (err) {
-      alert("Failed to send codes. Try again.");
+      alert("Failed to send verification code. Please try again.");
     }
   };
 
@@ -603,17 +602,17 @@ function VerificationPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/auth/verify`, { emailCode, phoneCode }, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.post(`${API_URL}/api/auth/verify`, { emailCode }, { headers: { Authorization: `Bearer ${token}` } });
       
       // Update local storage user state to verified
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       user.isVerified = true;
       localStorage.setItem('user', JSON.stringify(user));
 
-      alert("Verification successful!");
+      alert("Email verified successfully!");
       navigate('/', { replace: true });
     } catch (err) {
-      alert(err.response?.data?.message || "Invalid verification codes.");
+      alert(err.response?.data?.message || "Invalid verification code.");
     } finally {
       setLoading(false);
     }
@@ -621,20 +620,26 @@ function VerificationPage() {
 
   return (
     <div style={{ maxWidth: 400, margin: '4rem auto', background: '#fff', padding: '2rem', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)' }}>
-      <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '0.5rem' }}>Verify Your Account</h2>
+      <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '0.5rem' }}>Verify Your Email</h2>
       <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-        Please enter the verification codes sent to your email and phone number to unlock chatting and matching.
+        Please enter the verification code sent to your email address to unlock matching and messaging.
       </p>
 
-      <button onClick={handleSendCodes} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontWeight: 600, display: 'block', margin: '0 auto 1rem', fontSize: '0.9rem' }}>
-        🔄 Resend Codes
+      <button onClick={handleSendCode} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontWeight: 600, display: 'block', margin: '0 auto 1rem', fontSize: '0.9rem' }}>
+        ✉️ Send / Resend Code
       </button>
 
       <form onSubmit={handleVerify}>
-        <input type="text" placeholder="Enter Email Code" required value={emailCode} onChange={e => setEmailCode(e.target.value)} style={inputStyle} />
-        <input type="text" placeholder="Enter Phone Code" required value={phoneCode} onChange={e => setPhoneCode(e.target.value)} style={inputStyle} />
-        <button type="submit" disabled={loading} style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }}>
-          {loading ? 'Verifying...' : 'Verify & Proceed'}
+        <input 
+          type="text" 
+          placeholder="Enter 6-digit Email Code" 
+          required 
+          value={emailCode} 
+          onChange={e => setEmailCode(e.target.value)} 
+          style={inputStyle} 
+        />
+        <button type="submit" disabled={loading || !emailCode.trim()} style={{ ...primaryButtonStyle, opacity: (loading || !emailCode.trim()) ? 0.7 : 1 }}>
+          {loading ? 'Verifying...' : 'Verify Email & Proceed'}
         </button>
       </form>
     </div>
