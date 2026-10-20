@@ -493,17 +493,78 @@ function SocialAuthButtons() {
 
   const handleGoogleLogin = async () => {
     try {
-      alert("Google Sign-In integration hook goes here.");
+      // Simulate Google Login with SAFE DEFAULTS for Schema Validation
+      const email = prompt("Enter demo email (e.g., test@gmail.com):");
+      if (!email) return;
+      
+      const payload = {
+        email,
+        name: "Google User",
+        googleId: "google_" + Date.now(),
+        photo: "https://via.placeholder.com/150",
+        // ✅ CRITICAL FIX: Add required schema fields
+        age: 25,
+        gender: "other",
+        phone: "google_demo_" + Date.now()
+      };
+
+      const res = await fetch(`${API_URL}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || 'Google login failed');
+        return;
+      }
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+      navigate('/', { replace: true });
     } catch (err) {
       console.error("Google sign-in error", err);
+      alert("Google login error.");
     }
   };
 
   const handleAppleLogin = async () => {
     try {
-      alert("Apple Sign-In integration hook goes here.");
+      // Simulate Apple Login with SAFE DEFAULTS
+      const email = prompt("Enter demo email (e.g., test@icloud.com):");
+      if (!email) return;
+
+      const payload = {
+        email,
+        name: "Apple User",
+        appleId: "apple_" + Date.now(),
+        // ✅ CRITICAL FIX: Add required schema fields
+        age: 25,
+        gender: "other",
+        phone: "apple_demo_" + Date.now()
+      };
+
+      const res = await fetch(`${API_URL}/api/auth/apple`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || 'Apple login failed');
+        return;
+      }
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+      navigate('/', { replace: true });
     } catch (err) {
       console.error("Apple sign-in error", err);
+      alert("Apple login error.");
     }
   };
 
@@ -515,23 +576,13 @@ function SocialAuthButtons() {
         <div style={{ flex: 1, borderBottom: '1px solid #dfe3ea' }}></div>
       </div>
 
-      {/* GOOGLE BUTTON - OFFICIAL BRANDING */}
+      {/* GOOGLE BUTTON */}
       <button 
         type="button" 
         onClick={handleGoogleLogin} 
-        style={{ 
-          ...socialButtonStyle, 
-          background: '#fff', 
-          color: '#757575', 
-          border: '1px solid #dadce0', 
-          marginBottom: '0.8rem',
-          transition: 'box-shadow 0.2s'
-        }}
-        onMouseOver={e => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)'}
-        onMouseOut={e => e.currentTarget.style.boxShadow = 'none'}
+        style={{ ...socialButtonStyle, background: '#fff', color: '#444', border: '1px solid #dfe3ea', marginBottom: '0.8rem' }}
       >
-        {/* Official Google "G" Logo SVG */}
-        <svg width="18" height="18" viewBox="0 0 48 48" style={{ marginRight: '12px' }}>
+        <svg width="18" height="18" viewBox="0 0 48 48" style={{ marginRight: '10px' }}>
           <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
           <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
           <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -540,21 +591,13 @@ function SocialAuthButtons() {
         Continue with Google
       </button>
 
-      {/* APPLE BUTTON - OFFICIAL BRANDING */}
+      {/* APPLE BUTTON */}
       <button 
         type="button" 
         onClick={handleAppleLogin} 
-        style={{ 
-          ...socialButtonStyle, 
-          background: '#000', 
-          color: '#fff',
-          transition: 'background 0.2s'
-        }}
-        onMouseOver={e => e.currentTarget.style.background = '#333'}
-        onMouseOut={e => e.currentTarget.style.background = '#000'}
+        style={{ ...socialButtonStyle, background: '#000', color: '#fff' }}
       >
-        {/* Official Apple Logo SVG */}
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: '12px' }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: '10px' }}>
           <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
         </svg>
         Continue with Apple
