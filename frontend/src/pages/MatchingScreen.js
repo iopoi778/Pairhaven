@@ -72,11 +72,12 @@ function MatchingScreen() {
     fetchPotentialMatches(filters);
   }, [freshUser, token]);
 
-  // Safe Helper to render Location object or string without throwing React object error #31
+  // ✅ Enhanced Helper to render Location and Country cleanly
   const renderLocation = (loc) => {
     if (!loc) return 'Nearby';
     if (typeof loc === 'object') {
-      return loc.address || loc.name || 'Nearby';
+      const parts = [loc.address || loc.city || loc.name, loc.country].filter(Boolean);
+      return parts.length > 0 ? parts.join(', ') : 'Nearby';
     }
     return loc;
   };
@@ -103,7 +104,6 @@ function MatchingScreen() {
           // Ignore if passing user without active request
         }
       } else if (actionType === 'unmatch') {
-        // ✅ UNMATCH ACTION
         await axios.delete(`${API_URL}/api/users/match/${targetUser._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -149,7 +149,9 @@ function MatchingScreen() {
     
     const isMatched = (freshUser.matches || []).includes(targetUser._id);
     const hasSentRequest = (freshUser.requestsSent || []).includes(targetUser._id);
-    const hasReceivedRequest = (freshUser.requestsReceived || []).includes(targetUser._id);
+    
+    // ✅ Check if target user has sent a request to current user, OR if targetUser's data indicates a received request
+    const hasReceivedRequest = (freshUser.requestsReceived || []).includes(targetUser._id) || targetUser.hasReceivedRequest;
 
     if (isMatched) {
       return { 
@@ -158,12 +160,16 @@ function MatchingScreen() {
         unmatchAction: 'unmatch'
       };
     }
-    if (hasSentRequest) {
-      return { label: 'Request Sent', style: { background: '#ccc', color: '#fff' }, disabled: true };
-    }
+    
+    // ✅ If they sent us a request, prioritize showing Accept/Decline options
     if (hasReceivedRequest) {
       return { dualButtons: true };
     }
+
+    if (hasSentRequest) {
+      return { label: 'Request Sent', style: { background: '#ccc', color: '#fff' }, disabled: true };
+    }
+    
     return { label: '❤️ Request', style: { background: '#5b72f2', color: '#fff' }, action: 'send_request' };
   };
 
@@ -210,7 +216,6 @@ function MatchingScreen() {
     if (!currentUser) return;
 
     if (dragOffset.x > threshold) {
-      // Swiped Right -> Request / Accept / Chat
       const config = getButtonConfig(currentUser);
       if (config.isMatched) {
         handleMatchAction(currentUser, 'chat');
@@ -220,7 +225,6 @@ function MatchingScreen() {
         handleMatchAction(currentUser, 'send_request');
       }
     } else if (dragOffset.x < -threshold) {
-      // Swiped Left -> Pass / Decline
       handleMatchAction(currentUser, 'decline');
     } else {
       setDragOffset({ x: 0, y: 0 });
@@ -274,8 +278,8 @@ function MatchingScreen() {
             </div>
 
             <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.4rem' }}>Location / City</label>
-              <input type="text" placeholder="e.g. New York" value={filters.location} onChange={e => setFilters({...filters, location: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
+              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.4rem' }}>Location / City / Country</label>
+              <input type="text" placeholder="e.g. New York or United States" value={filters.location} onChange={e => setFilters({...filters, location: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
             </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
@@ -305,14 +309,12 @@ function MatchingScreen() {
           ) : (
             <div style={{ position: 'relative', height: '62vh', width: '100%' }}>
               
-              {/* Background Next Card Preview */}
               {users[currentIndex + 1] && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: '#fff', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', zIndex: 1, transform: 'scale(0.95)', opacity: 0.7 }}>
                   <img src={users[currentIndex + 1].photos?.[0]?.url || users[currentIndex + 1].photos?.[0] || 'https://via.placeholder.com/400'} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               )}
 
-              {/* Foreground Interactive Card */}
               <div 
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -331,7 +333,6 @@ function MatchingScreen() {
                   display: 'flex', flexDirection: 'column', userSelect: 'none'
                 }}
               >
-                {/* Swipe Overlay Badges */}
                 {dragOffset.x > 50 && (
                   <div style={{ position: 'absolute', top: '2rem', left: '2rem', border: '4px solid #10b981', color: '#10b981', padding: '0.4rem 0.8rem', fontSize: '1.4rem', fontWeight: 900, borderRadius: '8px', transform: 'rotate(-15deg)', zIndex: 10, background: 'rgba(255,255,255,0.85)' }}>
                     LIKE
@@ -351,7 +352,8 @@ function MatchingScreen() {
                   />
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', padding: '2rem 1.2rem 1rem', color: '#fff' }}>
                     <div style={{ fontSize: '1.6rem', fontWeight: 700 }}>{currentUser.name}, {currentUser.age || ''}</div>
-                    <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>📍 {renderLocation(currentUser.location)}</div>
+                    {/* ✅ Display Full Location & Country */}
+                    <div style={{ fontSize: '0.9rem', opacity: 0.9, marginTop: '2px' }}>📍 {renderLocation(currentUser.location)}</div>
                   </div>
                 </div>
 
@@ -374,7 +376,6 @@ function MatchingScreen() {
           {currentUser && currentIndex < users.length && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1.2rem', alignItems: 'center' }}>
               
-              {/* Pass / Swipe Left */}
               <button 
                 onClick={() => handleMatchAction(currentUser, 'decline')}
                 disabled={actionLoading === currentUser._id}
@@ -384,7 +385,6 @@ function MatchingScreen() {
                 ❌
               </button>
 
-              {/* Matched State -> Show Chat & Unmatch */}
               {getButtonConfig(currentUser).isMatched ? (
                 <>
                   <button 
@@ -406,6 +406,7 @@ function MatchingScreen() {
                 </>
               ) : getButtonConfig(currentUser).dualButtons ? (
                 <>
+                  {/* ✅ Show Accept & Decline Buttons when they sent a request */}
                   <button 
                     onClick={() => handleMatchAction(currentUser, 'accept')}
                     disabled={actionLoading === currentUser._id}
@@ -449,7 +450,8 @@ function MatchingScreen() {
 
                     <div style={{ padding: '0.6rem', flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{user.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#666' }}>{user.age ? `${user.age} yrs` : ''} • {renderLocation(user.location)}</div>
+                      {/* ✅ Display City and Country in Grid Subtext */}
+                      <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '2px' }}>{user.age ? `${user.age} yrs` : ''} • {renderLocation(user.location)}</div>
                     </div>
 
                     <div style={{ padding: '0 0.6rem 0.6rem' }}>
