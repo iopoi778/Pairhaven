@@ -175,11 +175,9 @@ function ChatScreen() {
     if (!myId || !selectedMatch?._id) return 'call_channel';
     const id1 = myId.toString().toLowerCase();
     const id2 = selectedMatch._id.toString().toLowerCase();
-    // Sorting guarantees User A calling User B uses the same string as User B calling User A
     return [id1, id2].sort().join('_');
   };
 
-  // ✅ INITIATE CALL & NOTIFY THE OTHER USER VIA SOCKET
   const startCall = (type) => {
     if (!selectedMatch) return;
     const channelName = getChannelName();
@@ -369,6 +367,19 @@ function ChatScreen() {
         />
       )}
     </div>
+  );
+}
+
+function CallModal({ appId, channelName, callType, onClose }) {
+  return (
+    <AgoraRTCProvider client={agoraClient}>
+      <div style={modalOverlayStyle}>
+        <div style={modalContentStyle}>
+          <h3>{callType === 'video' ? '📹 Video Call' : '📞 Voice Call'}</h3>
+          <CallRoom appId={appId} channelName={channelName} callType={callType} onClose={onClose} />
+        </div>
+      </div>
+    </AgoraRTCProvider>
   );
 }
 
