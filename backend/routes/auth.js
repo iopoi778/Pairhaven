@@ -6,6 +6,21 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { uploadPhotos } = require('../middleware/upload');
 
+// Helper function to create welcome notification
+async function createWelcomeNotification(userId, name) {
+  try {
+    await Notification.create({
+      recipient: userId,
+      sender: userId,
+      type: 'welcome',
+      message: `Welcome to PairHaven, ${name}! Explore profiles and find your match.`,
+      read: false
+    });
+  } catch (err) {
+    console.error('Failed to create welcome notification:', err);
+  }
+}
+
 router.post('/register', uploadPhotos.array('photos', 5), async (req, res) => {
   try {
     const { name, email, phone, password, age, gender, bio, interests } = req.body;
@@ -70,6 +85,9 @@ router.post('/register', uploadPhotos.array('photos', 5), async (req, res) => {
     }
 
     await user.save();
+
+    // ✅ Trigger Welcome Notification
+    await createWelcomeNotification(user._id, user.name);
 
     // Nearby user notifications
     try {
@@ -163,19 +181,26 @@ router.post('/login', async (req, res) => {
 // 🌐 Google Auth Route
 router.post('/google', async (req, res) => {
   try {
-    const { email, name, googleId, photo } = req.body;
+    const { email, name, googleId, photo, age, gender, phone } = req.body;
     
+    let isNewUser = false;
     let user = await User.findOne({ email });
     if (!user) {
+      isNewUser = true;
       user = new User({
         name,
         email,
         googleId,
-        photos: photo ? [{ url: photo, isPrimary: true }] : [],
+        age: age || 25,
+        gender: gender || 'other',
+        phone: phone || ('google_' + Date.now()),
+        photos: photo ? [{ url: photo, isPrimary: true }] : [{ url: 'https://via.placeholder.com/150', isPrimary: true }],
         verificationStatus: 'verified',
         location: { type: 'Point', coordinates: [0, 0] }
       });
       await user.save();
+      // ✅ Trigger Welcome Notification for new social signup
+      await createWelcomeNotification(user._id, user.name);
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -200,7 +225,7 @@ router.post('/google', async (req, res) => {
 // 🍎 Apple Auth Route
 router.post('/apple', async (req, res) => {
   try {
-    const { email, name, appleId } = req.body;
+    const { email, name, appleId, age, gender, phone } = req.body;
     
     let user = await User.findOne({ email });
     if (!user) {
@@ -208,10 +233,16 @@ router.post('/apple', async (req, res) => {
         name: name || 'Apple User',
         email,
         appleId,
+        age: age || 25,
+        gender: gender || 'other',
+        phone: phone || ('apple_' + Date.now()),
+        photos: [{ url: 'https://via.placeholder.com/150', isPrimary: true }],
         verificationStatus: 'verified',
         location: { type: 'Point', coordinates: [0, 0] }
       });
       await user.save();
+      // ✅ Trigger Welcome Notification for new social signup
+      await createWelcomeNotification(user._id, user.name);
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
