@@ -13,9 +13,8 @@ import AgoraRTC, {
 } from 'agora-rtc-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
-const AGORA_APP_ID = process.env.REACT_APP_AGORA_APP_ID || 'YOUR_AGORA_APP_ID'; // Replace with your Agora App ID
+const AGORA_APP_ID = process.env.REACT_APP_AGORA_APP_ID || 'YOUR_AGORA_APP_ID';
 
-// Create Agora Client Instance
 const agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
 function ChatScreen() {
@@ -25,11 +24,14 @@ function ChatScreen() {
   const [newMessage, setNewMessage] = useState('');
   const [activeCall, setActiveCall] = useState(null); // 'audio' | 'video' | null
   
+  // ✅ Menu & Modal States
+  const [showMenu, setShowMenu] = useState(false);
+  const [showGiftModal, setShowGiftModal] = useState(false);
+  
   const messagesEndRef = useRef(null);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
   
-  // ✅ AGGRESSIVE ID PARSING
   const getMyId = () => {
     try {
       const raw = localStorage.getItem('user');
@@ -55,6 +57,7 @@ function ChatScreen() {
 
   useEffect(() => {
     if (!selectedMatch) return;
+    setShowMenu(false);
     
     const fetchConversation = async () => {
       try {
@@ -91,7 +94,48 @@ function ChatScreen() {
       setConversations(prev => prev.map(c => 
         c.user._id === selectedMatch._id ? { ...c, lastMessage: res.data, unreadCount: 0 } : c
       ).sort((a, b) => new Date(b.lastMessage?.createdAt) - new Date(a.lastMessage?.createdAt)));
-    } catch (err) { alert("Send failed"); }
+    } catch (err) { alert(err.response?.data?.message || "Send failed"); }
+  };
+
+  // ✅ BLOCK USER HANDLER
+  const handleBlockUser = async () => {
+    if (!selectedMatch) return;
+    if (!window.confirm(`Are you sure you want to block ${selectedMatch.name}? They will no longer be able to message or call you.`)) return;
+
+    try {
+      await axios.post(`${API_URL}/api/users/block/${selectedMatch._id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert("User blocked successfully.");
+      setSelectedMatch(null);
+      setShowMenu(false);
+      // Refresh conversations list
+      const res = await axios.get(`${API_URL}/api/messages/conversations`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setConversations(res.data || []);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to block user");
+    }
+  };
+
+  // ✅ SEND VIRTUAL GIFT HANDLER
+  const handleSendGift = async (giftName) => {
+    try {
+      await axios.post(`${API_URL}/api/messages/send`, {
+        receiverId: selectedMatch._id, content: `🎁 Sent a virtual gift: ${giftName}`
+      }, { headers: { Authorization: `Bearer ${token}` } });
+
+      setShowGiftModal(false);
+      setShowMenu(true);
+      // Refresh conversation
+      const res = await axios.get(`${API_URL}/api/messages/conversation/${selectedMatch._id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessages(res.data || []);
+    } catch (err) {
+      alert("Failed to send gift");
+    }
   };
 
   const getAvatarUrl = (photos) => {
@@ -109,15 +153,15 @@ function ChatScreen() {
     return `${Math.floor(diff/1440)}d`;
   };
 
-  // Generate unique channel name for call between the two users
   const getChannelName = () => {
     if (!myId || !selectedMatch?._id) return 'call_channel';
     return [myId, selectedMatch._id].sort().join('_');
   };
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 78px)', background: '#fff' }}>
-      {/* SIDEBAR */}
+    <div style={{ display: 'flex', height: 'calc(100vh - 78px)', background: '#fff', position: 'relative' }}>
+      
+      {/* SIDEBAR CONVERSATIONS */}
       <div style={{ width: '320px', borderRight: '1px solid #eee', overflowY: 'auto', background: '#fff' }}>
         <div style={{ padding: '1.2rem', borderBottom: '1px solid #eee', fontWeight: 700 }}>Messages</div>
         {conversations.length === 0 ? (
@@ -149,10 +193,10 @@ function ChatScreen() {
       </div>
 
       {/* CHAT AREA */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', position: 'relative' }}>
         {selectedMatch ? (
           <>
-            {/* CHAT HEADER WITH VOICE/VIDEO CALL BUTTONS */}
+            {/* CHAT HEADER */}
             <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <img src={getAvatarUrl(selectedMatch.photos)} alt="" onClick={() => window.location.hash = `/profile/${selectedMatch._id}`} style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', cursor: 'pointer', border: '2px solid #f0f0f0' }} />
@@ -162,22 +206,30 @@ function ChatScreen() {
                 </div>
               </div>
 
-              {/* 📞 CALL BUTTONS */}
-              <div style={{ display: 'flex', gap: '10px' }}>
+              {/* HEADER ACTIONS & 3-DOT MENU */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
+                <button onClick={() => setActiveCall('audio')} title="Voice Call" style={callButtonStyle}>📞</button>
+                <button onClick={() => setActiveCall('video')} title="Video Call" style={callButtonStyle}>📹</button>
+                
+                {/* 3 DOT MENU BUTTON */}
                 <button 
-                  onClick={() => setActiveCall('audio')} 
-                  title="Voice Call" 
-                  style={callButtonStyle}
+                  onClick={() => setShowMenu(!showMenu)} 
+                  title="More Options" 
+                  style={{ ...callButtonStyle, background: showMenu ? '#eef2ff' : '#fff', fontWeight: 900 }}
                 >
-                  📞
+                  ⋮
                 </button>
-                <button 
-                  onClick={() => setActiveCall('video')} 
-                  title="Video Call" 
-                  style={callButtonStyle}
-                >
-                  📹
-                </button>
+
+                {/* 3 DOT DROPDOWN */}
+                {showMenu && (
+                  <div style={{ position: 'absolute', top: '45px', right: 0, background: '#fff', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', borderRadius: '12px', width: '180px', zIndex: 100, overflow: 'hidden', border: '1px solid #eee' }}>
+                    <button onClick={() => { setShowMenu(false); setActiveCall('audio'); }} style={menuItemStyle}>📞 Voice Call</button>
+                    <button onClick={() => { setShowMenu(false); setActiveCall('video'); }} style={menuItemStyle}>📹 Video Call</button>
+                    <button onClick={() => { setShowMenu(false); setShowGiftModal(true); }} style={menuItemStyle}>🎁 Send Gift</button>
+                    <div style={{ height: '1px', background: '#eee', margin: '4px 0' }} />
+                    <button onClick={handleBlockUser} style={{ ...menuItemStyle, color: '#e53e3e', fontWeight: 600 }}>🚫 Block User</button>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -222,6 +274,24 @@ function ChatScreen() {
         )}
       </div>
 
+      {/* GIFT MODAL */}
+      {showGiftModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalContentStyle}>
+            <h3>Send a Gift to {selectedMatch?.name} 🎁</h3>
+            <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>Choose a virtual gift to brighten their day!</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
+              {['🌹 Rose', '☕ Coffee', '🍫 Chocolate', '🧸 Teddy Bear', '💍 Ring', '💎 Diamond'].map(gift => (
+                <button key={gift} onClick={() => handleSendGift(gift)} style={{ padding: '0.8rem', background: '#f8f9fa', border: '1px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                  {gift}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowGiftModal(false)} style={{ background: '#cbd5e1', color: '#333', border: 'none', padding: '0.6rem 1.5rem', borderRadius: '20px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
       {/* CALL MODAL OVERLAY */}
       {activeCall && (
         <CallModal 
@@ -235,7 +305,6 @@ function ChatScreen() {
   );
 }
 
-// Sub-component to manage Agora Call Room
 function CallModal({ appId, channelName, callType, onClose }) {
   return (
     <AgoraRTCProvider client={agoraClient}>
@@ -251,7 +320,6 @@ function CallModal({ appId, channelName, callType, onClose }) {
 
 function CallRoom({ appId, channelName, callType, onClose }) {
   const isVideo = callType === 'video';
-
   useJoin({ appid: appId, channel: channelName, token: null });
 
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(true);
@@ -268,7 +336,6 @@ function CallRoom({ appId, channelName, callType, onClose }) {
             <p style={labelStyle}>You</p>
             {localCameraTrack && <LocalVideoTrack track={localCameraTrack} play style={{ width: '100%', height: '100%', borderRadius: '10px' }} />}
           </div>
-
           {remoteUsers.map(user => (
             <div key={user.uid} style={videoBoxStyle}>
               <p style={labelStyle}>Connected User</p>
@@ -281,10 +348,7 @@ function CallRoom({ appId, channelName, callType, onClose }) {
           🎙️ Voice Call Active...
         </div>
       )}
-
-      <button onClick={onClose} style={endCallButtonStyle}>
-        🛑 End Call
-      </button>
+      <button onClick={onClose} style={endCallButtonStyle}>🛑 End Call</button>
     </div>
   );
 }
@@ -303,13 +367,17 @@ const callButtonStyle = {
   justifyContent: 'center'
 };
 
+const menuItemStyle = {
+  width: '100%', padding: '0.75rem 1rem', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '0.9rem', color: '#333'
+};
+
 const modalOverlayStyle = {
   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999,
   display: 'flex', alignItems: 'center', justifyContent: 'center'
 };
 
 const modalContentStyle = {
-  background: '#fff', padding: '1.5rem', borderRadius: '16px', width: '90%', maxWidth: '500px', textAlign: 'center'
+  background: '#fff', padding: '1.5rem', borderRadius: '16px', width: '90%', maxWidth: '400px', textAlign: 'center'
 };
 
 const videoBoxStyle = {
