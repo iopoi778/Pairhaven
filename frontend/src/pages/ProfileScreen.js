@@ -13,12 +13,20 @@ function ProfileScreen({ userId }) {
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   
-  // Post Creation State
+  // Modals State
   const [showPostModal, setShowPostModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  
+  // Post Creation State
   const [newPostText, setNewPostText] = useState('');
   const [newPostMedia, setNewPostMedia] = useState(null);
   const [posting, setPosting] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Password Update State
+  const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [updatingPassword, setUpdatingPassword] = useState(false);
 
   const token = localStorage.getItem('token');
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -36,7 +44,6 @@ function ProfileScreen({ userId }) {
         const postsRes = await axios.get(`${API_URL}/api/users/profile/${profileRes.data._id}/posts`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
         setPosts(postsRes.data);
       } catch (err) {
         console.error("Failed to load profile", err);
@@ -46,6 +53,15 @@ function ProfileScreen({ userId }) {
     };
     if (token) fetchData();
   }, [userId, token]);
+
+  // Safe Location Helper (prevents React Error #31)
+  const renderLocation = (loc) => {
+    if (!loc) return 'Location not specified';
+    if (typeof loc === 'object') {
+      return loc.address || loc.name || 'Location specified';
+    }
+    return loc;
+  };
 
   // Match Request Handlers
   const handleSendRequest = async () => {
@@ -108,33 +124,33 @@ function ProfileScreen({ userId }) {
   };
 
   const handleCreatePost = async () => {
-  if (!newPostText.trim() && !newPostMedia) return;
-  setPosting(true);
-  
-  const formData = new FormData();
-  formData.append('text', newPostText);
-  if (newPostMedia) {
-    formData.append('media', newPostMedia);
-  }
-  
-  try {
-    const res = await axios.post(`${API_URL}/api/posts`, formData, {
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data'
-      }
-    });
+    if (!newPostText.trim() && !newPostMedia) return;
+    setPosting(true);
     
-    setPosts(prev => [res.data, ...prev]);
-    setNewPostText('');
-    setNewPostMedia(null);
-    setShowPostModal(false);
-  } catch (err) {
-    alert(err.response?.data?.message || "Failed to create post");
-  } finally {
-    setPosting(false);
-  }
-};
+    const formData = new FormData();
+    formData.append('text', newPostText);
+    if (newPostMedia) {
+      formData.append('media', newPostMedia);
+    }
+    
+    try {
+      const res = await axios.post(`${API_URL}/api/posts`, formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      setPosts(prev => [res.data, ...prev]);
+      setNewPostText('');
+      setNewPostMedia(null);
+      setShowPostModal(false);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to create post");
+    } finally {
+      setPosting(false);
+    }
+  };
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
@@ -179,6 +195,45 @@ function ProfileScreen({ userId }) {
     } catch (err) { alert("Failed to delete post"); }
   };
 
+  // Change Password Handler
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      return alert("New passwords do not match.");
+    }
+    setUpdatingPassword(true);
+    try {
+      await axios.patch(`${API_URL}/api/users/password`, {
+        currentPassword: passwords.currentPassword,
+        newPassword: passwords.newPassword
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      
+      alert("Password updated successfully!");
+      setShowPasswordModal(false);
+      setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update password");
+    } finally {
+      setUpdatingPassword(false);
+    }
+  };
+
+  // Delete Profile / Account Handler
+  const handleDeleteAccount = async () => {
+    const confirmation = window.prompt("Type 'DELETE' to permanently delete your account and all data:");
+    if (confirmation !== 'DELETE') return;
+
+    try {
+      await axios.delete(`${API_URL}/api/users/profile/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert("Your account has been deleted.");
+      handleLogout();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete account");
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -192,19 +247,98 @@ function ProfileScreen({ userId }) {
     return typeof photo === 'string' ? photo : photo.url;
   };
 
-  if (loading) return <div style={{padding:'2rem', textAlign:'center'}}>Loading...</div>;
-  if (!user) return <div style={{padding:'2rem', textAlign:'center'}}>User not found.</div>;
+  if (loading) return <div style={{padding:'3rem', textAlign:'center', color: '#666'}}>Loading profile...</div>;
+  if (!user) return <div style={{padding:'3rem', textAlign:'center', color: '#666'}}>User not found.</div>;
 
   return (
-    <div style={{ padding: '1rem', paddingBottom: '90px', position: 'relative' }}>
+    <div style={{ padding: '1rem', paddingBottom: '100px', maxWidth: '500px', margin: '0 auto', position: 'relative' }}>
       
+      {/* HEADER BAR FOR OWN PROFILE */}
+      {isOwnProfile && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700 }}>My Profile</h2>
+          <button 
+            onClick={() => setShowSettingsModal(true)} 
+            style={{ background: '#f0f2f5', border: 'none', padding: '0.5rem 1rem', borderRadius: '20px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            ⚙️ Settings
+          </button>
+        </div>
+      )}
+
+      {/* SETTINGS / ACCOUNT MODAL */}
+      {showSettingsModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
+          <div style={{ background: '#fff', width: '100%', maxWidth: '500px', borderTopLeftRadius: '20px', borderTopRightRadius: '20px', padding: '1.5rem', animation: 'slideUp 0.3s ease' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
+              <h3 style={{ margin: 0 }}>Account Settings</h3>
+              <button onClick={() => setShowSettingsModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button 
+                onClick={() => { setShowSettingsModal(false); setShowPasswordModal(true); }}
+                style={{ width: '100%', padding: '0.8rem', background: '#f8f9fa', border: '1px solid #e2e8f0', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
+              >
+                🔒 Change Password
+              </button>
+
+              <button 
+                onClick={handleLogout}
+                style={{ width: '100%', padding: '0.8rem', background: '#f8f9fa', border: '1px solid #e2e8f0', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', textAlign: 'left', color: '#e53e3e' }}
+              >
+                🚪 Logout
+              </button>
+
+              <button 
+                onClick={handleDeleteAccount}
+                style={{ width: '100%', padding: '0.8rem', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', textAlign: 'left', color: '#dc2626', marginTop: '0.5rem' }}
+              >
+                ⚠️ Delete Account Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHANGE PASSWORD MODAL */}
+      {showPasswordModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
+          <div style={{ background: '#fff', width: '100%', maxWidth: '400px', borderRadius: '16px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>Change Password</h3>
+              <button onClick={() => setShowPasswordModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            </div>
+            
+            <form onSubmit={handleChangePassword}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Current Password</label>
+                <input type="password" required value={passwords.currentPassword} onChange={e => setPasswords({...passwords, currentPassword: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>New Password</label>
+                <input type="password" required value={passwords.newPassword} onChange={e => setPasswords({...passwords, newPassword: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Confirm New Password</label>
+                <input type="password" required value={passwords.confirmPassword} onChange={e => setPasswords({...passwords, confirmPassword: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' }} />
+              </div>
+              
+              <button type="submit" disabled={updatingPassword} style={{ width: '100%', background: '#5b72f2', color: '#fff', border: 'none', padding: '0.75rem', borderRadius: '10px', fontWeight: 700, cursor: updatingPassword ? 'wait' : 'pointer' }}>
+                {updatingPassword ? 'Updating...' : 'Update Password'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* POST MODAL */}
       {showPostModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0 }}>New Post</h3>
-              <button onClick={() => setShowPostModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}></button>
+              <h3 style={{ margin: 0 }}>Create New Post</h3>
+              <button onClick={() => setShowPostModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
             </div>
             <textarea value={newPostText} onChange={e => setNewPostText(e.target.value)} placeholder="What's on your mind?" rows="4" style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '0.8rem', resize: 'none', fontSize: '1rem', boxSizing: 'border-box' }} />
             {newPostMedia && (
@@ -226,38 +360,35 @@ function ProfileScreen({ userId }) {
         </div>
       )}
 
-      {/* FLOATING "+" BUTTON */}
+      {/* FLOATING "+" POST BUTTON */}
       {isOwnProfile && (
-        <button onClick={() => setShowPostModal(true)} style={{ position: 'fixed', bottom: '90px', left: '20px', background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '50%', width: '56px', height: '56px', fontSize: '2rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(91, 114, 242, 0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s' }} onMouseOver={e => e.target.style.transform = 'scale(1.1)'} onMouseOut={e => e.target.style.transform = 'scale(1)'}>+</button>
+        <button onClick={() => setShowPostModal(true)} style={{ position: 'fixed', bottom: '90px', right: '20px', background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '50%', width: '56px', height: '56px', fontSize: '2rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(91, 114, 242, 0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
       )}
 
-      {/* LOGOUT BUTTON */}
-      {isOwnProfile && (
-        <button onClick={handleLogout} style={{ position: 'fixed', bottom: '90px', right: '20px', background: '#fff', color: '#e53e3e', border: '1px solid #fee2e2', borderRadius: '50px', padding: '0.6rem 1.2rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(229, 62, 62, 0.15)', zIndex: 100, display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span>🚪</span> Logout
-        </button>
-      )}
-
-      {/* PROFILE PICTURE SECTION */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
-        <div style={{ position: 'relative' }}>
-          <img src={getAvatarUrl()} alt={user.name} style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
+      {/* PROFILE CARD HERO SECTION */}
+      <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', marginBottom: '1.5rem', textAlign: 'center', position: 'relative' }}>
+        <div style={{ position: 'relative', display: 'inline-block', marginBottom: '0.8rem' }}>
+          <img src={getAvatarUrl()} alt={user.name} style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: '3px solid #f0f2f5', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
           {isOwnProfile && (
-            <label style={{ position: 'absolute', bottom: 0, right: 0, background: '#5b72f2', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploadingPhoto ? 'wait' : 'pointer', border: '2px solid #fff', fontSize: '1rem' }}>
+            <label style={{ position: 'absolute', bottom: 0, right: 0, background: '#5b72f2', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploadingPhoto ? 'wait' : 'pointer', border: '2px solid #fff', fontSize: '0.9rem' }}>
               📷
               <input type="file" accept="image/*" onChange={handlePhotoUpload} disabled={uploadingPhoto} style={{ display: 'none' }} />
             </label>
           )}
         </div>
-        <h2 style={{ margin: '0.8rem 0 0.3rem', textAlign: 'center' }}>{user.name}</h2>
-        <p style={{ margin: 0, color: '#666', fontSize: '0.9rem', textAlign: 'center' }}>
-          {user.age ? `${user.age} years old` : ''} 
-          {user.location?.address ? ` • ${user.location.address}` : ''}
-        </p>
+
+        <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.5rem', fontWeight: 700 }}>{user.name}</h2>
         
+        {/* PROMINENT LOCATION & AGE DISPLAY */}
+        <p style={{ margin: '0 0 1rem', color: '#666', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          <span>{user.age ? `${user.age} yrs` : ''}</span>
+          {user.age && renderLocation(user.location) ? ' • ' : ''}
+          <span>📍 {renderLocation(user.location)}</span>
+        </p>
+
         {/* MATCH ACTION BUTTONS */}
         {!isOwnProfile && (
-          <div style={{ display: 'flex', gap: '10px', marginTop: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             {currentUser.requestsSent?.includes(user._id) && (
               <button disabled style={{ background: '#ccc', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: 'not-allowed', fontSize: '0.9rem' }}>⏳ Request Sent</button>
             )}
@@ -282,53 +413,54 @@ function ProfileScreen({ userId }) {
         )}
 
         {isOwnProfile && (
-          <button onClick={handleTogglePrivacy} style={{ marginTop: '0.8rem', background: user.isPrivate ? '#e53e3e' : '#10b981', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-            {user.isPrivate ? '🔒 Private' : ' Public'}
+          <button onClick={handleTogglePrivacy} style={{ background: user.isPrivate ? '#fee2e2' : '#d1fae5', color: user.isPrivate ? '#dc2626' : '#047857', border: 'none', borderRadius: '20px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+            {user.isPrivate ? '🔒 Private Account' : '🔓 Public Account'}
           </button>
         )}
       </div>
 
       {/* STATS ROW */}
-      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '1rem 0', borderTop: '1px solid #eee', borderBottom: '1px solid #eee', marginBottom: '1.5rem' }}>
-        <div style={{textAlign:'center'}}><strong>{posts.length}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Posts</span></div>
-        <div style={{textAlign:'center'}}><strong>{user.matchesCount || 0}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Matches</span></div>
+      <div style={{ display: 'flex', justifyContent: 'space-around', background: '#fff', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem' }}>
+        <div style={{textAlign:'center'}}><strong style={{fontSize:'1.1rem'}}>{posts.length}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Posts</span></div>
+        <div style={{textAlign:'center'}}><strong style={{fontSize:'1.1rem'}}>{user.matchesCount || 0}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Matches</span></div>
       </div>
 
       {/* BIO SECTION */}
-      <div style={{ background: '#f9f9f9', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+      <div style={{ background: '#fff', padding: '1.2rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem' }}>
+        <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', color: '#444' }}>About Me</h4>
         {isEditingBio ? (
           <>
-            <textarea value={bioText} onChange={e => setBioText(e.target.value)} rows="3" style={{width:'100%',border:'1px solid #ddd',borderRadius:'8px',padding:'0.5rem', boxSizing: 'border-box'}} />
+            <textarea value={bioText} onChange={e => setBioText(e.target.value)} rows="3" style={{width:'100%',border:'1px solid #ddd',borderRadius:'8px',padding:'0.6rem', boxSizing: 'border-box'}} />
             <div style={{marginTop:'0.5rem',display:'flex',gap:'0.5rem'}}>
-              <button onClick={handleSaveBio} style={{background:'#5b72f2',color:'#fff',border:'none',borderRadius:'6px',padding:'0.4rem 1rem',cursor:'pointer'}}>Save</button>
-              <button onClick={() => setIsEditingBio(false)} style={{background:'#ccc',border:'none',borderRadius:'6px',padding:'0.4rem 1rem',cursor:'pointer'}}>Cancel</button>
+              <button onClick={handleSaveBio} style={{background:'#5b72f2',color:'#fff',border:'none',borderRadius:'6px',padding:'0.4rem 1rem',cursor:'pointer', fontWeight: 600}}>Save</button>
+              <button onClick={() => setIsEditingBio(false)} style={{background:'#ccc',border:'none',borderRadius:'6px',padding:'0.4rem 1rem',cursor:'pointer', fontWeight: 600}}>Cancel</button>
             </div>
           </>
         ) : (
           <div>
-            <p style={{margin:'0 0 0.5rem', lineHeight: '1.5'}}>{user.bio || 'No bio yet.'}</p>
-            {isOwnProfile && <button onClick={() => setIsEditingBio(true)} style={{background:'none',border:'none',color:'#5b72f2',cursor:'pointer',padding:0, fontWeight: 600}}>Edit Bio</button>}
+            <p style={{margin:'0 0 0.5rem', lineHeight: '1.5', color: '#333'}}>{user.bio || 'No bio provided yet.'}</p>
+            {isOwnProfile && <button onClick={() => setIsEditingBio(true)} style={{background:'none',border:'none',color:'#5b72f2',cursor:'pointer',padding:0, fontWeight: 600, fontSize:'0.9rem'}}>Edit Bio</button>}
           </div>
         )}
       </div>
 
-      {/* ✅ CLEAN POSTS GRID - SYNTAX VERIFIED */}
-      <h3 style={{ marginBottom: '1rem' }}>Posts</h3>
+      {/* POSTS GRID SECTION */}
+      <h3 style={{ marginBottom: '1rem', fontSize: '1.2rem' }}>Posts</h3>
       {posts.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
+        <div style={{ textAlign: 'center', color: '#888', padding: '3rem', background: '#fff', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           {isOwnProfile ? "You haven't posted anything yet." : "No public posts to show."}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', borderRadius: '12px', overflow: 'hidden' }}>
           {posts.map(post => {
             const hasText = post.text && post.text.trim().length > 0;
             const hasMedia = post.mediaUrl && post.mediaUrl !== 'null';
             const isVideo = hasMedia && (post.mediaType === 'video' || post.mediaUrl.includes('/video/upload'));
 
             return (
-              <div key={post._id} style={{ aspectRatio: '1', overflow: 'hidden', background: '#f5f5f5', position: 'relative' }}>
+              <div key={post._id} style={{ aspectRatio: '1', overflow: 'hidden', background: '#f5f5f5', position: 'relative', borderRadius: '8px' }}>
                 {hasText && !hasMedia && (
-                  <div style={{ padding: '10px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', wordBreak: 'break-word', height: '100%', background: '#fff' }}>
+                  <div style={{ padding: '10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', wordBreak: 'break-word', height: '100%', background: '#fff', color: '#333' }}>
                     {post.text.substring(0, 50)}{post.text.length > 50 ? '...' : ''}
                   </div>
                 )}
@@ -343,7 +475,7 @@ function ProfileScreen({ userId }) {
                 )}
                 {isOwnProfile && (
                   <button onClick={() => handleDeletePost(post._id)} style={{ 
-                    position: 'absolute', top: '5px', right: '5px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' 
+                    position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' 
                   }}>×</button>
                 )}
               </div>
