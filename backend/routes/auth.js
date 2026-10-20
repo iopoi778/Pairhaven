@@ -6,7 +6,7 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { uploadPhotos } = require('../middleware/upload');
-const auth = require('../middleware/auth'); /
+const auth = require('../middleware/auth'); 
 
 // Helper function to create welcome notification
 async function createWelcomeNotification(userId, name) {
