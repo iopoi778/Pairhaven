@@ -8,7 +8,7 @@ import NotificationsScreen from './pages/NotificationsScreen';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
-// ✅ SAFE TOKEN INITIALIZATION
+// ✅ SAFE TOKEN INITIALIZATION (Only runs once at module load)
 const initialToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 if (initialToken) {
   axios.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
@@ -22,14 +22,17 @@ const ProtectedRoute = ({ children }) => {
 function ProfileRouteWrapper({ onUpdateCounts }) {
   const navigate = useNavigate();
   
-  // ✅ SAFE USER PARSING
+  // ✅ SAFE USER PARSING FUNCTION (Never crashes)
   const getCurrentUser = () => {
     try {
       return JSON.parse(localStorage.getItem('user')) || {};
-    } catch (e) { return {}; }
+    } catch (e) { 
+      console.error("Failed to parse user", e);
+      return {}; 
+    }
   };
-  const currentUserData = getCurrentUser();
   
+  const currentUserData = getCurrentUser();
   const hashPath = window.location.hash.replace('#', '') || '/';
   const parts = hashPath.split('/').filter(Boolean);
   
@@ -73,7 +76,7 @@ function App() {
           const count = c.unreadCount ?? (c.messages?.filter(m => !m.read).length ?? 0);
           return sum + (count || 0);
         }, 0);
-      } catch (err) { console.error("Chat count failed:", err.message); }
+      } catch (err) { /* Silent fail for counts */ }
 
       let unreadNotifs = 0;
       try {
@@ -81,10 +84,10 @@ function App() {
           headers: { Authorization: `Bearer ${currentToken}` } 
         });
         unreadNotifs = (notifRes.data || []).filter(n => n.read === false).length;
-      } catch (err) { console.error("Alert count failed:", err.message); }
+      } catch (err) { /* Silent fail for counts */ }
 
       setNavCounts({ chat: totalUnreadMsgs, alerts: unreadNotifs });
-    } catch (err) { console.error("CRITICAL: Failed to fetch nav counts:", err); }
+    } catch (err) { console.error("Nav counts failed:", err); }
   };
 
   useEffect(() => {
@@ -161,11 +164,10 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {renderContent()}
       </main>
 
-      {/* ✅ NAV BAR WITH ALL ICONS RESTORED */}
       <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
         {[
           { id: 'home', label: 'Home', icon: '🏠' },
-          { id: 'matching', label: 'Match', icon: '💖' },
+          { id: 'matching', label: 'Match', icon: '' },
           { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
           { id: 'notifications', label: 'Alerts', icon: '', count: navCounts?.alerts },
           { id: 'profile', label: 'Profile', icon: '' }
@@ -318,7 +320,6 @@ function HomeFeed({ onNavigateToProfile }) {
   );
 }
 
-// ✅ MOBILE-OPTIMIZED ANIMATED LOGIN PAGE
 function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -327,14 +328,24 @@ function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: e.target.email.value, password: e.target.password.value }) });
+      const res = await fetch(`${API_URL}/api/auth/login`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ email: e.target.email.value, password: e.target.password.value }) 
+      });
       const data = await res.json();
       if (!res.ok) { alert(data.message || 'Login failed'); return; }
+      
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       navigate('/', { replace: true });
-    } catch (err) { console.error(err); alert('Server error.'); } finally { setLoading(false); }
+    } catch (err) { 
+      console.error(err); 
+      alert('Server error.'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
@@ -346,17 +357,9 @@ function LoginPage() {
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         <style>{`
           @keyframes fadeSlide {
-            0% { opacity: 0; }
-            10% { opacity: 1; }
-            33% { opacity: 1; }
-            43% { opacity: 0; }
-            100% { opacity: 0; }
+            0% { opacity: 0; } 10% { opacity: 1; } 33% { opacity: 1; } 43% { opacity: 0; } 100% { opacity: 0; }
           }
-          .bg-slide {
-            position: absolute; inset: 0; 
-            background-size: cover; background-position: center;
-            opacity: 0; animation: fadeSlide 18s infinite;
-          }
+          .bg-slide { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; animation: fadeSlide 18s infinite; }
           .bg-1 { animation-delay: 0s; background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=1080&auto=format&fit=crop'); }
           .bg-2 { animation-delay: 6s; background-image: url('https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?q=80&w=1080&auto=format&fit=crop'); }
           .bg-3 { animation-delay: 12s; background-image: url('https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1080&auto=format&fit=crop'); }
@@ -392,23 +395,41 @@ function LoginPage() {
 function RegisterPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     const formData = new FormData(e.target);
+    
     try {
       if (navigator.geolocation) {
         try {
-          const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 5000 }));
+          const pos = await new Promise((resolve, reject) => 
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 5000 })
+          );
           formData.append('location', JSON.stringify({ type: 'Point', coordinates: [pos.coords.longitude, pos.coords.latitude] }));
-        } catch (geoErr) { formData.append('location', JSON.stringify({ type: 'Point', coordinates: [0, 0] })); }
+        } catch (geoErr) { 
+          formData.append('location', JSON.stringify({ type: 'Point', coordinates: [0, 0] })); 
+        }
       }
+      
       const res = await fetch(`${API_URL}/api/auth/register`, { method: 'POST', body: formData });
       const data = await res.json();
-      if (!res.ok) { alert(data.message || 'Registration failed'); return; }
+      
+      if (!res.ok) { 
+        alert(data.message || 'Registration failed'); 
+        return; 
+      }
+      
+      // Auto-login after successful registration
       try {
-        const loginRes = await fetch(`${API_URL}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: formData.get('email'), password: formData.get('password') }) });
+        const loginRes = await fetch(`${API_URL}/api/auth/login`, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ email: formData.get('email'), password: formData.get('password') }) 
+        });
         const loginData = await loginRes.json();
+        
         if (loginRes.ok) {
           localStorage.setItem('token', loginData.token);
           localStorage.setItem('user', JSON.stringify(loginData.user));
@@ -416,11 +437,21 @@ function RegisterPage() {
           navigate('/', { replace: true });
           return;
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error("Auto-login failed:", err);
+      }
+      
       alert('Registered! Please log in.');
       navigate('/login', { replace: true });
-    } catch (err) { alert('Server error.'); } finally { setLoading(false); }
+      
+    } catch (err) { 
+      console.error("Registration error:", err);
+      alert('Server error.'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
+
   return (
     <div style={{ maxWidth: 420, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
       <h2 style={{ textAlign: 'center', color: '#5b72f2' }}>Join PairHaven</h2>
@@ -431,13 +462,22 @@ function RegisterPage() {
         <input name="password" type="password" placeholder="Password" required style={inputStyle} />
         <div style={{ display: 'flex', gap: '1rem' }}>
           <input name="age" type="number" placeholder="Age" required style={{ ...inputStyle, flex: 1 }} />
-          <select name="gender" required style={{ ...inputStyle, flex: 1 }}><option value="">Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select>
+          <select name="gender" required style={{ ...inputStyle, flex: 1 }}>
+            <option value="">Gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
         </div>
         <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
         <input name="photos" type="file" multiple accept="image/*" required style={{ marginBottom: '1rem', width: '100%' }} />
-        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>{loading ? 'Signing up...' : 'Sign Up'}</button>
+        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>
+          {loading ? 'Signing up...' : 'Sign Up'}
+        </button>
       </form>
-      <p style={{ textAlign: 'center', marginTop: '1rem' }}>Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span></p>
+      <p style={{ textAlign: 'center', marginTop: '1rem' }}>
+        Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
+      </p>
     </div>
   );
 }
