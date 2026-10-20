@@ -26,12 +26,37 @@ router.get('/profile/:id', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-// POTENTIAL MATCHES
+// POTENTIAL MATCHES (With query filters support: minAge, maxAge, location, maxDistance)
 router.get('/potential-matches', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.userId);
     if (!currentUser) return res.status(404).json({ message: 'User not found' });
-    const users = await User.find({ _id: { $ne: req.user.userId } }).select('name photos age location bio');
+
+    const { minAge, maxAge, location } = req.query;
+    
+    // Build filter query
+    let query = { 
+      _id: { 
+        $ne: req.user.userId, 
+        $nin: currentUser.blockedUsers || [] 
+      } 
+    };
+
+    if (minAge || maxAge) {
+      query.age = {};
+      if (minAge) query.age.$gte = Number(minAge);
+      if (maxAge) query.age.$lte = Number(maxAge);
+    }
+
+    if (location && location.trim() !== '') {
+      // Matches location string or location object address field loosely
+      query.$or = [
+        { location: { $regex: location,$options: 'i' } },
+        { 'location.address': { $regex: location,$options: 'i' } }
+      ];
+    }
+
+    const users = await User.find(query).select('name photos age location bio');
     
     const enriched = users.map(u => {
       const obj = u.toObject();
@@ -40,6 +65,7 @@ router.get('/potential-matches', auth, async (req, res) => {
       obj.hasReceivedRequest = (currentUser.requestsReceived || []).includes(u._id);
       return obj;
     });
+    
     res.json(enriched);
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
@@ -76,8 +102,8 @@ router.post('/accept-request/:userId', auth, async (req, res) => {
     // ✅ CREATE MATCH ACCEPTANCE NOTIFICATION
     try {
       await Notification.create({
-        recipient: req.params.userId, // The person who sent the request
-        sender: req.user.userId,      // The person who accepted
+        recipient: req.params.userId,
+        sender: req.user.userId,
         type: 'match_accepted',
         message: `${current.name} accepted your match request! You can now chat.`,
         read: false
@@ -106,20 +132,20 @@ router.delete('/request/:userId', auth, async (req, res) => {
     res.json({ message: 'Request removed' });
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
-// DELETE /api/users/match/:id
-router.delete('/match/:id', authMiddleware, async (req, res) => {
+
+// DELETE /api/users/match/:id (Fixed auth property lookup to req.user.userId)
+router.delete('/match/:id', auth, async (req, res) => {
   try {
     const targetUserId = req.params.id;
-    const currentUser = await User.findById(req.user.id);
+    const currentUser = await User.findById(req.user.userId);
     const targetUser = await User.findById(targetUserId);
 
     if (!targetUser) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Remove each other from matches arrays
-    currentUser.matches = currentUser.matches.filter(id => id.toString() !== targetUserId);
-    targetUser.matches = targetUser.matches.filter(id => id.toString() !== currentUser._id.toString());
+    currentUser.matches = (currentUser.matches || []).filter(id => id.toString() !== targetUserId);
+    targetUser.matches = (targetUser.matches || []).filter(id => id.toString() !== currentUser._id.toString());
 
     await currentUser.save();
     await targetUser.save();
@@ -129,20 +155,23 @@ router.delete('/match/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Server error unmatching", error: err.message });
   }
 });
-// POST /api/users/block/:id
-router.post('/block/:id', authMiddleware, async (req, res) => {
+
+// POST /api/users/block/:id (Fixed auth property lookup to req.user.userId)
+router.post('/block/:id', auth, async (req, res) => {
   try {
     const userIdToBlock = req.params.id;
-    const currentUser = await User.findById(req.user.id);
+    const currentUser = await User.findById(req.user.userId);
 
-    // Add to blocked users array if not already blocked
+    if (!currentUser.blockedUsers) {
+      currentUser.blockedUsers = [];
+    }
+
     if (!currentUser.blockedUsers.includes(userIdToBlock)) {
       currentUser.blockedUsers.push(userIdToBlock);
       
-      // Also remove from matches/requests if present
-      currentUser.matches = currentUser.matches.filter(id => id.toString() !== userIdToBlock);
-      currentUser.requestsSent = currentUser.requestsSent.filter(id => id.toString() !== userIdToBlock);
-      currentUser.requestsReceived = currentUser.requestsReceived.filter(id => id.toString() !== userIdToBlock);
+      currentUser.matches = (currentUser.matches || []).filter(id => id.toString() !== userIdToBlock);
+      currentUser.requestsSent = (currentUser.requestsSent || []).filter(id => id.toString() !== userIdToBlock);
+      currentUser.requestsReceived = (currentUser.requestsReceived || []).filter(id => id.toString() !== userIdToBlock);
       
       await currentUser.save();
     }
@@ -215,7 +244,6 @@ router.delete('/posts/:postId', auth, async (req, res) => {
     const post = await Post.findById(req.params.postId);
     if (!post) return res.status(404).json({ message: 'Post not found' });
     
-    // Verify ownership
     if (post.author.toString() !== req.user.userId) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
@@ -234,8 +262,8 @@ router.get('/cleanup-empty-posts', auth, async (req, res) => {
     const result = await Post.deleteMany({
       author: req.user.userId,
       $and: [
-        { $or: [{ text: { $exists: false } }, { text: '' }, { text: null }] },
-        { $or: [{ mediaUrl: { $exists: false } }, { mediaUrl: null }, { mediaUrl: '' }] }
+        { $or: [{ text: {$exists: false } }, { text: '' }, { text: null }] },
+        { $or: [{ mediaUrl: {$exists: false } }, { mediaUrl: null }, { mediaUrl: '' }] }
       ]
     });
     res.json({ deleted: result.deletedCount, message: 'Empty posts removed' });
