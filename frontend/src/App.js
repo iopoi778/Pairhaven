@@ -383,9 +383,9 @@ function LoginPage() {
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1: Age verification prompt, 2: Details, 3: Profile picture
+  const [step, setStep] = useState(1); // 1: Age verification, 2: Details, 3: Profile pictures
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '', age: '', gender: '', bio: '' });
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [selectedPhotos, setSelectedPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const handleDetailsSubmit = (e) => {
@@ -405,23 +405,39 @@ function RegisterPage() {
       gender: data.get('gender'),
       bio: data.get('bio')
     });
-    setStep(3); // Move to picture step
+    setStep(3); // Move to multi-photo selection step
+  };
+
+  const handleFilesChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      // Append new files up to 6 max
+      setSelectedPhotos(prev => [...prev, ...files].slice(0, 6));
+    }
+  };
+
+  const handleRemovePhoto = (index) => {
+    setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleFinalRegistration = async () => {
-    if (!selectedPhoto) {
-      alert("Please upload at least one profile picture.");
+    // ✅ Ensure at least 2 photos match the backend requirement
+    if (selectedPhotos.length < 2) {
+      alert("Please upload at least 2 photos to continue.");
       return;
     }
+    
     setLoading(true);
     const payload = new FormData();
     
-    // ✅ FIX: Properly loop through the plain formData object keys
     Object.keys(formData).forEach(key => {
       payload.append(key, formData[key]);
     });
-    
-    payload.append('photos', selectedPhoto);
+
+    // ✅ Append each photo file individually using the 'photos' field name expected by multer
+    selectedPhotos.forEach(photo => {
+      payload.append('photos', photo);
+    });
 
     if (navigator.geolocation) {
       try {
@@ -499,7 +515,7 @@ function RegisterPage() {
               </select>
             </div>
             <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
-            <button type="submit" style={primaryButtonStyle}>Next: Add Picture</button>
+            <button type="submit" style={primaryButtonStyle}>Next: Add Pictures</button>
           </form>
           <p style={{ textAlign: 'center', marginTop: '1rem' }}>
             Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
@@ -507,27 +523,36 @@ function RegisterPage() {
         </div>
       )}
 
-      {/* STEP 3: DISPLAY FIRST PICTURE SELECTION */}
+      {/* STEP 3: MULTI-PHOTO SELECTION */}
       {step === 3 && (
         <div style={{ textAlign: 'center' }}>
-          <h2 style={{ color: '#5b72f2', marginBottom: '0.5rem' }}>Upload Profile Picture</h2>
-          <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Show your matches your best smile!</p>
+          <h2 style={{ color: '#5b72f2', marginBottom: '0.5rem' }}>Upload Profile Pictures</h2>
+          <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>Please upload at least **2 photos** to continue.</p>
           
-          <div style={{ width: '150px', height: '150px', borderRadius: '50%', background: '#f0f2f5', margin: '0 auto 1.5rem', overflow: 'hidden', border: '2px dashed #5b72f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {selectedPhoto ? (
-              <img src={URL.createObjectURL(selectedPhoto)} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <span style={{ color: '#888', fontSize: '0.9rem' }}>No Photo</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '1.5rem' }}>
+            {selectedPhotos.map((file, idx) => (
+              <div key={idx} style={{ aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', background: '#eee', position: 'relative' }}>
+                <img src={URL.createObjectURL(file)} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button 
+                  type="button"
+                  onClick={() => handleRemovePhoto(idx)} 
+                  style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            {selectedPhotos.length < 6 && (
+              <label style={{ aspectRatio: '1', borderRadius: '8px', border: '2px dashed #5b72f2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#5b72f2', background: '#f8fafc' }}>
+                <span style={{ fontSize: '1.5rem' }}>+</span>
+                <span style={{ fontSize: '0.75rem' }}>Add Photo</span>
+                <input type="file" multiple accept="image/*" onChange={handleFilesChange} style={{ display: 'none' }} />
+              </label>
             )}
           </div>
 
-          <label style={{ display: 'inline-block', background: '#f0f2f5', padding: '0.6rem 1.2rem', borderRadius: '20px', cursor: 'pointer', fontWeight: 600, color: '#5b72f2', marginBottom: '1.5rem' }}>
-            Choose Photo
-            <input type="file" accept="image/*" onChange={e => setSelectedPhoto(e.target.files[0])} style={{ display: 'none' }} />
-          </label>
-
-          <button onClick={handleFinalRegistration} disabled={loading || !selectedPhoto} style={{ ...primaryButtonStyle, opacity: (loading || !selectedPhoto) ? 0.6 : 1 }}>
-            {loading ? 'Finalizing...' : 'Complete Sign Up'}
+          <button onClick={handleFinalRegistration} disabled={loading || selectedPhotos.length < 2} style={{ ...primaryButtonStyle, opacity: (loading || selectedPhotos.length < 2) ? 0.6 : 1 }}>
+            {loading ? 'Finalizing...' : `Complete Sign Up (${selectedPhotos.length}/2+ photos)`}
           </button>
         </div>
       )}
