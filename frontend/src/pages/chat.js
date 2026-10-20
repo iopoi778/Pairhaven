@@ -173,7 +173,10 @@ function ChatScreen() {
 
   const getChannelName = () => {
     if (!myId || !selectedMatch?._id) return 'call_channel';
-    return [myId, selectedMatch._id].sort().join('_');
+    const id1 = myId.toString().toLowerCase();
+    const id2 = selectedMatch._id.toString().toLowerCase();
+    // Sorting guarantees User A calling User B uses the same string as User B calling User A
+    return [id1, id2].sort().join('_');
   };
 
   // ✅ INITIATE CALL & NOTIFY THE OTHER USER VIA SOCKET
@@ -369,68 +372,65 @@ function ChatScreen() {
   );
 }
 
-function CallModal({ appId, channelName, callType, onClose }) {
-  return (
-    <AgoraRTCProvider client={agoraClient}>
-      <div style={modalOverlayStyle}>
-        <div style={modalContentStyle}>
-          <h3>{callType === 'video' ? '📹 Video Call' : '📞 Voice Call'}</h3>
-          <CallRoom appId={appId} channelName={channelName} callType={callType} onClose={onClose} />
-        </div>
-      </div>
-    </AgoraRTCProvider>
-  );
-}
-
 function CallRoom({ appId, channelName, callType, onClose }) {
   const isVideo = callType === 'video';
-  
-  // Safely join channel using token if defined, else null
-  useJoin({ 
-    appid: appId, 
-    channel: channelName, 
-    token: AGORA_TEMP_TOKEN || null 
+
+  useJoin({
+    appid: appId,
+    channel: channelName,
+    token: AGORA_TEMP_TOKEN || null
   });
 
-  const { localMicrophoneTrack, isLoading: micLoading, error: micError } = useLocalMicrophoneTrack(true);
-  const { localCameraTrack, isLoading: camLoading, error: camError } = useLocalCameraTrack(isVideo);
+  const { localMicrophoneTrack } = useLocalMicrophoneTrack(true);
+  const { localCameraTrack } = useLocalCameraTrack(isVideo);
 
+  // Publish your own tracks
   usePublish([localMicrophoneTrack, localCameraTrack].filter(Boolean));
-  const remoteUsers = useRemoteUsers();
 
-  if (micError || camError) {
-    return (
-      <div style={{ padding: '1rem', color: '#e53e3e' }}>
-        <p>⚠️ Media Permission Error: Please allow camera and microphone access in your browser settings.</p>
-        <button onClick={onClose} style={endCallButtonStyle}>Close</button>
-      </div>
-    );
-  }
+  // Get all remote users in this channel
+  const remoteUsers = useRemoteUsers();
 
   return (
     <div style={{ textAlign: 'center' }}>
       {isVideo ? (
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          {/* Local User Preview */}
           <div style={videoBoxStyle}>
             <p style={labelStyle}>You</p>
-            {camLoading ? (
-              <div style={{ color: '#fff', paddingTop: '80px' }}>Loading Camera...</div>
-            ) : (
-              localCameraTrack && <LocalVideoTrack track={localCameraTrack} play style={{ width: '100%', height: '100%', borderRadius: '10px' }} />
+            {localCameraTrack && (
+              <LocalVideoTrack 
+                track={localCameraTrack} 
+                play 
+                style={{ width: '100%', height: '100%', borderRadius: '10px' }} 
+              />
             )}
           </div>
-          {remoteUsers.map(user => (
-            <div key={user.uid} style={videoBoxStyle}>
-              <p style={labelStyle}>Connected User</p>
-              <RemoteUser user={user} style={{ width: '100%', height: '100%', borderRadius: '10px' }} />
+
+          {/* Remote User Stream */}
+          {remoteUsers.length === 0 ? (
+            <div style={{ ...videoBoxStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa', fontSize: '0.85rem' }}>
+              Waiting for user to join...
             </div>
-          ))}
+          ) : (
+            remoteUsers.map(user => (
+              <div key={user.uid} style={videoBoxStyle}>
+                <p style={labelStyle}>Matched User</p>
+                <RemoteUser 
+                  user={user} 
+                  playVideo={isVideo} 
+                  playAudio={true} 
+                  style={{ width: '100%', height: '100%', borderRadius: '10px' }} 
+                />
+              </div>
+            ))
+          )}
         </div>
       ) : (
         <div style={{ padding: '2rem 0', fontSize: '1.2rem', color: '#5b72f2' }}>
-          {micLoading ? 'Connecting Microphone...' : '🎙️ Voice Call Active...'}
+          🎙️ Voice Call Active ({remoteUsers.length > 0 ? 'Connected' : 'Waiting for user...'})
         </div>
       )}
+
       <button onClick={onClose} style={endCallButtonStyle}>🛑 End Call</button>
     </div>
   );
