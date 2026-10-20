@@ -21,5 +21,19 @@ router.put('/:id/read', auth, async (req, res) => {
     res.json(note || { message: 'Not found' });
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
+// Backend endpoint to trigger incoming call alert
+router.post('/call/notify', auth, async (req, res) => {
+  const { targetUserId, callType, channelName } = req.body;
+
+  await Notification.create({
+    recipient: targetUserId,
+    sender: req.user.userId,
+    type: 'incoming_call',
+    message: `Incoming ${callType} call...`,
+    metadata: { channelName, callType }
+  });
+
+  res.json({ success: true });
+});
 
 module.exports = router;
