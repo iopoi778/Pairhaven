@@ -57,10 +57,33 @@ module.exports = function(io) {
       }
     });
 
+    // ✅ HANDLE START CALL SIGNAL
+    socket.on('start-call', (data) => {
+      // data: { recipientId, callerId, callerName, callType, channelName }
+      const receiverSocketId = userSockets.get(data.recipientId);
+      if (receiverSocketId) {
+        console.log(`📞 Call initiated to user ${data.recipientId} at socket ${receiverSocketId}`);
+        io.to(receiverSocketId).emit('incoming-call', data);
+      } else {
+        console.log(`❌ Call failed: User ${data.recipientId} is offline or not registered in socket map.`);
+      }
+    });
+
+    // ✅ HANDLE END CALL SIGNAL
+    socket.on('end-call', (data) => {
+      // data: { recipientId }
+      const receiverSocketId = userSockets.get(data.recipientId);
+      if (receiverSocketId) {
+        console.log(`🛑 Call ended for user ${data.recipientId}`);
+        io.to(receiverSocketId).emit('call-ended', data);
+      }
+    });
+
     socket.on('disconnect', () => {
       for (const [userId, socketId] of userSockets.entries()) {
         if (socketId === socket.id) {
           userSockets.delete(userId);
+          console.log(`User ${userId} disconnected from socket ${socket.id}`);
           break;
         }
       }
