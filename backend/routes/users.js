@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const Post = require('../models/Post');
+const Notification = require('../models/Notification'); // ✅ Import Notification model
 const auth = require('../middleware/auth');
 
 // GET USER PROFILE
@@ -59,7 +60,7 @@ router.post('/request/:userId', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-// ACCEPT REQUEST
+// ✅ ACCEPT REQUEST - WITH NOTIFICATION
 router.post('/accept-request/:userId', auth, async (req, res) => {
   try {
     const requester = await User.findById(req.params.userId);
@@ -71,6 +72,20 @@ router.post('/accept-request/:userId', auth, async (req, res) => {
     current.matches = [...(current.matches || []), req.params.userId];
     requester.matches = [...(requester.matches || []), req.user.userId];
     await current.save(); await requester.save();
+
+    // ✅ CREATE MATCH ACCEPTANCE NOTIFICATION
+    try {
+      await Notification.create({
+        recipient: req.params.userId, // The person who sent the request
+        sender: req.user.userId,      // The person who accepted
+        type: 'match_accepted',
+        message: `${current.name} accepted your match request! You can now chat.`,
+        read: false
+      });
+    } catch (notifErr) {
+      console.error('Failed to create match notification:', notifErr);
+    }
+
     res.json({ message: 'Match accepted' });
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
