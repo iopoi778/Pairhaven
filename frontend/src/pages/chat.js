@@ -15,7 +15,7 @@ import AgoraRTC, {
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 const AGORA_APP_ID = process.env.REACT_APP_AGORA_APP_ID || 'YOUR_AGORA_APP_ID';
-const AGORA_TEMP_TOKEN = process.env.REACT_APP_AGORA_TEMP_TOKEN; 
+const AGORA_TEMP_TOKEN = process.env.REACT_APP_AGORA_TEMP_TOKEN || null; 
 
 const agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
@@ -54,7 +54,6 @@ function ChatScreen() {
     socketRef.current.emit('join', myId); // Join user's personal room
 
     socketRef.current.on('incoming-call', (data) => {
-      // Triggered when someone calls this user
       setIncomingCall(data);
     });
 
@@ -182,7 +181,6 @@ function ChatScreen() {
     if (!selectedMatch) return;
     const channelName = getChannelName();
     
-    // Emit signal to receiver
     if (socketRef.current) {
       socketRef.current.emit('start-call', {
         recipientId: selectedMatch._id,
@@ -311,7 +309,12 @@ function ChatScreen() {
             <p style={{ margin: '1rem 0', color: '#555' }}><b>{incomingCall.callerName}</b> is calling you...</p>
             <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
               <button 
-                onClick={() => setIncomingCall(null)} 
+                onClick={() => {
+                  if (socketRef.current) {
+                    socketRef.current.emit('end-call', { recipientId: incomingCall.callerId });
+                  }
+                  setIncomingCall(null);
+                }} 
                 style={{ background: '#e53e3e', color: '#fff', border: 'none', padding: '0.7rem 1.5rem', borderRadius: '20px', cursor: 'pointer', fontWeight: 600 }}
               >
                 Decline
@@ -382,17 +385,27 @@ function CallModal({ appId, channelName, callType, onClose }) {
 function CallRoom({ appId, channelName, callType, onClose }) {
   const isVideo = callType === 'video';
   
+  // Safely join channel using token if defined, else null
   useJoin({ 
     appid: appId, 
     channel: channelName, 
-    token: AGORA_TEMP_TOKEN 
+    token: AGORA_TEMP_TOKEN || null 
   });
 
-  const { localMicrophoneTrack } = useLocalMicrophoneTrack(true);
-  const { localCameraTrack } = useLocalCameraTrack(isVideo);
+  const { localMicrophoneTrack, isLoading: micLoading, error: micError } = useLocalMicrophoneTrack(true);
+  const { localCameraTrack, isLoading: camLoading, error: camError } = useLocalCameraTrack(isVideo);
 
   usePublish([localMicrophoneTrack, localCameraTrack].filter(Boolean));
   const remoteUsers = useRemoteUsers();
+
+  if (micError || camError) {
+    return (
+      <div style={{ padding: '1rem', color: '#e53e3e' }}>
+        <p>⚠️ Media Permission Error: Please allow camera and microphone access in your browser settings.</p>
+        <button onClick={onClose} style={endCallButtonStyle}>Close</button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ textAlign: 'center' }}>
@@ -400,7 +413,11 @@ function CallRoom({ appId, channelName, callType, onClose }) {
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <div style={videoBoxStyle}>
             <p style={labelStyle}>You</p>
-            {localCameraTrack && <LocalVideoTrack track={localCameraTrack} play style={{ width: '100%', height: '100%', borderRadius: '10px' }} />}
+            {camLoading ? (
+              <div style={{ color: '#fff', paddingTop: '80px' }}>Loading Camera...</div>
+            ) : (
+              localCameraTrack && <LocalVideoTrack track={localCameraTrack} play style={{ width: '100%', height: '100%', borderRadius: '10px' }} />
+            )}
           </div>
           {remoteUsers.map(user => (
             <div key={user.uid} style={videoBoxStyle}>
@@ -411,7 +428,7 @@ function CallRoom({ appId, channelName, callType, onClose }) {
         </div>
       ) : (
         <div style={{ padding: '2rem 0', fontSize: '1.2rem', color: '#5b72f2' }}>
-          🎙️ Voice Call Active...
+          {micLoading ? 'Connecting Microphone...' : '🎙️ Voice Call Active...'}
         </div>
       )}
       <button onClick={onClose} style={endCallButtonStyle}>🛑 End Call</button>
