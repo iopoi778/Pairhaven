@@ -159,7 +159,6 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 });
-// Add these routes to your existing Express auth router
 
 // 🌐 Google Auth Route
 router.post('/google', async (req, res) => {
@@ -168,7 +167,6 @@ router.post('/google', async (req, res) => {
     
     let user = await User.findOne({ email });
     if (!user) {
-      // Create a new user if they don't exist
       user = new User({
         name,
         email,
@@ -233,4 +231,5 @@ router.post('/apple', async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 });
+
 module.exports = router;
