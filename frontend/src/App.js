@@ -15,15 +15,15 @@ if (initialToken) {
 }
 
 const ProtectedRoute = ({ children }) => {
-  const currentToken = localStorage.getItem('token');
-  return currentToken ? children : <Navigate to="/login" replace />;
+  const authToken = localStorage.getItem('token');
+  return authToken ? children : <Navigate to="/login" replace />;
 };
 
 function ProfileRouteWrapper({ onUpdateCounts }) {
   const navigate = useNavigate();
   
   // ✅ SAFE USER PARSING FUNCTION (Never crashes)
-  const getCurrentUser = () => {
+  const getStoredUser = () => {
     try {
       return JSON.parse(localStorage.getItem('user')) || {};
     } catch (e) { 
@@ -32,21 +32,21 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
     }
   };
   
-  const currentUserData = getCurrentUser();
+  const storedUserData = getStoredUser();
   const hashPath = window.location.hash.replace('#', '') || '/';
-  const parts = hashPath.split('/').filter(Boolean);
+  const pathParts = hashPath.split('/').filter(Boolean);
   
   useEffect(() => {
-    if (parts[0] === 'profile' && parts[1] && parts[1] !== currentUserData._id) {
+    if (pathParts[0] === 'profile' && pathParts[1] && pathParts[1] !== storedUserData._id) {
       if (onUpdateCounts) onUpdateCounts();
     }
-  }, [hashPath, currentUserData._id]); 
+  }, [hashPath, storedUserData._id]); 
 
-  if (parts[0] === 'profile' && !parts[1]) return <Navigate to="/" replace />;
-  if (parts[0] !== 'profile') return <Navigate to="/" replace />;
+  if (pathParts[0] === 'profile' && !pathParts[1]) return <Navigate to="/" replace />;
+  if (pathParts[0] !== 'profile') return <Navigate to="/" replace />;
 
-  const targetUserId = parts[1];
-  if (targetUserId === currentUserData._id) return <Navigate to="/" replace />;
+  const targetUserId = pathParts[1];
+  if (targetUserId === storedUserData._id) return <Navigate to="/" replace />;
 
   return (
     <DashboardLayout 
@@ -63,14 +63,14 @@ function App() {
   const [navCounts, setNavCounts] = useState({ chat: 0, alerts: 0 });
 
   const fetchNavCounts = async () => {
-    const currentToken = localStorage.getItem('token');
-    if (!currentToken) return;
+    const authToken = localStorage.getItem('token');
+    if (!authToken) return;
     
     try {
       let totalUnreadMsgs = 0;
       try {
         const msgRes = await axios.get(`${API_URL}/api/messages/conversations`, { 
-          headers: { Authorization: `Bearer ${currentToken}` } 
+          headers: { Authorization: `Bearer ${authToken}` } 
         });
         totalUnreadMsgs = (msgRes.data || []).reduce((sum, c) => {
           const count = c.unreadCount ?? (c.messages?.filter(m => !m.read).length ?? 0);
@@ -81,7 +81,7 @@ function App() {
       let unreadNotifs = 0;
       try {
         const notifRes = await axios.get(`${API_URL}/api/notifications`, { 
-          headers: { Authorization: `Bearer ${currentToken}` } 
+          headers: { Authorization: `Bearer ${authToken}` } 
         });
         unreadNotifs = (notifRes.data || []).filter(n => n.read === false).length;
       } catch (err) { /* Silent fail for counts */ }
@@ -199,14 +199,14 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
 
 function HomeFeed({ onNavigateToProfile }) {
   const [posts, setPosts] = useState([]);
-  const currentToken = localStorage.getItem('token');
+  const authToken = localStorage.getItem('token');
   
   useEffect(() => {
     const fetchPosts = async () => {
-      if (!currentToken) return;
+      if (!authToken) return;
       try {
         const res = await axios.get(`${API_URL}/api/posts`, { 
-          headers: { Authorization: `Bearer ${currentToken}` } 
+          headers: { Authorization: `Bearer ${authToken}` } 
         });
         
         const safePosts = (res.data || []).map(post => ({
@@ -224,13 +224,13 @@ function HomeFeed({ onNavigateToProfile }) {
       } catch (err) { console.warn('Failed to load feed posts', err); }
     };
     fetchPosts();
-  }, [currentToken]);
+  }, [authToken]);
 
   const handleReact = async (postId, type) => {
     try {
       const res = await axios.post(`${API_URL}/api/posts/${postId}/react`, 
         { type }, 
-        { headers: { Authorization: `Bearer ${currentToken}` } }
+        { headers: { Authorization: `Bearer ${authToken}` } }
       );
       
       setPosts(prev => prev.map(post => {
