@@ -28,7 +28,6 @@ function NotificationsScreen() {
   }, [token]);
 
   const handleNotificationClick = async (note) => {
-    // ✅ FIX: Use PUT instead of PATCH to avoid 404s
     try {
       await axios.put(`${API_URL}/api/notifications/${note._id}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
@@ -45,10 +44,13 @@ function NotificationsScreen() {
     if (note.type === 'message') {
       localStorage.setItem('activeTab', 'messages');
       window.location.hash = '/';
-    } else if (['like', 'match', 'follow', 'match_request', 'match_accepted'].includes(note.type)) {
-      const senderId = note.sender?._id || note.sender;
-      if (senderId) window.location.hash = `/profile/${senderId}`;
+    } else if (['like', 'match', 'follow', 'match_request', 'match_accepted', 'new-user'].includes(note.type)) {
+      const senderId = note.sender?._id || note.sender || note.metadata?.newUserId;
+      if (senderId) {
+        window.location.hash = `/profile/${senderId}`;
+      }
     }
+    // 'welcome' notifications keep the user right on the notifications screen or home feed
   };
 
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading alerts...</div>;
@@ -83,11 +85,13 @@ function NotificationsScreen() {
                 {!isRead && <span style={{width: 8, height: 8, background: '#5b72f2', borderRadius: '50%'}}></span>}
                 {note.type === 'like' && '❤️ New Like'}
                 {note.type === 'follow' && '👤 New Follower'}
-                {note.type === 'match' && ' It\'s a Match!'}
+                {note.type === 'match' && '💖 It\'s a Match!'}
                 {note.type === 'message' && '💬 New Message'}
                 {note.type === 'match_request' && '💌 Match Request'}
                 {note.type === 'match_accepted' && '💖 Match Accepted'}
-                {!['like','follow','match','message','match_request','match_accepted'].includes(note.type) && '🔔 Notification'}
+                {note.type === 'welcome' && '👋 Welcome to PairHaven'}
+                {note.type === 'new-user' && '🌟 New User Nearby'}
+                {!['like','follow','match','message','match_request','match_accepted','welcome','new-user'].includes(note.type) && '🔔 Notification'}
               </div>
               <div style={{ color: '#444' }}>{note.message}</div>
               <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
