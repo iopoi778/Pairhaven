@@ -415,7 +415,12 @@ function RegisterPage() {
     }
     setLoading(true);
     const payload = new FormData();
-    Object.keys(formData.forEach(key => payload.append(key, formData[key])));
+    
+    // ✅ FIX: Properly loop through the plain formData object keys
+    Object.keys(formData).forEach(key => {
+      payload.append(key, formData[key]);
+    });
+    
     payload.append('photos', selectedPhoto);
 
     if (navigator.geolocation) {
