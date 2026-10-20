@@ -505,7 +505,7 @@ function RegisterPage() {
       {/* STEP 1: 18+ AGE GATE PROMPT */}
       {step === 1 && (
         <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛡️</div>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚫</div>
           <h2 style={{ color: '#5b72f2', marginBottom: '0.8rem' }}>Are you 18 or older?</h2>
           <p style={{ color: '#666', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.4' }}>
             PairHaven is strictly for adults. By continuing you confirm you are at least 18 and agree to our Community Guidelines and Terms.
