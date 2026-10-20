@@ -8,7 +8,6 @@ import NotificationsScreen from './pages/NotificationsScreen';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
-// ✅ SAFE TOKEN INITIALIZATION (Only runs once at module load)
 const initialToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 if (initialToken) {
   axios.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
@@ -16,18 +15,23 @@ if (initialToken) {
 
 const ProtectedRoute = ({ children }) => {
   const authToken = localStorage.getItem('token');
-  return authToken ? children : <Navigate to="/login" replace />;
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  if (!authToken) return <Navigate to="/login" replace />;
+  // If user hasn't verified email/phone, redirect to verification screen
+  if (user && (user.isVerified === false)) {
+    return <Navigate to="/verify" replace />;
+  }
+  return children;
 };
 
 function ProfileRouteWrapper({ onUpdateCounts }) {
   const navigate = useNavigate();
   
-  // ✅ SAFE USER PARSING FUNCTION (Never crashes)
   const getStoredUser = () => {
     try {
       return JSON.parse(localStorage.getItem('user')) || {};
     } catch (e) { 
-      console.error("Failed to parse user", e);
       return {}; 
     }
   };
@@ -76,7 +80,7 @@ function App() {
           const count = c.unreadCount ?? (c.messages?.filter(m => !m.read).length ?? 0);
           return sum + (count || 0);
         }, 0);
-      } catch (err) { /* Silent fail for counts */ }
+      } catch (err) {}
 
       let unreadNotifs = 0;
       try {
@@ -84,10 +88,10 @@ function App() {
           headers: { Authorization: `Bearer ${authToken}` } 
         });
         unreadNotifs = (notifRes.data || []).filter(n => n.read === false).length;
-      } catch (err) { /* Silent fail for counts */ }
+      } catch (err) {}
 
       setNavCounts({ chat: totalUnreadMsgs, alerts: unreadNotifs });
-    } catch (err) { console.error("Nav counts failed:", err); }
+    } catch (err) {}
   };
 
   useEffect(() => {
@@ -102,6 +106,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify" element={<VerificationPage />} />
           <Route path="/profile/*" element={<ProtectedRoute><ProfileRouteWrapper onUpdateCounts={fetchNavCounts} /></ProtectedRoute>} />
           <Route path="/*" element={<ProtectedRoute><DashboardLayout navCounts={navCounts} onUpdateCounts={fetchNavCounts} /></ProtectedRoute>} />
         </Routes>
@@ -221,7 +226,7 @@ function HomeFeed({ onNavigateToProfile }) {
         }));
         
         setPosts(safePosts);
-      } catch (err) { console.warn('Failed to load feed posts', err); }
+      } catch (err) {}
     };
     fetchPosts();
   }, [authToken]);
@@ -246,7 +251,6 @@ function HomeFeed({ onNavigateToProfile }) {
         return post;
       }));
     } catch (err) {
-      console.error("Reaction failed", err);
       setPosts(prev => prev.map(post => {
         if (post._id === postId) {
           if (type === 'like') return { ...post, userLiked: !post.userLiked, likesCount: post.userLiked ? post.likesCount - 1 : post.likesCount + 1 };
@@ -268,7 +272,6 @@ function HomeFeed({ onNavigateToProfile }) {
   return (
     <div style={{ padding: '0.5rem 0 3rem' }}>
       <h2 style={{ margin: '0 0 1rem' }}>Your Feed</h2>
-      
       {posts.length === 0 ? (
         <div style={{ background: '#fff', borderRadius: '12px', padding: '1.2rem', textAlign: 'center', color: '#666' }}>No posts yet.</div>
       ) : (
@@ -279,7 +282,6 @@ function HomeFeed({ onNavigateToProfile }) {
 
           return (
             <div key={post._id} style={{ background: '#fff', borderRadius: '12px', marginTop: '1rem', padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-              
               <div onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
                 <img src={avatarSrc} alt={post.author?.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', background: '#eee' }} onError={(e) => { e.target.src = 'https://via.placeholder.com/36'; }} />
                 <div>
@@ -289,9 +291,7 @@ function HomeFeed({ onNavigateToProfile }) {
               </div>
 
               {post.text && post.text.trim() !== '' && (
-                <div style={{ marginBottom: hasMedia ? 8 : 0, lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
-                  {post.text}
-                </div>
+                <div style={{ marginBottom: hasMedia ? 8 : 0, lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>{post.text}</div>
               )}
 
               {hasMedia && (
@@ -339,9 +339,8 @@ function LoginPage() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-      navigate('/', { replace: true });
+      navigate(data.user.isVerified ? '/' : '/verify', { replace: true });
     } catch (err) { 
-      console.error(err); 
       alert('Server error.'); 
     } finally { 
       setLoading(false); 
@@ -349,16 +348,10 @@ function LoginPage() {
   };
 
   return (
-    <div style={{ 
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-      overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#000'
-    }}>
+    <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         <style>{`
-          @keyframes fadeSlide {
-            0% { opacity: 0; } 10% { opacity: 1; } 33% { opacity: 1; } 43% { opacity: 0; } 100% { opacity: 0; }
-          }
+          @keyframes fadeSlide { 0% { opacity: 0; } 10% { opacity: 1; } 33% { opacity: 1; } 43% { opacity: 0; } 100% { opacity: 0; } }
           .bg-slide { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; animation: fadeSlide 18s infinite; }
           .bg-1 { animation-delay: 0s; background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=1080&auto=format&fit=crop'); }
           .bg-2 { animation-delay: 6s; background-image: url('https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?q=80&w=1080&auto=format&fit=crop'); }
@@ -370,12 +363,7 @@ function LoginPage() {
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}></div>
       </div>
 
-      <div style={{ 
-        position: 'relative', zIndex: 1, width: '90%', maxWidth: 400, 
-        background: '#fff', padding: '2rem 1.5rem', borderRadius: '16px', 
-        boxShadow: '0 10px 40px rgba(0,0,0,0.3)', margin: '1rem',
-        maxHeight: '90vh', overflowY: 'auto'
-      }}>
+      <div style={{ position: 'relative', zIndex: 1, width: '90%', maxWidth: 400, background: '#fff', padding: '2rem 1.5rem', borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', margin: '1rem', maxHeight: '90vh', overflowY: 'auto' }}>
         <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '1.5rem', fontSize: '1.8rem' }}>Welcome Back</h2>
         <form onSubmit={handleSubmit}>
           <input name="email" type="email" placeholder="Email" required autoComplete="email" style={inputStyle} />
@@ -384,9 +372,7 @@ function LoginPage() {
             {loading ? 'Logging in...' : 'Log In'}
           </button>
         </form>
-
         <SocialAuthButtons />
-
         <p style={{ textAlign: 'center', marginTop: '1.5rem', color: '#666', fontSize: '0.95rem' }}>
           New here? <span onClick={() => navigate('/register')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}>Create Account</span>
         </p>
@@ -397,93 +383,207 @@ function LoginPage() {
 
 function RegisterPage() {
   const navigate = useNavigate();
+  const [step, setStep] = useState(1); // 1: Age verification prompt, 2: Details, 3: Profile picture
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '', age: '', gender: '', bio: '' });
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
-  
-  const handleSubmit = async (e) => {
+
+  const handleDetailsSubmit = (e) => {
     e.preventDefault();
+    const data = new FormData(e.target);
+    const age = Number(data.get('age'));
+    if (age < 18) {
+      alert("You must be 18 or older to register.");
+      return;
+    }
+    setFormData({
+      name: data.get('name'),
+      email: data.get('email'),
+      phone: data.get('phone'),
+      password: data.get('password'),
+      age,
+      gender: data.get('gender'),
+      bio: data.get('bio')
+    });
+    setStep(3); // Move to picture step
+  };
+
+  const handleFinalRegistration = async () => {
+    if (!selectedPhoto) {
+      alert("Please upload at least one profile picture.");
+      return;
+    }
     setLoading(true);
-    const formData = new FormData(e.target);
-    
-    try {
-      if (navigator.geolocation) {
-        try {
-          const pos = await new Promise((resolve, reject) => 
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 5000 })
-          );
-          formData.append('location', JSON.stringify({ type: 'Point', coordinates: [pos.coords.longitude, pos.coords.latitude] }));
-        } catch (geoErr) { 
-          formData.append('location', JSON.stringify({ type: 'Point', coordinates: [0, 0] })); 
-        }
-      }
-      
-      const res = await fetch(`${API_URL}/api/auth/register`, { method: 'POST', body: formData });
-      const data = await res.json();
-      
-      if (!res.ok) { 
-        alert(data.message || 'Registration failed'); 
-        return; 
-      }
-      
-      // Auto-login after successful registration
+    const payload = new FormData();
+    Object.keys(formData.forEach(key => payload.append(key, formData[key])));
+    payload.append('photos', selectedPhoto);
+
+    if (navigator.geolocation) {
       try {
-        const loginRes = await fetch(`${API_URL}/api/auth/login`, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ email: formData.get('email'), password: formData.get('password') }) 
-        });
-        const loginData = await loginRes.json();
-        
-        if (loginRes.ok) {
-          localStorage.setItem('token', loginData.token);
-          localStorage.setItem('user', JSON.stringify(loginData.user));
-          axios.defaults.headers.common['Authorization'] = `Bearer ${loginData.token}`;
-          navigate('/', { replace: true });
-          return;
-        }
-      } catch (err) {
-        console.error("Auto-login failed:", err);
+        const pos = await new Promise((resolve, reject) => 
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 5000 })
+        );
+        payload.append('location', JSON.stringify({ type: 'Point', coordinates: [pos.coords.longitude, pos.coords.latitude] }));
+      } catch (geoErr) {
+        payload.append('location', JSON.stringify({ type: 'Point', coordinates: [0, 0] }));
       }
-      
-      alert('Registered! Please log in.');
-      navigate('/login', { replace: true });
-      
-    } catch (err) { 
-      console.error("Registration error:", err);
-      alert('Server error.'); 
-    } finally { 
-      setLoading(false); 
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/register`, { method: 'POST', body: payload });
+      const data = await res.json();
+      if (!res.ok) { alert(data.message || 'Registration failed'); setLoading(false); return; }
+
+      // Auto login
+      const loginRes = await fetch(`${API_URL}/api/auth/login`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ email: formData.email, password: formData.password }) 
+      });
+      const loginData = await loginRes.json();
+      if (loginRes.ok) {
+        localStorage.setItem('token', loginData.token);
+        localStorage.setItem('user', JSON.stringify(loginData.user));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${loginData.token}`;
+        navigate('/verify', { replace: true });
+      } else {
+        navigate('/login', { replace: true });
+      }
+    } catch (err) {
+      alert('Server error during registration.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: 420, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
-      <h2 style={{ textAlign: 'center', color: '#5b72f2' }}>Join PairHaven</h2>
-      <form onSubmit={handleSubmit}>
-        <input name="name" placeholder="Full Name" required style={inputStyle} />
-        <input name="email" type="email" placeholder="Email" required style={inputStyle} />
-        <input name="phone" placeholder="Phone" required style={inputStyle} />
-        <input name="password" type="password" placeholder="Password" required style={inputStyle} />
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <input name="age" type="number" placeholder="Age" required style={{ ...inputStyle, flex: 1 }} />
-          <select name="gender" required style={{ ...inputStyle, flex: 1 }}>
-            <option value="">Gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-          </select>
+    <div style={{ maxWidth: 420, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)' }}>
+      {/* STEP 1: 18+ AGE GATE PROMPT */}
+      {step === 1 && (
+        <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛡️</div>
+          <h2 style={{ color: '#5b72f2', marginBottom: '0.8rem' }}>Are you 18 or older?</h2>
+          <p style={{ color: '#666', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.4' }}>
+            PairHaven is strictly for adults. By continuing you confirm you are at least 18 and agree to our Community Guidelines and Terms.
+          </p>
+          <button onClick={() => setStep(2)} style={{ ...primaryButtonStyle, background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', marginBottom: '1rem', padding: '1rem' }}>
+            I'm 18 or older
+          </button>
+          <button onClick={() => alert("You must be 18 or older to join.")} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '0.9rem' }}>
+            I'm under 18
+          </button>
         </div>
-        <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
-        <input name="photos" type="file" multiple accept="image/*" required style={{ marginBottom: '1rem', width: '100%' }} />
-        <button type="submit" style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }} disabled={loading}>
-          {loading ? 'Signing up...' : 'Sign Up'}
+      )}
+
+      {/* STEP 2: USER DETAILS */}
+      {step === 2 && (
+        <div>
+          <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '1.2rem' }}>Create Account</h2>
+          <form onSubmit={handleDetailsSubmit}>
+            <input name="name" placeholder="Full Name" required style={inputStyle} />
+            <input name="email" type="email" placeholder="Email" required style={inputStyle} />
+            <input name="phone" placeholder="Phone Number" required style={inputStyle} />
+            <input name="password" type="password" placeholder="Password" required style={inputStyle} />
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <input name="age" type="number" min="18" placeholder="Age" required style={{ ...inputStyle, flex: 1 }} />
+              <select name="gender" required style={{ ...inputStyle, flex: 1 }}>
+                <option value="">Gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
+            <button type="submit" style={primaryButtonStyle}>Next: Add Picture</button>
+          </form>
+          <p style={{ textAlign: 'center', marginTop: '1rem' }}>
+            Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
+          </p>
+        </div>
+      )}
+
+      {/* STEP 3: DISPLAY FIRST PICTURE SELECTION */}
+      {step === 3 && (
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ color: '#5b72f2', marginBottom: '0.5rem' }}>Upload Profile Picture</h2>
+          <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Show your matches your best smile!</p>
+          
+          <div style={{ width: '150px', height: '150px', borderRadius: '50%', background: '#f0f2f5', margin: '0 auto 1.5rem', overflow: 'hidden', border: '2px dashed #5b72f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {selectedPhoto ? (
+              <img src={URL.createObjectURL(selectedPhoto)} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span style={{ color: '#888', fontSize: '0.9rem' }}>No Photo</span>
+            )}
+          </div>
+
+          <label style={{ display: 'inline-block', background: '#f0f2f5', padding: '0.6rem 1.2rem', borderRadius: '20px', cursor: 'pointer', fontWeight: 600, color: '#5b72f2', marginBottom: '1.5rem' }}>
+            Choose Photo
+            <input type="file" accept="image/*" onChange={e => setSelectedPhoto(e.target.files[0])} style={{ display: 'none' }} />
+          </label>
+
+          <button onClick={handleFinalRegistration} disabled={loading || !selectedPhoto} style={{ ...primaryButtonStyle, opacity: (loading || !selectedPhoto) ? 0.6 : 1 }}>
+            {loading ? 'Finalizing...' : 'Complete Sign Up'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VerificationPage() {
+  const navigate = useNavigate();
+  const [emailCode, setEmailCode] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const token = localStorage.getItem('token');
+
+  const handleSendCodes = async () => {
+    try {
+      await axios.post(`${API_URL}/api/auth/send-verification`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      alert("Verification codes sent to your email and phone!");
+    } catch (err) {
+      alert("Failed to send codes. Try again.");
+    }
+  };
+
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/verify`, { emailCode, phoneCode }, { headers: { Authorization: `Bearer ${token}` } });
+      
+      // Update local storage user state to verified
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      user.isVerified = true;
+      localStorage.setItem('user', JSON.stringify(user));
+
+      alert("Verification successful!");
+      navigate('/', { replace: true });
+    } catch (err) {
+      alert(err.response?.data?.message || "Invalid verification codes.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: 400, margin: '4rem auto', background: '#fff', padding: '2rem', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)' }}>
+      <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '0.5rem' }}>Verify Your Account</h2>
+      <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+        Please enter the verification codes sent to your email and phone number to unlock chatting and matching.
+      </p>
+
+      <button onClick={handleSendCodes} style={{ background: 'none', border: 'none', color: '#5b72f2', cursor: 'pointer', fontWeight: 600, display: 'block', margin: '0 auto 1rem', fontSize: '0.9rem' }}>
+        🔄 Resend Codes
+      </button>
+
+      <form onSubmit={handleVerify}>
+        <input type="text" placeholder="Enter Email Code" required value={emailCode} onChange={e => setEmailCode(e.target.value)} style={inputStyle} />
+        <input type="text" placeholder="Enter Phone Code" required value={phoneCode} onChange={e => setPhoneCode(e.target.value)} style={inputStyle} />
+        <button type="submit" disabled={loading} style={{ ...primaryButtonStyle, opacity: loading ? 0.7 : 1 }}>
+          {loading ? 'Verifying...' : 'Verify & Proceed'}
         </button>
       </form>
-
-      <SocialAuthButtons />
-
-      <p style={{ textAlign: 'center', marginTop: '1rem' }}>
-        Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
-      </p>
     </div>
   );
 }
@@ -493,7 +593,6 @@ function SocialAuthButtons() {
 
   const handleGoogleLogin = async () => {
     try {
-      // Simulate Google Login with SAFE DEFAULTS for Schema Validation
       const email = prompt("Enter demo email (e.g., test@gmail.com):");
       if (!email) return;
       
@@ -502,7 +601,6 @@ function SocialAuthButtons() {
         name: "Google User",
         googleId: "google_" + Date.now(),
         photo: "https://via.placeholder.com/150",
-        // ✅ CRITICAL FIX: Add required schema fields
         age: 25,
         gender: "other",
         phone: "google_demo_" + Date.now()
@@ -515,24 +613,19 @@ function SocialAuthButtons() {
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        alert(data.message || 'Google login failed');
-        return;
-      }
+      if (!res.ok) { alert(data.message || 'Google login failed'); return; }
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-      navigate('/', { replace: true });
+      navigate(data.user.isVerified ? '/' : '/verify', { replace: true });
     } catch (err) {
-      console.error("Google sign-in error", err);
       alert("Google login error.");
     }
   };
 
   const handleAppleLogin = async () => {
     try {
-      // Simulate Apple Login with SAFE DEFAULTS
       const email = prompt("Enter demo email (e.g., test@icloud.com):");
       if (!email) return;
 
@@ -540,7 +633,6 @@ function SocialAuthButtons() {
         email,
         name: "Apple User",
         appleId: "apple_" + Date.now(),
-        // ✅ CRITICAL FIX: Add required schema fields
         age: 25,
         gender: "other",
         phone: "apple_demo_" + Date.now()
@@ -553,17 +645,13 @@ function SocialAuthButtons() {
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        alert(data.message || 'Apple login failed');
-        return;
-      }
+      if (!res.ok) { alert(data.message || 'Apple login failed'); return; }
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-      navigate('/', { replace: true });
+      navigate(data.user.isVerified ? '/' : '/verify', { replace: true });
     } catch (err) {
-      console.error("Apple sign-in error", err);
       alert("Apple login error.");
     }
   };
@@ -576,49 +664,17 @@ function SocialAuthButtons() {
         <div style={{ flex: 1, borderBottom: '1px solid #dfe3ea' }}></div>
       </div>
 
-      {/* GOOGLE BUTTON */}
-      <button 
-        type="button" 
-        onClick={handleGoogleLogin} 
-        style={{ ...socialButtonStyle, background: '#fff', color: '#444', border: '1px solid #dfe3ea', marginBottom: '0.8rem' }}
-      >
-        <svg width="18" height="18" viewBox="0 0 48 48" style={{ marginRight: '10px' }}>
-          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-        </svg>
+      <button type="button" onClick={handleGoogleLogin} style={{ ...socialButtonStyle, background: '#fff', color: '#444', border: '1px solid #dfe3ea', marginBottom: '0.8rem' }}>
         Continue with Google
       </button>
-
-      {/* APPLE BUTTON */}
-      <button 
-        type="button" 
-        onClick={handleAppleLogin} 
-        style={{ ...socialButtonStyle, background: '#000', color: '#fff' }}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: '10px' }}>
-          <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-        </svg>
+      <button type="button" onClick={handleAppleLogin} style={{ ...socialButtonStyle, background: '#000', color: '#fff' }}>
         Continue with Apple
       </button>
     </div>
   );
 }
 
-const socialButtonStyle = {
-  width: '100%',
-  padding: '0.8rem',
-  borderRadius: '8px',
-  fontWeight: 600,
-  fontSize: '0.95rem',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  boxSizing: 'border-box'
-};
-
+const socialButtonStyle = { width: '100%', padding: '0.8rem', borderRadius: '8px', fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' };
 const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '0.8rem', borderRadius: '8px', border: '1px solid #dfe3ea', marginBottom: '1rem', fontSize: '1rem' };
 const primaryButtonStyle = { width: '100%', padding: '0.9rem', border: 'none', borderRadius: '8px', background: '#5b72f2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
 
