@@ -14,6 +14,7 @@ import AgoraRTC, {
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 const AGORA_APP_ID = process.env.REACT_APP_AGORA_APP_ID || 'YOUR_AGORA_APP_ID';
+const AGORA_TEMP_TOKEN = process.env.REACT_APP_AGORA_TEMP_TOKEN; 
 
 const agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
