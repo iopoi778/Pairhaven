@@ -30,9 +30,9 @@ router.post('/send', auth, async (req, res) => {
 
     await message.save();
 
-    // Populate sender info for immediate UI update
+    // Populate sender info for immediate UI update (including verificationStatus)
     const populatedMessage = await Message.findById(message._id)
-      .populate('sender', 'name photos');
+      .populate('sender', 'name photos verificationStatus');
 
     res.status(201).json(populatedMessage);
   } catch (error) {
@@ -50,7 +50,7 @@ router.get('/conversation/:userId', auth, async (req, res) => {
         { sender: req.params.userId, receiver: req.user.userId }
       ]
     })
-    .populate('sender', 'name photos') // ✅ THIS LINE IS CRITICAL - ADD IT
+    .populate('sender', 'name photos verificationStatus') // ✅ Includes verificationStatus
     .sort({ createdAt: 1 });
 
     // Mark messages as read
@@ -68,26 +68,12 @@ router.get('/conversation/:userId', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// GET /api/messages/conversations
-router.get('/conversations', auth, async (req, res) => {
-  try {
-    const myId = req.user.userId;
-    // ...
-    // Make sure when populating the conversation user details you include verificationStatus:
-    const populatedConvs = await User.populate(conversations, {
-      path: 'user',
-      select: 'name photos verificationStatus age' // ✅ Added verificationStatus
-    });
-    res.json(populatedConvs);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
+
 // GET ALL CONVERSATIONS (for Messages tab) - OPTIMIZED
 router.get('/conversations', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.userId)
-      .populate('matches', 'name photos age lastSeen');
+      .populate('matches', 'name photos age lastSeen verificationStatus'); // ✅ Includes verificationStatus
 
     // Handle case where user has no matches yet
     const matches = currentUser.matches || [];
