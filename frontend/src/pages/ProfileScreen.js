@@ -94,9 +94,10 @@ function ProfileScreen({ userId }) {
         });
         alert(res.data.message);
         // Refresh profile data to update remaining coins
-        const profileRes = await axios.get(`${API_URL}/api/users/profile/me`, {
+        const profileRes = await axios.get(`${API_URL}/api/users/profile/me/photo`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        
         setUser(profileRes.data);
       } catch (e) {
         alert("Failed to claim ad reward.");
