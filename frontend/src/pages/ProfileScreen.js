@@ -487,25 +487,42 @@ function ProfileScreen({ userId }) {
         </div>
 
         {/* LIVE CAMERA VERIFICATION BUTTON */}
-        {isOwnProfile && (
-          <button 
-            onClick={() => setShowSelfieModal(true)}
-            style={{ 
-              background: user.verificationStatus === 'verified' ? '#dbeafe' : '#5b72f2', 
-              color: user.verificationStatus === 'verified' ? '#1d4ed8' : '#fff', 
-              border: 'none', 
-              borderRadius: '20px', 
-              padding: '0.6rem 1.2rem', 
-              cursor: 'pointer', 
-              fontSize: '0.85rem', 
-              fontWeight: 700, 
-              display: 'block', 
-              margin: '0.5rem auto 0' 
-            }}
-          >
-            {user.verificationStatus === 'verified' ? '🟦★ Verified Account' : '📸 Verify Account (Live Selfie)'}
-          </button>
-        )}
+{isOwnProfile && (
+  <button 
+    onClick={() => {
+      if (user.verificationStatus !== 'pending' && user.verificationStatus !== 'verified') {
+        setShowSelfieModal(true);
+      }
+    }}
+    disabled={user.verificationStatus === 'pending' || user.verificationStatus === 'verified'}
+    style={{ 
+      background: user.verificationStatus === 'verified' 
+        ? '#dbeafe' 
+        : user.verificationStatus === 'pending' 
+        ? '#f1f5f9' // 🎨 Gray background when pending
+        : '#5b72f2', 
+      color: user.verificationStatus === 'verified' 
+        ? '#1d4ed8' 
+        : user.verificationStatus === 'pending' 
+        ? '#64748b' // 🎨 Gray text when pending
+        : '#fff', 
+      border: 'none', 
+      borderRadius: '20px', 
+      padding: '0.6rem 1.2rem', 
+      cursor: user.verificationStatus === 'pending' ? 'default' : 'pointer', 
+      fontSize: '0.85rem', 
+      fontWeight: 700, 
+      display: 'block', 
+      margin: '0.5rem auto 0' 
+    }}
+  >
+    {user.verificationStatus === 'verified' 
+      ? '🟦★ Verified Account' 
+      : user.verificationStatus === 'pending' 
+      ? '⏳ Pending Admin Review' // ⏳ Text changes when pending
+      : '📸 Verify Account (Live Selfie)'}
+  </button>
+)}
 
         {/* MATCH ACTION BUTTONS */}
         {!isOwnProfile && (
