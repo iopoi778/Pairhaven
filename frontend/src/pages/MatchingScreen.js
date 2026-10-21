@@ -350,7 +350,7 @@ function MatchingScreen() {
                       <div>
                         <div style={{ fontSize: '1.7rem', fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {currentUser.name}
-                          {currentUser.verificationStatus === 'verified' && <VerifiedBadge />}
+                          <VerifiedBadge status={currentUser.verificationStatus} />
                           <span style={{ fontWeight: 400, opacity: 0.9 }}>{currentUser.age || ''}</span>
                         </div>
                         <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -448,7 +448,7 @@ function MatchingScreen() {
                       <img src={user.photos?.[0]?.url || user.photos?.[0] || 'https://via.placeholder.com/200'} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', padding: '1rem 0.8rem 0.5rem', color: '#fff' }}>
                         <div style={{ fontWeight: 700, fontSize: '0.95rem', textShadow: '0 1px 2px rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                          {user.name} {user.verificationStatus === 'verified' && <VerifiedBadge />}
+                          {user.name} <VerifiedBadge status={user.verificationStatus} />
                         </div>
                         <div style={{ fontSize: '0.7rem', opacity: 0.9, marginTop: '2px' }}>📍 {renderLocation(user.location)}</div>
                       </div>
