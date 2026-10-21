@@ -185,7 +185,7 @@ function AdminScreen() {
         u._id === userId ? { ...u, verificationStatus: newStatus } : u
       ));
 
-      alert(`User is now ${newStatus === 'verified' ? '🟦★ VERIFIED' : 'UNVERIFIED'}`);
+      alert(`User is now ${newStatus === 'verified' ? '★ VERIFIED' : 'UNVERIFIED'}`);
     } catch (err) {
       alert("Failed to update verification status");
     } finally {
@@ -360,7 +360,7 @@ function AdminScreen() {
                       disabled={isLoading}
                       style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer' }}
                     >
-                      {isLoading ? '...' : '✅ Grant 🟦★ Blue Badge'}
+                      {isLoading ? '...' : '✅ Grant ★ Blue Badge'}
                     </button>
                     <button 
                       onClick={() => handleVerifyDecision(u._id, 'not_verified')}
