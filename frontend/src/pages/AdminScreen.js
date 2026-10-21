@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import io from 'socket.io-client';
 import VerifiedBadge from '../components/VerifiedBadge';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
