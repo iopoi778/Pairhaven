@@ -1,3 +1,10 @@
+const User = require('./models/User');
+const Message = require('./models/Message');
+const Notification = require('./models/Notification');
+
+// Map to track online users: userId -> socketId
+const userSockets = new Map();
+
 module.exports = function(io) {
   io.on('connection', (socket) => {
     console.log('⚡ Socket client connected:', socket.id);
@@ -6,21 +13,13 @@ module.exports = function(io) {
     socket.on('join', (userId) => {
       if (userId) {
         socket.join(userId.toString());
-        console.log(`✅ User ${userId} joined socket room`);
+        userSockets.set(userId.toString(), socket.id);
+        console.log(`✅ User ${userId} joined socket room & mapped to socket ${socket.id}`);
       }
     });
 
-    socket.on('disconnect', () => {
-      console.log('🔌 Client disconnected:', socket.id);
-    });
-  });
-};    
-    
     socket.on('sendMessage', async (data) => {
       try {
-        const Message = require('./models/Message');
-        const Notification = require('./models/Notification');
-
         const msg = await Message.create({
           sender: data.senderId,
           receiver: data.receiverId,
@@ -42,6 +41,8 @@ module.exports = function(io) {
             senderId: data.senderId,
             receiverId: data.receiverId
           });
+          // Also trigger the real-time pop-up notification event
+          io.to(receiverSocketId).emit('receive-message', msg);
         }
 
         socket.emit('messageSent', {
