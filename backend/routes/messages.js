@@ -92,7 +92,7 @@ router.get('/conversation/:userId', auth, async (req, res) => {
   }
 });
 
-// GET ALL CONVERSATIONS
+// GET ALL CONVERSATIONS (Supports Admin inbox aggregation)
 router.get('/conversations', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.userId);
@@ -102,17 +102,16 @@ router.get('/conversations', auth, async (req, res) => {
     let targetUserIds = [];
 
     if (isAdmin) {
-      // 🛡️ Admin Mode: Find ALL unique user IDs who have exchanged messages with Admin
-      const adminMessages = await Message.find({
+      // 🛡️ Admin Mode: Find all unique user IDs that have message history with the admin
+      const allMessages = await Message.find({
         $or: [{ sender: currentUser._id }, { receiver: currentUser._id }]
       }).select('sender receiver');
 
       const idsSet = new Set();
-      adminMessages.forEach(msg => {
+      allMessages.forEach(msg => {
         if (msg.sender.toString() !== currentUser._id.toString()) idsSet.add(msg.sender.toString());
         if (msg.receiver.toString() !== currentUser._id.toString()) idsSet.add(msg.receiver.toString());
       });
-
       targetUserIds = Array.from(idsSet);
     } else {
       // 👤 Standard User Mode: Get matched users
@@ -147,7 +146,7 @@ router.get('/conversations', auth, async (req, res) => {
       });
     }
 
-    // Sort by recent activity
+    // Sort conversations by latest message timestamp
     conversations.sort((a, b) => {
       const dateA = a.lastMessage?.createdAt || new Date(0);
       const dateB = b.lastMessage?.createdAt || new Date(0);
