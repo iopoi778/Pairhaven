@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import VerifiedBadge from '../components/VerifiedBadge'; // ✅ Import your badge component
+import VerifiedBadge from '../components/VerifiedBadge';
+import SelfieVerificationModal from '../components/SelfieVerificationModal'; // ✅ Import live camera verification modal
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -18,6 +19,7 @@ function ProfileScreen({ userId }) {
   const [showPostModal, setShowPostModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showSelfieModal, setShowSelfieModal] = useState(false); // ✅ Live camera modal state
   
   // Post Creation State
   const [newPostText, setNewPostText] = useState('');
@@ -33,26 +35,27 @@ function ProfileScreen({ userId }) {
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const isOwnProfile = userId === currentUser._id || !userId;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const profileRes = await axios.get(`${API_URL}/api/users/profile/${userId || 'me'}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setUser(profileRes.data);
-        setBioText(profileRes.data.bio || '');
+  const fetchProfileData = async () => {
+    try {
+      const profileRes = await axios.get(`${API_URL}/api/users/profile/${userId || 'me'}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(profileRes.data);
+      setBioText(profileRes.data.bio || '');
 
-        const postsRes = await axios.get(`${API_URL}/api/users/profile/${profileRes.data._id}/posts`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setPosts(postsRes.data);
-      } catch (err) {
-        console.error("Failed to load profile", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (token) fetchData();
+      const postsRes = await axios.get(`${API_URL}/api/users/profile/${profileRes.data._id}/posts`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPosts(postsRes.data);
+    } catch (err) {
+      console.error("Failed to load profile", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchProfileData();
   }, [userId, token]);
 
   const renderLocation = (loc) => {
@@ -92,10 +95,7 @@ function ProfileScreen({ userId }) {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         alert(res.data.message);
-        const profileRes = await axios.get(`${API_URL}/api/users/profile/me/photo`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setUser(profileRes.data);
+        fetchProfileData();
       } catch (e) {
         alert("Failed to claim ad reward.");
       }
@@ -472,11 +472,7 @@ function ProfileScreen({ userId }) {
         {/* 🟦★ Verified Badge Next to Name */}
         <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {user.name}
-          {user.verificationStatus === 'verified' && (
-            <span title="Verified User" style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              🟦★ Verified
-            </span>
-          )}
+          <VerifiedBadge status={user.verificationStatus} size="1.2rem" />
         </h2>
         
         <p style={{ margin: '0 0 0.6rem', color: '#666', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
@@ -489,23 +485,28 @@ function ProfileScreen({ userId }) {
         <div style={{ margin: '0.2rem 0 1rem', display: 'inline-block', padding: '4px 14px', borderRadius: '12px', background: user.membershipTier === 'unlimited' ? 'linear-gradient(135deg, #ff4b4b, #dc2626)' : user.membershipTier === 'pro' ? '#5b72f2' : '#e2e8f0', color: user.membershipTier ? '#fff' : '#475569', fontSize: '0.8rem', fontWeight: 700 }}>
           {user.membershipTier === 'unlimited' ? '👑 Unlimited Plan' : user.membershipTier === 'pro' ? '⭐ Pro Plan' : 'Standard Member'}
         </div>
-         {isOwnProfile && (
-  <button 
-    onClick={async () => {
-      try {
-        const res = await axios.post(`${API_URL}/api/users/request-verification`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        alert(res.data.message || "Verification request submitted!");
-      } catch (err) {
-        alert(err.response?.data?.message || "Failed to submit verification request");
-      }
-    }}
-    style={{ background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: '20px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, display: 'block', margin: '0.5rem auto 0' }}
-  >
-    {user.verificationStatus === 'verified' ? '🟦★ Verified Account' : '✨ Verify Account'}
-  </button>
-)}
+
+        {/* LIVE CAMERA VERIFICATION BUTTON */}
+        {isOwnProfile && (
+          <button 
+            onClick={() => setShowSelfieModal(true)}
+            style={{ 
+              background: user.verificationStatus === 'verified' ? '#dbeafe' : '#5b72f2', 
+              color: user.verificationStatus === 'verified' ? '#1d4ed8' : '#fff', 
+              border: 'none', 
+              borderRadius: '20px', 
+              padding: '0.6rem 1.2rem', 
+              cursor: 'pointer', 
+              fontSize: '0.85rem', 
+              fontWeight: 700, 
+              display: 'block', 
+              margin: '0.5rem auto 0' 
+            }}
+          >
+            {user.verificationStatus === 'verified' ? '🟦★ Verified Account' : '📸 Verify Account (Live Selfie)'}
+          </button>
+        )}
+
         {/* MATCH ACTION BUTTONS */}
         {!isOwnProfile && (
           <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -538,22 +539,17 @@ function ProfileScreen({ userId }) {
           </button>
         )}
       </div>
-<button 
-  onClick={() => setShowSelfieModal(true)} // ✅ Opens the live camera modal first!
-  style={{ background: '#5b72f2', color: '#fff', border: 'none', padding: '0.6rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}
->
-  📸 Verify Account
-</button>
 
-{/* Render the Selfie Verification Modal when showSelfieModal is true */}
-{showSelfieModal && (
-  <SelfieVerificationModal 
-    onClose={() => setShowSelfieModal(false)} 
-    onSuccess={() => {
-      fetchUserProfile(); // Refresh profile after submission
-    }} 
-  />
-)}
+      {/* SELFIE VERIFICATION MODAL */}
+      {showSelfieModal && (
+        <SelfieVerificationModal 
+          onClose={() => setShowSelfieModal(false)} 
+          onSuccess={() => {
+            fetchProfileData(); 
+          }} 
+        />
+      )}
+
       {/* MEMBERSHIP & COINS MANAGEMENT SECTION */}
       {isOwnProfile && (
         <div style={{ background: user.isVip ? 'linear-gradient(135deg, #f6d365, #fda085)' : '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem', textAlign: 'center' }}>
