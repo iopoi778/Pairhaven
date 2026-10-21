@@ -7,7 +7,7 @@ router.get('/', auth, async (req, res) => {
   try {
     const notifs = await Notification.find({ recipient: req.user.userId })
       .sort({ createdAt: -1 }).limit(100)
-      .populate('sender', 'name photos');
+      .populate('sender', 'name photos verificationStatus');
     res.json(notifs);
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
