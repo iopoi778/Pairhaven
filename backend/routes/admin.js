@@ -61,18 +61,30 @@ router.post('/verify-selfie', auth, async (req, res) => {
   }
 });
 
-// 2. Admin approves or revokes Blue Badge
-router.patch('/admin/users/:id/verify', auth, adminAuth, async (req, res) => {
+// PATCH /api/admin/users/:id/tier - Update user membership tier
+router.patch('/users/:id/tier', auth, adminAuth, async (req, res) => {
   try {
-    const { status } = req.body; // 'verified' or 'not_verified'
-    const targetUser = await User.findById(req.params.id);
-    if (!targetUser) return res.status(404).json({ message: 'User not found' });
+    const { tier } = req.body;
+    if (!['standard', 'pro', 'unlimited'].includes(tier)) {
+      return res.status(400).json({ message: 'Invalid membership tier' });
+    }
 
-    targetUser.verificationStatus = status;
-    await targetUser.save();
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { 
+        membershipTier: tier,
+        isVip: tier !== 'standard' 
+      },
+      { new: true }
+    ).select('-password');
 
-    res.json({ message: `User verification updated to ${status}` });
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'Tier updated successfully', user: updatedUser });
   } catch (err) {
+    console.error('Update tier error:', err);
     res.status(500).json({ message: err.message });
   }
 });
