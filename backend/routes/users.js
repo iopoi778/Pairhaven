@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const User = require('../models/User');
 const Post = require('../models/Post');
 const Notification = require('../models/Notification'); // ✅ Import Notification model
@@ -49,7 +50,6 @@ router.get('/potential-matches', auth, async (req, res) => {
     }
 
     if (location && location.trim() !== '') {
-      // Matches location string or location object address field loosely
       query.$or = [
         { location: { $regex: location,$options: 'i' } },
         { 'location.address': { $regex: location,$options: 'i' } }
@@ -69,6 +69,8 @@ router.get('/potential-matches', auth, async (req, res) => {
     res.json(enriched);
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
+
+// LEGACY UPGRADE ROUTE (Manual / Direct Card & Bank)
 router.post('/upgrade', auth, async (req, res) => {
   try {
     const { plan, paymentMethod, cardDetails } = req.body;
@@ -81,28 +83,69 @@ router.post('/upgrade', auth, async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (paymentMethod === 'card') {
-      // Basic card field validation
       if (!cardDetails || !cardDetails.number || !cardDetails.expiry || !cardDetails.cvc) {
         return res.status(400).json({ message: 'Please provide valid card details.' });
       }
-      // Instant upgrade for card payment
       user.isVip = true;
       user.membershipTier = plan;
       await user.save();
       return res.status(200).json({ message: `Successfully upgraded to ${plan.toUpperCase()} plan!` });
     } else if (paymentMethod === 'bank') {
-      // Mark as upgraded or pending transfer confirmation
       user.isVip = true;
       user.membershipTier = plan;
       await user.save();
       return res.status(200).json({ message: 'Bank transfer request registered. Upgrade applied!' });
     } else {
-      return res.status(400).json({ message: 'Invalid payment method.' });
+      user.isVip = true;
+      user.membershipTier = plan;
+      await user.save();
+      return res.status(200).json({ message: `Successfully upgraded to ${plan.toUpperCase()} plan!` });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
+
+// ✅ FLUTTERWAVE PAYMENT VERIFICATION ROUTE (Supports All African Payment Methods)
+router.post('/verify-flutterwave', auth, async (req, res) => {
+  try {
+    const { transactionId, plan } = req.body;
+
+    if (!['pro', 'unlimited'].includes(plan)) {
+      return res.status(400).json({ message: 'Invalid subscription plan.' });
+    }
+
+    // Verify transaction with Flutterwave API
+    const response = await axios.get(`https://api.flutterwave.com/v3/transactions/${transactionId}/verify`, {
+      headers: {
+        Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`
+      }
+    });
+
+    const data = response.data;
+
+    if (data.status === 'success' && data.data.status === 'successful') {
+      const user = await User.findById(req.user.userId);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+
+      // Apply VIP status & set membership tier ('pro' or 'unlimited')
+      user.isVip = true;
+      user.membershipTier = plan;
+      await user.save();
+
+      return res.status(200).json({ 
+        message: `Payment verified! Successfully upgraded to ${plan.toUpperCase()} plan 🎉` 
+      });
+    } else {
+      return res.status(400).json({ message: 'Transaction verification failed or incomplete.' });
+    }
+  } catch (error) {
+    console.error('Flutterwave verification error:', error.response?.data || error.message);
+    res.status(500).json({ message: 'Server error verifying payment.' });
+  }
+});
+
+// SEND REQUEST WITH DAILY MATCH LIMIT ENFORCEMENT
 router.post('/request/:userId', auth, async (req, res) => {
   try {
     const current = await User.findById(req.user.userId);
@@ -118,18 +161,21 @@ router.post('/request/:userId', auth, async (req, res) => {
       current.lastMatchResetDate = new Date();
     }
 
-    // Limit check: Non-VIP users are capped at 20 matches per day
-    const DAILY_LIMIT = 20;
-    if (!current.isVip && current.matchesSentToday >= DAILY_LIMIT) {
+    // Limit check: Non-VIP users capped at 20, Pro capped at 50, Unlimited has no cap
+    if (!current.isVip && current.matchesSentToday >= 20) {
       return res.status(403).json({ 
-        message: 'Daily match limit reached (20/20). Upgrade to VIP for unlimited matches or watch an ad to get 3 free matches!' 
+        message: 'Daily match limit reached (20/20). Upgrade to Pro/Unlimited or watch an ad for 3 free matches!' 
+      });
+    }
+    if (current.membershipTier === 'pro' && current.matchesSentToday >= 50) {
+      return res.status(403).json({ 
+        message: 'Daily match limit reached (50/50). Upgrade to the Unlimited plan for unrestricted matching!' 
       });
     }
 
     if ((current.matches || []).includes(req.params.userId)) return res.status(400).json({ message: 'Already matched' });
     if ((current.requestsSent || []).includes(req.params.userId)) return res.status(400).json({ message: 'Request already sent' });
 
-    // Increment count and save
     current.matchesSentToday += 1;
     current.requestsSent = [...(current.requestsSent || []), req.params.userId];
     target.requestsReceived = [...(target.requestsReceived || []), req.user.userId];
@@ -142,27 +188,13 @@ router.post('/request/:userId', auth, async (req, res) => {
     res.status(500).json({ message: error.message }); 
   }
 });
-// SEND REQUEST
-router.post('/request/:userId', auth, async (req, res) => {
-  try {
-    const target = await User.findById(req.params.userId);
-    const current = await User.findById(req.user.userId);
-    if (!target || !current) return res.status(404).json({ message: 'User not found' });
-    if ((current.matches || []).includes(req.params.userId)) return res.status(400).json({ message: 'Already matched' });
-    if ((current.requestsSent || []).includes(req.params.userId)) return res.status(400).json({ message: 'Request already sent' });
 
-    current.requestsSent = [...(current.requestsSent || []), req.params.userId];
-    target.requestsReceived = [...(target.requestsReceived || []), req.user.userId];
-    await current.save(); await target.save();
-    res.json({ message: 'Request sent' });
-  } catch (error) { res.status(500).json({ message: error.message }); }
-});
+// REWARD AD MATCHES
 router.post('/reward-ad-matches', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Grant 3 extra matches by subtracting 3 from today's count (minimum 0)
     user.matchesSentToday = Math.max(0, user.matchesSentToday - 3);
     await user.save();
 
@@ -171,6 +203,7 @@ router.post('/reward-ad-matches', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 // ✅ ACCEPT REQUEST - WITH NOTIFICATION
 router.post('/accept-request/:userId', auth, async (req, res) => {
   try {
@@ -184,7 +217,6 @@ router.post('/accept-request/:userId', auth, async (req, res) => {
     requester.matches = [...(requester.matches || []), req.user.userId];
     await current.save(); await requester.save();
 
-    // ✅ CREATE MATCH ACCEPTANCE NOTIFICATION
     try {
       await Notification.create({
         recipient: req.params.userId,
@@ -218,7 +250,7 @@ router.delete('/request/:userId', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-// DELETE /api/users/match/:id (Fixed auth property lookup to req.user.userId)
+// UNMATCH USER
 router.delete('/match/:id', auth, async (req, res) => {
   try {
     const targetUserId = req.params.id;
@@ -241,7 +273,7 @@ router.delete('/match/:id', auth, async (req, res) => {
   }
 });
 
-// POST /api/users/block/:id (Fixed auth property lookup to req.user.userId)
+// BLOCK USER
 router.post('/block/:id', auth, async (req, res) => {
   try {
     const userIdToBlock = req.params.id;
@@ -270,8 +302,15 @@ router.post('/block/:id', auth, async (req, res) => {
 // PATCH PROFILE
 router.patch('/profile/me', auth, async (req, res) => {
   try {
-    const { bio, isPrivate } = req.body;
-    const user = await User.findByIdAndUpdate(req.user.userId, { bio, isPrivate }, { new: true }).select('-password');
+    const { bio, isPrivate, photos, isVip, membershipTier } = req.body;
+    const updateFields = {};
+    if (bio !== undefined) updateFields.bio = bio;
+    if (isPrivate !== undefined) updateFields.isPrivate = isPrivate;
+    if (photos !== undefined) updateFields.photos = photos;
+    if (isVip !== undefined) updateFields.isVip = isVip;
+    if (membershipTier !== undefined) updateFields.membershipTier = membershipTier;
+
+    const user = await User.findByIdAndUpdate(req.user.userId, updateFields, { new: true }).select('-password');
     res.json(user);
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
@@ -298,7 +337,7 @@ router.get('/profile/:userId/posts', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-// ✅ STRICT POST CREATION (Prevents empty posts)
+// STRICT POST CREATION
 router.post('/', auth, async (req, res) => {
   try {
     const { text, mediaUrl, mediaType } = req.body;
@@ -322,21 +361,8 @@ router.post('/', auth, async (req, res) => {
     res.status(201).json(populated);
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
-// DELETE CURRENT USER PROFILE
-router.delete('/profile/me', auth, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    
-    // Delete user posts and the user document
-    await Post.deleteMany({ author: userId });
-    await User.findByIdAndDelete(userId);
 
-    res.status(200).json({ message: 'Account deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-// DELETE POST - FIX 404 ERROR
+// DELETE POST
 router.delete('/posts/:postId', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
@@ -353,16 +379,15 @@ router.delete('/posts/:postId', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// DELETE CURRENT USER PROFILE & CLEAN UP REFERENCES
+
+// DELETE CURRENT USER PROFILE & DEEP REFERENCE CLEANUP
 router.delete('/profile/me', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     
-    // 1. Delete user posts and notifications
     await Post.deleteMany({ author: userId });
     await Notification.deleteMany({ $or: [{ recipient: userId }, { sender: userId }] });
 
-    // 2. Remove this user from everyone else's matches, requests, and blocks
     await User.updateMany(
       {},
       { 
@@ -375,7 +400,6 @@ router.delete('/profile/me', auth, async (req, res) => {
       }
     );
     
-    // 3. Finally, delete the user document itself
     await User.findByIdAndDelete(userId);
 
     res.status(200).json({ message: 'Account and references deleted successfully' });
@@ -383,7 +407,8 @@ router.delete('/profile/me', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// ⚠️ TEMPORARY CLEANUP - DELETE AFTER USE
+
+// TEMPORARY CLEANUP
 router.get('/cleanup-empty-posts', auth, async (req, res) => {
   try {
     const result = await Post.deleteMany({
