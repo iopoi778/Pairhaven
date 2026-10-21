@@ -104,6 +104,15 @@ app.use('/api/swipes', swipesRoutes);
 app.use('/api/admin', adminRoutes); // ✅ Mounted Admin Endpoints
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: '*' } });
+
+app.set('io', io);
 
 socketHandlers(io);
 
