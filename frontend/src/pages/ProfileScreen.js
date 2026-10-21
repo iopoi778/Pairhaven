@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import VerifiedBadge from './components/VerifiedBadge';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -55,7 +54,6 @@ function ProfileScreen({ userId }) {
     if (token) fetchData();
   }, [userId, token]);
 
-  // Safe Location Helper
   const renderLocation = (loc) => {
     if (!loc) return 'Location not specified';
     if (typeof loc === 'object') {
@@ -65,7 +63,6 @@ function ProfileScreen({ userId }) {
     return loc;
   };
 
-  // Match Request Handlers
   const handleSendRequest = async (targetUserId) => {
     try {
       await axios.post(`${API_URL}/api/users/request/${targetUserId}`, {}, {
@@ -94,11 +91,9 @@ function ProfileScreen({ userId }) {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         alert(res.data.message);
-        // Refresh profile data to update remaining coins
         const profileRes = await axios.get(`${API_URL}/api/users/profile/me/photo`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
         setUser(profileRes.data);
       } catch (e) {
         alert("Failed to claim ad reward.");
@@ -106,7 +101,6 @@ function ProfileScreen({ userId }) {
     }, 2000);
   };
 
-  // Flutterwave Payment Integration
   const handleFlutterwavePayment = (plan, priceInUsd) => {
     const FLUTTERWAVE_PUBLIC_KEY = process.env.REACT_APP_FLUTTERWAVE_PUBLIC_KEY || 'FLWPUBK_TEST-your_public_key_here';
 
@@ -342,7 +336,6 @@ function ProfileScreen({ userId }) {
 
   const photosList = Array.isArray(user.photos) ? user.photos : [];
 
-  // Standard Plan Daily Coins Calculation
   const maxStandardMatches = 10;
   const maxStandardChats = 10;
   const matchesUsed = user.matchesSentToday || 0;
@@ -475,7 +468,15 @@ function ProfileScreen({ userId }) {
           )}
         </div>
 
-        <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.5rem', fontWeight: 700 }}>{user.name}</h2>
+        {/* 🟦★ Verified Badge Next to Name */}
+        <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {user.name}
+          {user.verificationStatus === 'verified' && (
+            <span title="Verified User" style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              🟦★ Verified
+            </span>
+          )}
+        </h2>
         
         <p style={{ margin: '0 0 0.6rem', color: '#666', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
           <span>{user.age ? `${user.age} yrs` : ''}</span>
@@ -483,7 +484,7 @@ function ProfileScreen({ userId }) {
           <span>📍 {renderLocation(user.location)}</span>
         </p>
 
-        {/* PUBLIC MEMBERSHIP PLAN BADGE (VISIBLE TO EVERYONE) */}
+        {/* PUBLIC MEMBERSHIP PLAN BADGE */}
         <div style={{ margin: '0.2rem 0 1rem', display: 'inline-block', padding: '4px 14px', borderRadius: '12px', background: user.membershipTier === 'unlimited' ? 'linear-gradient(135deg, #ff4b4b, #dc2626)' : user.membershipTier === 'pro' ? '#5b72f2' : '#e2e8f0', color: user.membershipTier ? '#fff' : '#475569', fontSize: '0.8rem', fontWeight: 700 }}>
           {user.membershipTier === 'unlimited' ? '👑 Unlimited Plan' : user.membershipTier === 'pro' ? '⭐ Pro Plan' : 'Standard Member'}
         </div>
@@ -521,14 +522,13 @@ function ProfileScreen({ userId }) {
         )}
       </div>
 
-      {/* MEMBERSHIP & COINS MANAGEMENT SECTION (ONLY VISIBLE ON OWN PROFILE) */}
+      {/* MEMBERSHIP & COINS MANAGEMENT SECTION */}
       {isOwnProfile && (
         <div style={{ background: user.isVip ? 'linear-gradient(135deg, #f6d365, #fda085)' : '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem', textAlign: 'center' }}>
           <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: user.isVip ? '#fff' : '#333' }}>
             {user.membershipTier === 'unlimited' ? '👑 Unlimited Plan Active' : user.membershipTier === 'pro' ? '⭐ Pro Plan Active' : '⭐ Standard Plan Balances'}
           </h4>
 
-          {/* SHOW REMAINING COIN BALANCES ONLY IF OWNER IS ON STANDARD PLAN */}
           {(!user.membershipTier || user.membershipTier === 'standard') && (
             <div style={{ display: 'flex', justifyContent: 'space-around', margin: '1rem 0', background: '#f8fafc', padding: '0.8rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div>
@@ -546,7 +546,6 @@ function ProfileScreen({ userId }) {
             {user.membershipTier === 'unlimited' ? 'You have unlimited daily matches & unlimited chats!' : user.membershipTier === 'pro' ? 'Pro Plan: 50 Match Coins & Unlimited Chat Active!' : 'Get more coins by watching ads or upgrading your plan!'}
           </p>
 
-          {/* AD REWARD BUTTON FOR STANDARD USERS */}
           {(!user.membershipTier || user.membershipTier === 'standard') && (
             <button 
               onClick={handleWatchAd}
@@ -556,7 +555,6 @@ function ProfileScreen({ userId }) {
             </button>
           )}
 
-          {/* UPGRADE OPTIONS FOR PRO & UNLIMITED PLANS */}
           {user.membershipTier !== 'unlimited' && (
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
               {user.membershipTier !== 'pro' && (
