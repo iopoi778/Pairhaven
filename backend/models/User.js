@@ -5,10 +5,12 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true },
   phone: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  
+  // ✅ VIP & Match Limit Fields
   isVip: { type: Boolean, default: false },
   matchesSentToday: { type: Number, default: 0 },
-  lastMatchResetDate: { type: Date, default: Date.now }
-});
+  lastMatchResetDate: { type: Date, default: Date.now },
+
   photos: [{
     url: { type: String, required: true },
     publicId: String,
@@ -28,7 +30,7 @@ const userSchema = new mongoose.Schema({
   verificationStatus: { type: String, enum: ['not_verified', 'verified'], default: 'not_verified' },
   isPrivate: { type: Boolean, default: false },
   
-  // ✅ NEW MATCH REQUEST FIELDS (Required for matching system)
+  // ✅ Match Request Fields
   matches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   requestsSent: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   requestsReceived: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
