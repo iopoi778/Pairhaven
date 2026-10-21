@@ -82,6 +82,10 @@ function MatchingScreen() {
     if (!targetUser) return;
     setActionLoading(targetUser._id);
     
+    // Immediately move to the next card and reset drag position for instant feedback
+    setDragOffset({ x: 0, y: 0 });
+    setCurrentIndex(prev => prev + 1);
+
     try {
       if (actionType === 'send_request') {
         await axios.post(`${API_URL}/api/users/request/${targetUser._id}`, {}, {
@@ -107,34 +111,27 @@ function MatchingScreen() {
         return;
       }
       
-      await refreshData();
-      if (viewMode === 'swipe') {
-        setCurrentIndex(prev => prev + 1);
-      }
+      await refreshDataSilent();
     } catch (err) {
       if (err.response?.status === 400 && err.response?.data?.message === 'Already matched') {
-        await refreshData();
-        if (viewMode === 'swipe') setCurrentIndex(prev => prev + 1);
+        await refreshDataSilent();
       } else if (err.response?.status !== 400) {
         alert(err.response?.data?.message || "Action failed");
       }
     } finally {
       setActionLoading(null);
-      setDragOffset({ x: 0, y: 0 });
     }
   };
 
-  const refreshData = async () => {
+  const refreshDataSilent = async () => {
     try {
-      const [userRes, matchesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/users/profile/me`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API_URL}/api/users/potential-matches`, { headers: { Authorization: `Bearer ${token}` } })
+      const [userRes] = await Promise.all([
+        axios.get(`${API_URL}/api/users/profile/me`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
       setFreshUser(userRes.data);
       localStorage.setItem('user', JSON.stringify(userRes.data));
-      setUsers(matchesRes.data || []);
     } catch (err) {
-      console.error("Refresh failed", err);
+      console.error("Silent refresh failed", err);
     }
   };
 
@@ -194,7 +191,7 @@ function MatchingScreen() {
   };
 
   const evaluateSwipe = () => {
-    const threshold = 110;
+    const threshold = 100;
     const currentUser = users[currentIndex];
     if (!currentUser) return;
 
