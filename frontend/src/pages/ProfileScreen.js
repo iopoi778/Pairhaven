@@ -469,7 +469,7 @@ function ProfileScreen({ userId }) {
           )}
         </div>
 
-        {/* 🟦★ Verified Badge Next to Name */}
+        {/* ★ Verified Badge Next to Name */}
         <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {user.name}
           <VerifiedBadge status={user.verificationStatus} size="1.2rem" />
@@ -517,10 +517,10 @@ function ProfileScreen({ userId }) {
     }}
   >
     {user.verificationStatus === 'verified' 
-      ? '🟦★ Verified Account' 
+      ? '★ Verified ' 
       : user.verificationStatus === 'pending' 
-      ? '⏳ Pending Admin Review' // ⏳ Text changes when pending
-      : '📸 Verify Account (Live Selfie)'}
+      ? '⏳ Pending Review' // ⏳ Text changes when pending
+      : '📸 Verify Account'}
   </button>
 )}
 
