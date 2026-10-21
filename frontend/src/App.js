@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import React, { useEffect } from 'react';
 import axios from 'axios';
 import io from 'socket.io-client';
 import ProfileScreen from './pages/ProfileScreen';
