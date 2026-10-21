@@ -179,13 +179,13 @@ function ChatScreen() {
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 78px)', background: '#fff', position: 'relative' }}>
+      {/* Conversations Sidebar */}
       <div style={{ width: '320px', borderRight: '1px solid #eee', overflowY: 'auto', background: '#fff' }}>
         <div style={{ padding: '1.2rem', borderBottom: '1px solid #eee', fontWeight: 700 }}>Messages</div>
         {conversations.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>No conversations</div>
         ) : conversations.map(conv => {
           const isActive = selectedMatch?._id === conv.user._id;
-          const hasUnread = conv.unreadCount > 0;
           return (
             <div key={conv.user._id} onClick={() => setSelectedMatch(conv.user)} style={{ 
               padding: '1rem 1.2rem', cursor: 'pointer',
@@ -194,8 +194,9 @@ function ChatScreen() {
             }}>
               <img src={getAvatarUrl(conv.user.photos)} alt="" style={{ width: 50, height: 50, borderRadius: '50%', objectFit: 'cover' }} />
               <div style={{ flex: 1, minWidth: '0' }}>
-                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {conv.user.name} {conv.user.verificationStatus === 'verified' && '🟦★'}
+                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                  {conv.user.name} 
+                  <VerifiedBadge status={conv.user.verificationStatus} size="0.85rem" />
                 </div>
                 <div style={{ fontSize: '0.85rem', color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.lastMessage?.content || 'Start chatting'}</div>
               </div>
@@ -204,6 +205,7 @@ function ChatScreen() {
         })}
       </div>
 
+      {/* Active Chat Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', position: 'relative' }}>
         {selectedMatch ? (
           <>
@@ -213,7 +215,7 @@ function ChatScreen() {
                 <div>
                   <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     {selectedMatch.name}
-                    {selectedMatch.verificationStatus === 'verified' && <VerifiedBadge />}
+                    <VerifiedBadge status={selectedMatch.verificationStatus} size="0.95rem" />
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#888' }}>{selectedMatch.age ? `${selectedMatch.age} yrs` : 'Online'}</div>
                 </div>
