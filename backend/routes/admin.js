@@ -132,6 +132,20 @@ router.patch('/users/:id/profile', auth, adminAuth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+router.patch('/users/:id/verify', auth, adminAuth, async (req, res) => {
+  try {
+    const { status } = req.body; // 'verified' or 'not_verified'
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    user.verificationStatus = status;
+    await user.save();
+
+    res.json({ message: `Verification status updated to ${status}`, user });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 // 3. DELETE USER ACCOUNT (For Terms of Service violations)
 router.delete('/users/:id', auth, adminAuth, async (req, res) => {
   try {
