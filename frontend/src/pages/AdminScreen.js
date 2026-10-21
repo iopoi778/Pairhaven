@@ -363,30 +363,46 @@ function AdminScreen() {
               ))
             )}
           </div>
-{/* Inside the user list map in AdminScreen.js */}
-<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+  {/* Inside the users map loop in AdminScreen.js */}
+<div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
   
-  {/* 🟦 Toggle Verified Badge Button */}
+  {/* 🟦⭐ Toggle Blue Badge Button */}
   <button
     onClick={async () => {
-      const newStatus = u.verificationStatus === 'verified' ? 'not_verified' : 'verified';
-      await axios.patch(`${API_URL}/api/admin/users/${u._id}/verify`, { status: newStatus }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      alert(`User is now ${newStatus === 'verified' ? '🟦 VERIFIED' : 'UNVERIFIED'}`);
-      fetchUsers();
+      const nextStatus = u.verificationStatus === 'verified' ? 'not_verified' : 'verified';
+      try {
+        await axios.patch(`${API_URL}/api/admin/users/${u._id}/verify`, 
+          { status: nextStatus }, 
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        // Optimistically update local React state
+        setUsers(prev => prev.map(userItem => 
+          userItem._id === u._id 
+            ? { ...userItem, verificationStatus: nextStatus } 
+            : userItem
+        ));
+
+        alert(`User is now ${nextStatus === 'verified' ? 'VERIFIED (🟦★)' : 'UNVERIFIED'}`);
+      } catch (err) {
+        alert("Failed to update verification status.");
+      }
     }}
     style={{
       background: u.verificationStatus === 'verified' ? '#dbeafe' : '#f1f5f9',
-      color: u.verificationStatus === 'verified' ? '#2563eb' : '#64748b',
+      color: u.verificationStatus === 'verified' ? '#1d4ed8' : '#64748b',
       border: '1px solid #bfdbfe',
       borderRadius: '8px',
       padding: '0.5rem 0.8rem',
+      fontSize: '0.82rem',
       fontWeight: 700,
-      cursor: 'pointer'
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
     }}
   >
-    {u.verificationStatus === 'verified' ? '🟦 Verified' : 'Grant 🟦 Badge'}
+    {u.verificationStatus === 'verified' ? '🟦★ Verified' : 'Grant 🟦★ Badge'}
   </button>
 
 </div>
