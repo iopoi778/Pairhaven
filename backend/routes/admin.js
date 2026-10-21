@@ -46,7 +46,34 @@ router.patch('/users/:id/tier', auth, adminAuth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// 4. ADMIN: DELETE ANY POST (Inappropriate content moderation)
+router.delete('/posts/:postId', auth, adminAuth, async (req, res) => {
+  try {
+    const post = await Post.findByIdAndDelete(req.params.postId);
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+    res.json({ message: 'Post deleted successfully by admin.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
+// 5. ADMIN: UPDATE USER PROFILE / PHOTOS / BIO
+router.patch('/users/:id/profile', auth, adminAuth, async (req, res) => {
+  try {
+    const { bio, photos, name } = req.body;
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) return res.status(404).json({ message: 'User not found' });
+
+    if (bio !== undefined) targetUser.bio = bio;
+    if (name !== undefined) targetUser.name = name;
+    if (photos !== undefined) targetUser.photos = photos; // Remove or replace bad photos
+
+    await targetUser.save();
+    res.json({ message: 'User profile updated successfully by admin.', user: targetUser });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 // 3. DELETE USER ACCOUNT (For Terms of Service violations)
 router.delete('/users/:id', auth, adminAuth, async (req, res) => {
   try {
