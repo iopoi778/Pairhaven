@@ -53,7 +53,6 @@ function ChatScreen() {
     socketRef.current = io(API_URL);
     socketRef.current.emit('join', myId);
 
-    // 💬 Real-time message receiver inside active chat
     socketRef.current.on('receive-message', (data) => {
       if (selectedMatch && (data.sender?._id === selectedMatch._id || data.sender === selectedMatch._id)) {
         setMessages(prev => [...prev, data]);
@@ -80,7 +79,13 @@ function ChatScreen() {
       const res = await axios.get(`${API_URL}/api/messages/conversations`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setConversations(res.data || []);
+      const convs = res.data || [];
+      setConversations(convs);
+
+      // 🚀 Auto-select first conversation (Support or recent match) on load
+      if (convs.length > 0 && !selectedMatch) {
+        setSelectedMatch(convs[0].user);
+      }
     } catch (err) { console.error("Conv fetch failed", err); }
   };
 
@@ -99,7 +104,6 @@ function ChatScreen() {
         });
         setMessages(res.data || []);
         
-        // Reset unread count for selected match
         setConversations(prev => prev.map(c => 
           c.user._id === selectedMatch._id ? { ...c, unreadCount: 0 } : c
         ));
@@ -147,7 +151,7 @@ function ChatScreen() {
   const handleSendGift = async (giftName) => {
     try {
       await axios.post(`${API_URL}/api/messages/send`, {
-        receiverId: selectedMatch._id, content: `🎁 Sent: ${giftName}`
+        receiverId: selectedMatch._id, content: `🎁 Sent a virtual gift: ${giftName}`
       }, { headers: { Authorization: `Bearer ${token}` } });
 
       setShowGiftModal(false);
@@ -308,14 +312,14 @@ function ChatScreen() {
             </div>
 
             <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #eee', display: 'flex', gap: '10px' }}>
-              <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()} placeholder={`Message ${selectedMatch.name}...`} style={{ flex: 1, padding: '0.8rem 1.2rem', borderRadius: '24px', border: '1px solid #e2e8f0', outline: 'none', background: '#f8f9fa' }} />
+              <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()} placeholder={`Type a message to ${selectedMatch.name}...`} style={{ flex: 1, padding: '0.8rem 1.2rem', borderRadius: '24px', border: '1px solid #e2e8f0', outline: 'none', background: '#f8f9fa' }} />
               <button onClick={handleSend} disabled={!newMessage.trim()} style={{ background: newMessage.trim() ? '#5b72f2' : '#cbd5e1', color: '#fff', border: 'none', borderRadius: '24px', padding: '0.8rem 1.5rem', fontWeight: 600, cursor: newMessage.trim() ? 'pointer' : 'default' }}>Send</button>
             </div>
           </>
         ) : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
             <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>💬</div>
-            <p>Select a conversation or tap PairHaven Support to start chatting</p>
+            <p>Loading conversation...</p>
           </div>
         )}
       </div>
