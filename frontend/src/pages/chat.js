@@ -370,19 +370,6 @@ function ChatScreen() {
   );
 }
 
-function CallModal({ appId, channelName, callType, onClose }) {
-  return (
-    <AgoraRTCProvider client={agoraClient}>
-      <div style={modalOverlayStyle}>
-        <div style={modalContentStyle}>
-          <h3>{callType === 'video' ? '📹 Video Call' : '📞 Voice Call'}</h3>
-          <CallRoom appId={appId} channelName={channelName} callType={callType} onClose={onClose} />
-        </div>
-      </div>
-    </AgoraRTCProvider>
-  );
-}
-
 function CallRoom({ appId, channelName, callType, onClose }) {
   const isVideo = callType === 'video';
 
@@ -392,10 +379,11 @@ function CallRoom({ appId, channelName, callType, onClose }) {
     token: AGORA_TEMP_TOKEN || null
   });
 
+  // ✅ Ensure both microphone and camera tracks are created
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(true);
   const { localCameraTrack } = useLocalCameraTrack(isVideo);
 
-  // Publish your own tracks
+  // ✅ CRITICAL FIX: Publish BOTH microphone and camera tracks together
   usePublish([localMicrophoneTrack, localCameraTrack].filter(Boolean));
 
   // Get all remote users in this channel
@@ -438,7 +426,7 @@ function CallRoom({ appId, channelName, callType, onClose }) {
         </div>
       ) : (
         <div style={{ padding: '2rem 0', fontSize: '1.2rem', color: '#5b72f2' }}>
-          🎙️ Voice Call Active ({remoteUsers.length > 0 ? 'Connected' : 'Waiting for user...'})
+          🎙️ Voice Call Active ({remoteUsers.length > 0 ? 'Connected & Speaking' : 'Waiting for user to join...'})
         </div>
       )}
 
