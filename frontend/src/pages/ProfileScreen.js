@@ -73,11 +73,11 @@ function ProfileScreen({ userId }) {
       alert("Match request sent!");
     } catch (err) {
       if (err.response && err.response.status === 403) {
-        const choice = window.confirm("You've reached your 20 match limit for today! \n\nClick 'OK' to watch an ad for +3 free matches, or 'Cancel' to learn about VIP.");
+        const choice = window.confirm("You've run out of match/chat coins for today! \n\nClick 'OK' to watch an ad for +3 Match Coins & +3 Chat Coins, or 'Cancel' to upgrade.");
         if (choice) {
           handleWatchAd();
         } else {
-          alert("Upgrade to VIP for unlimited daily matches!");
+          alert("Upgrade to Pro or Unlimited for more capacity!");
         }
       } else {
         alert(err.response?.data?.message || "Error sending request");
@@ -93,13 +93,18 @@ function ProfileScreen({ userId }) {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         alert(res.data.message);
+        // Refresh profile data to update remaining coins
+        const profileRes = await axios.get(`${API_URL}/api/users/profile/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUser(profileRes.data);
       } catch (e) {
         alert("Failed to claim ad reward.");
       }
     }, 2000);
   };
 
-  // 💳 Pan-African Payment via Flutterwave (Supports Cards, Mobile Money, Bank Transfers & USSD)
+  // Flutterwave Payment Integration
   const handleFlutterwavePayment = (plan, priceInUsd) => {
     const FLUTTERWAVE_PUBLIC_KEY = process.env.REACT_APP_FLUTTERWAVE_PUBLIC_KEY || 'FLWPUBK_TEST-your_public_key_here';
 
@@ -111,8 +116,8 @@ function ProfileScreen({ userId }) {
     window.FlutterwaveCheckout({
       public_key: FLUTTERWAVE_PUBLIC_KEY,
       tx_ref: "ph_tx_" + Date.now(),
-      amount: priceInUsd, // $2 for Pro, $5 for Unlimited
-      currency: "USD",    // Automatically converts to local currency (KES, NGN, GHS, ZAR, etc.) at checkout
+      amount: priceInUsd, 
+      currency: "USD",
       payment_options: "card, mobilemoney, banktransfer, ussd",
       customer: {
         email: user.email,
@@ -120,7 +125,7 @@ function ProfileScreen({ userId }) {
         phone_number: user.phone || ""
       },
       customizations: {
-        title: "PairHaven VIP Upgrade",
+        title: "PairHaven Membership Upgrade",
         description: `Upgrade to ${plan.toUpperCase()} plan`,
         logo: "https://via.placeholder.com/150"
       },
@@ -137,7 +142,6 @@ function ProfileScreen({ userId }) {
     });
   };
 
-  // Verify transaction on backend
   const verifyFlutterwavePayment = async (transactionId, plan) => {
     try {
       const res = await axios.post(`${API_URL}/api/users/verify-flutterwave`, { transactionId, plan }, {
@@ -336,6 +340,14 @@ function ProfileScreen({ userId }) {
 
   const photosList = Array.isArray(user.photos) ? user.photos : [];
 
+  // Calculate remaining coins for standard user (Assuming 10 daily base, or track usage via backend)
+  const maxStandardMatches = 10;
+  const maxStandardChats = 10;
+  const matchesUsed = user.matchesSentToday || 0;
+  const chatsUsed = user.chatsSentToday || 0;
+  const remainingMatchCoins = Math.max(0, maxStandardMatches - matchesUsed);
+  const remainingChatCoins = Math.max(0, maxStandardChats - chatsUsed);
+
   return (
     <div style={{ padding: '1rem', paddingBottom: '100px', maxWidth: '500px', margin: '0 auto', position: 'relative' }}>
       
@@ -469,6 +481,11 @@ function ProfileScreen({ userId }) {
           <span>📍 {renderLocation(user.location)}</span>
         </p>
 
+        {/* PUBLIC PLAN BADGE SHOWN TO EVERYONE */}
+        <div style={{ margin: '0.5rem 0', display: 'inline-block', padding: '4px 12px', borderRadius: '12px', background: user.membershipTier === 'unlimited' ? '#ff4b4b' : user.membershipTier === 'pro' ? '#5b72f2' : '#e2e8f0', color: user.membershipTier ? '#fff' : '#475569', fontSize: '0.8rem', fontWeight: 700 }}>
+          {user.membershipTier === 'unlimited' ? '👑 Unlimited Plan' : user.membershipTier === 'pro' ? '⭐ Pro Plan' : 'Standard Member'}
+        </div>
+
         {/* MATCH ACTION BUTTONS */}
         {!isOwnProfile && (
           <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -496,36 +513,60 @@ function ProfileScreen({ userId }) {
         )}
 
         {isOwnProfile && (
-          <button onClick={handleTogglePrivacy} style={{ background: user.isPrivate ? '#fee2e2' : '#d1fae5', color: user.isPrivate ? '#dc2626' : '#047857', border: 'none', borderRadius: '20px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+          <button onClick={handleTogglePrivacy} style={{ background: user.isPrivate ? '#fee2e2' : '#d1fae5', color: user.isPrivate ? '#dc2626' : '#047857', border: 'none', borderRadius: '20px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, display: 'block', margin: '0.5rem auto 0' }}>
             {user.isPrivate ? '🔒 Private Account' : '🔓 Public Account'}
           </button>
         )}
       </div>
 
-      {/* VIP & PRO MEMBERSHIP MODAL / CARD ($2 PRO / $5 UNLIMITED) */}
+      {/* MEMBERSHIP & COINS SECTION */}
       <div style={{ background: user.isVip ? 'linear-gradient(135deg, #f6d365, #fda085)' : '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem', textAlign: 'center' }}>
         <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: user.isVip ? '#fff' : '#333' }}>
-          {user.membershipTier === 'unlimited' ? '👑 Unlimited Member' : user.membershipTier === 'pro' ? '⭐ Pro Member' : 'Standard Member'}
+          {user.membershipTier === 'unlimited' ? '👑 Unlimited Member' : user.membershipTier === 'pro' ? '⭐ Pro Member' : '⭐ Standard Plan'}
         </h4>
+
+        {/* ONLY SHOW COIN BALANCES IF USER IS STANDARD (Hide for Pro and Unlimited) */}
+        {(!user.membershipTier || user.membershipTier === 'standard') && (
+          <div style={{ display: 'flex', justifyContent: 'space-around', margin: '1rem 0', background: '#f8fafc', padding: '0.8rem', borderRadius: '8px' }}>
+            <div>
+              <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>{remainingMatchCoins} / 10</strong>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Match Coins</div>
+            </div>
+            <div>
+              <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>{remainingChatCoins} / 10</strong>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Chat Coins</div>
+            </div>
+          </div>
+        )}
+
         <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: user.isVip ? '#fff' : '#666' }}>
-          {user.membershipTier === 'unlimited' ? 'Unlimited daily matches & all features active!' : user.membershipTier === 'pro' ? 'Pro Member (50 matches/day)' : 'Daily limit: 20 matches'}
+          {user.membershipTier === 'unlimited' ? 'Unlimited daily matches & unlimited chat active!' : user.membershipTier === 'pro' ? 'Pro Plan: 50 Match Coins & Unlimited Chat' : 'Get more coins by watching ads or upgrading!'}
         </p>
 
+        {isOwnProfile && (!user.membershipTier || user.membershipTier === 'standard') && (
+          <button 
+            onClick={handleWatchAd}
+            style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem', marginBottom: '1rem', display: 'block', margin: '0 auto 1rem' }}
+          >
+            📺 Watch Ad (+3 Match Coins & +3 Chats)
+          </button>
+        )}
+
         {isOwnProfile && user.membershipTier !== 'unlimited' && (
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
             {user.membershipTier !== 'pro' && (
               <button 
                 onClick={() => handleFlutterwavePayment('pro', 2)}
                 style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
               >
-                ⭐ Pro Plan ($2)
+                ⭐ Pro Plan ($2) - 50 Coins + Unlim. Chat
               </button>
             )}
             <button 
               onClick={() => handleFlutterwavePayment('unlimited', 5)}
               style={{ background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
             >
-              👑 Unlimited Plan ($5)
+              👑 Unlimited Plan ($5) - Unlim. Coins & Chat
             </button>
           </div>
         )}
