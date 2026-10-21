@@ -200,6 +200,9 @@ router.post('/login', async (req, res) => {
         photos: user.photos,
         verificationStatus: user.verificationStatus,
         location: user.location,
+        role: user.role,                  // ✅ Added role
+        membershipTier: user.membershipTier, // ✅ Added membership tier
+        isVip: user.isVip,                // ✅ Added VIP status
         followersCount: (user.followers || []).length,
         followingCount: (user.following || []).length,
         likesReceivedCount: (user.likesReceived || []).length
