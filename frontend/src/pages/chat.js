@@ -89,6 +89,8 @@ function ChatScreen() {
           headers: { Authorization: `Bearer ${token}` }
         });
         setMessages(res.data || []);
+        
+        // Reset unread count for selected match
         setConversations(prev => prev.map(c => 
           c.user._id === selectedMatch._id ? { ...c, unreadCount: 0 } : c
         ));
@@ -186,19 +188,41 @@ function ChatScreen() {
           <div style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>No conversations</div>
         ) : conversations.map(conv => {
           const isActive = selectedMatch?._id === conv.user._id;
+          const unreadCount = conv.unreadCount || 0;
+
           return (
             <div key={conv.user._id} onClick={() => setSelectedMatch(conv.user)} style={{ 
               padding: '1rem 1.2rem', cursor: 'pointer',
               background: isActive ? '#f0f7ff' : '#fff',
-              borderBottom: '1px solid #f5f5f5', display: 'flex', alignItems: 'center', gap: '12px'
+              borderBottom: '1px solid #f5f5f5', display: 'flex', alignItems: 'center', gap: '12px',
+              position: 'relative'
             }}>
-              <img src={getAvatarUrl(conv.user.photos)} alt="" style={{ width: 50, height: 50, borderRadius: '50%', objectFit: 'cover' }} />
+              <div style={{ position: 'relative' }}>
+                <img src={getAvatarUrl(conv.user.photos)} alt="" style={{ width: 50, height: 50, borderRadius: '50%', objectFit: 'cover' }} />
+                {unreadCount > 0 && (
+                  <span style={{ 
+                    position: 'absolute', top: -2, right: -2, background: '#ff4b4b', color: '#fff', 
+                    fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: '10px',
+                    border: '2px solid #fff'
+                  }}>
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+
               <div style={{ flex: 1, minWidth: '0' }}>
-                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                  {conv.user.name} 
-                  <VerifiedBadge status={conv.user.verificationStatus} size="0.85rem" />
+                <div style={{ fontWeight: unreadCount > 0 ? 800 : 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                    {conv.user.name} 
+                    <VerifiedBadge status={conv.user.verificationStatus} size="0.85rem" />
+                  </div>
+                  {unreadCount > 0 && (
+                    <span style={{ width: '8px', height: '8px', background: '#5b72f2', borderRadius: '50%' }}></span>
+                  )}
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.lastMessage?.content || 'Start chatting'}</div>
+                <div style={{ fontSize: '0.85rem', color: unreadCount > 0 ? '#1e293b' : '#888', fontWeight: unreadCount > 0 ? 700 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {conv.lastMessage?.content || 'Start chatting'}
+                </div>
               </div>
             </div>
           );
