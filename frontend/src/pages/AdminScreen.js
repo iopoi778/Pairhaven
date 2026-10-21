@@ -349,6 +349,45 @@ function AdminScreen() {
 
     </div>
   );
+// Inside AdminScreen.js (top header rendering)
+const handleLogout = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  axios.defaults.headers.common['Authorization'] = '';
+  navigate('/login', { replace: true });
+};
+
+return (
+  <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '100px', fontFamily: 'sans-serif' }}>
+    
+    {/* Header with Logout Button */}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+      <div>
+        <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#1e293b' }}>🛡️ Admin & Support Center</h2>
+        <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>Manage users, review policy violations, or reply to customer support inquiries.</p>
+      </div>
+
+      {/* 🔴 Logout Button */}
+      <button 
+        onClick={handleLogout}
+        style={{
+          background: '#fee2e2',
+          color: '#dc2626',
+          border: '1px solid #fca5a5',
+          borderRadius: '10px',
+          padding: '0.6rem 1.1rem',
+          fontWeight: 700,
+          fontSize: '0.88rem',
+          cursor: 'pointer'
+        }}
+      >
+        🚪 Log Out
+      </button>
+    </div>
+
+    {/* ... rest of your AdminScreen component ... */}
+  </div>
+);
 }
 
 export default AdminScreen;
