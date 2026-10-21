@@ -283,7 +283,6 @@ function AdminScreen() {
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {u.name} 
-                          {/* 🟦★ Automatic Verified Badge */}
                           <span title="Verified User" style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '6px', fontWeight: 700 }}>
                             🟦★ Verified
                           </span>
