@@ -363,7 +363,33 @@ function AdminScreen() {
               ))
             )}
           </div>
+{/* Inside the user list map in AdminScreen.js */}
+<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+  
+  {/* 🟦 Toggle Verified Badge Button */}
+  <button
+    onClick={async () => {
+      const newStatus = u.verificationStatus === 'verified' ? 'not_verified' : 'verified';
+      await axios.patch(`${API_URL}/api/admin/users/${u._id}/verify`, { status: newStatus }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert(`User is now ${newStatus === 'verified' ? '🟦 VERIFIED' : 'UNVERIFIED'}`);
+      fetchUsers();
+    }}
+    style={{
+      background: u.verificationStatus === 'verified' ? '#dbeafe' : '#f1f5f9',
+      color: u.verificationStatus === 'verified' ? '#2563eb' : '#64748b',
+      border: '1px solid #bfdbfe',
+      borderRadius: '8px',
+      padding: '0.5rem 0.8rem',
+      fontWeight: 700,
+      cursor: 'pointer'
+    }}
+  >
+    {u.verificationStatus === 'verified' ? '🟦 Verified' : 'Grant 🟦 Badge'}
+  </button>
 
+</div>
           {/* Active Reply Pane */}
           {selectedConversation && (
             <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1rem', display: 'flex', flexDirection: 'column', height: '450px' }}>
