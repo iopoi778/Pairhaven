@@ -54,7 +54,7 @@ function ProfileScreen({ userId }) {
     if (token) fetchData();
   }, [userId, token]);
 
-  // Safe Location Helper (prevents React Error #31 & formats Location + Country)
+  // Safe Location Helper
   const renderLocation = (loc) => {
     if (!loc) return 'Location not specified';
     if (typeof loc === 'object') {
@@ -65,43 +65,40 @@ function ProfileScreen({ userId }) {
   };
 
   // Match Request Handlers
-const handleSendRequest = async (targetUserId) => {
-  try {
-    await axios.post(`${API_URL}/api/users/request/${targetUserId}`, {}, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    alert("Match request sent!");
-  } catch (err) {
-    if (err.response && err.response.status === 403) {
-      // Limit reached modal trigger
-      const choice = window.confirm("You've reached your 20 match limit for today! \n\nClick 'OK' to watch an ad for +3 free matches, or 'Cancel' to learn about VIP.");
-      if (choice) {
-        handleWatchAd();
-      } else {
-        // Trigger VIP Upgrade screen or modal
-        alert("Redirecting to VIP Upgrade...");
-      }
-    } else {
-      alert(err.response?.data?.message || "Error sending request");
-    }
-  }
-};
-
-// Simulated Ad Reward Function (integrate Google AdMob or an ad script here)
-const handleWatchAd = async () => {
-  // Simulate watching an ad for 3 seconds
-  alert("Playing reward ad... (Simulated)");
-  setTimeout(async () => {
+  const handleSendRequest = async (targetUserId) => {
     try {
-      const res = await axios.post(`${API_URL}/api/users/reward-ad-matches`, {}, {
+      await axios.post(`${API_URL}/api/users/request/${targetUserId}`, {}, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-      alert(res.data.message);
-    } catch (e) {
-      alert("Failed to claim ad reward.");
+      alert("Match request sent!");
+    } catch (err) {
+      if (err.response && err.response.status === 403) {
+        const choice = window.confirm("You've reached your 20 match limit for today! \n\nClick 'OK' to watch an ad for +3 free matches, or 'Cancel' to learn about VIP.");
+        if (choice) {
+          handleWatchAd();
+        } else {
+          alert("Upgrade to VIP for unlimited daily matches!");
+        }
+      } else {
+        alert(err.response?.data?.message || "Error sending request");
+      }
     }
-  }, 2000);
-};
+  };
+
+  const handleWatchAd = async () => {
+    alert("Playing reward ad... (Simulated)");
+    setTimeout(async () => {
+      try {
+        const res = await axios.post(`${API_URL}/api/users/reward-ad-matches`, {}, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        alert(res.data.message);
+      } catch (e) {
+        alert("Failed to claim ad reward.");
+      }
+    }, 2000);
+  };
+
   const handleAcceptRequest = async () => {
     setActionLoading(true);
     try {
@@ -172,7 +169,6 @@ const handleWatchAd = async () => {
     }
   };
 
-  // ✅ Multiple Photo Management Upload Handler
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -183,7 +179,6 @@ const handleWatchAd = async () => {
       const res = await axios.patch(`${API_URL}/api/users/profile/me/photo`, formData, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
       });
-      // Assuming backend returns updated photos array or photoUrl
       const updatedPhotos = res.data.photos || [...(user.photos || []), res.data.photoUrl];
       setUser(prev => ({ ...prev, photos: updatedPhotos }));
       alert("Photo added successfully!");
@@ -198,7 +193,6 @@ const handleWatchAd = async () => {
     if (!window.confirm("Remove this photo?")) return;
     try {
       const updatedPhotos = user.photos.filter((_, idx) => idx !== photoIndex);
-      // Optional: sync with backend if your API supports updating photo array directly
       await axios.patch(`${API_URL}/api/users/profile/me`, { photos: updatedPhotos }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -232,7 +226,6 @@ const handleWatchAd = async () => {
     } catch (err) { alert("Failed to delete post"); }
   };
 
-  // Change Password Handler
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (passwords.newPassword !== passwords.confirmPassword) {
@@ -255,7 +248,6 @@ const handleWatchAd = async () => {
     }
   };
 
-  // Delete Profile / Account Handler
   const handleDeleteAccount = async () => {
     const confirmation = window.prompt("Type 'DELETE' to permanently delete your account and all data:");
     if (confirmation !== 'DELETE') return;
@@ -415,7 +407,6 @@ const handleWatchAd = async () => {
 
         <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.5rem', fontWeight: 700 }}>{user.name}</h2>
         
-        {/* PROMINENT LOCATION & AGE DISPLAY */}
         <p style={{ margin: '0 0 1rem', color: '#666', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
           <span>{user.age ? `${user.age} yrs` : ''}</span>
           {user.age && renderLocation(user.location) ? ' • ' : ''}
@@ -443,7 +434,7 @@ const handleWatchAd = async () => {
             {!currentUser.requestsSent?.includes(user._id) && 
              !currentUser.requestsReceived?.includes(user._id) && 
              !currentUser.matches?.includes(user._id) && (
-              <button onClick={handleSendRequest} disabled={actionLoading} style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: actionLoading ? 'wait' : 'pointer', fontSize: '0.9rem' }}>❤️ Send Match Request</button>
+              <button onClick={() => handleSendRequest(user._id)} disabled={actionLoading} style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', cursor: actionLoading ? 'wait' : 'pointer', fontSize: '0.9rem' }}>❤️ Send Match Request</button>
             )}
           </div>
         )}
@@ -455,13 +446,44 @@ const handleWatchAd = async () => {
         )}
       </div>
 
+      {/* 🌟 VIP MEMBERSHIP STATUS & UPGRADE CARD */}
+      <div style={{ background: user.isVip ? 'linear-gradient(135deg, #f6d365, #fda085)' : '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem', textAlign: 'center', color: user.isVip ? '#fff' : '#333' }}>
+        <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem' }}>
+          {user.isVip ? '👑 VIP Pro Member' : '⭐ Standard Member'}
+        </h4>
+        <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', opacity: 0.9 }}>
+          {user.isVip ? 'You have unlimited matches and exclusive perks!' : `Daily Matches Sent: ${user.matchesSentToday || 0} / 20`}
+        </p>
+        {isOwnProfile && !user.isVip && (
+          <button 
+            onClick={async () => {
+              const confirmVip = window.confirm("Upgrade to VIP Pro Member for unlimited daily matches?");
+              if (confirmVip) {
+                try {
+                  await axios.patch(`${API_URL}/api/users/profile/me`, { isVip: true }, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  });
+                  setUser(prev => ({ ...prev, isVip: true }));
+                  alert("Congratulations! You are now a VIP Pro Member 🎉");
+                } catch (err) {
+                  alert("Failed to upgrade to VIP.");
+                }
+              }
+            }}
+            style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.5rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}
+          >
+            🚀 Get VIP / Pro Member
+          </button>
+        )}
+      </div>
+
       {/* STATS ROW */}
       <div style={{ display: 'flex', justifyContent: 'space-around', background: '#fff', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem' }}>
         <div style={{textAlign:'center'}}><strong style={{fontSize:'1.1rem'}}>{posts.length}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Posts</span></div>
         <div style={{textAlign:'center'}}><strong style={{fontSize:'1.1rem'}}>{user.matchesCount || 0}</strong><br/><span style={{fontSize:'0.8rem',color:'#666'}}>Matches</span></div>
       </div>
 
-      {/* ✅ PICTURE GALLERY / PHOTOS SECTION */}
+      {/* PHOTOS SECTION */}
       <div style={{ background: '#fff', padding: '1.2rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
           <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#444' }}>Photos ({photosList.length})</h4>
