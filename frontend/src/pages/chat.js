@@ -3,6 +3,8 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import AgoraRTC, {
+import VerifiedBadge from './components/VerifiedBadge';
+
   AgoraRTCProvider,
   useJoin,
   useLocalCameraTrack,
