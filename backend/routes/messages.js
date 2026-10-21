@@ -4,7 +4,7 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 
-// SEND MESSAGE (only between matched users)
+// SEND MESSAGE (between matched users OR directly with Admin Support)
 router.post('/send', auth, async (req, res) => {
   try {
     const { receiverId, content } = req.body;
@@ -13,15 +13,27 @@ router.post('/send', auth, async (req, res) => {
       return res.status(400).json({ message: 'Receiver ID and content are required' });
     }
 
-    // Check if users are matched
     const currentUser = await User.findById(req.user.userId);
-    
-    if (!currentUser.matches.includes(receiverId)) {
-      return res.status(403).json({ 
-        message: 'Can only message matched users' 
-      });
+    const receiverUser = await User.findById(receiverId);
+
+    if (!receiverUser) {
+      return res.status(404).json({ message: 'Receiver not found' });
     }
 
+    // 🛡️ Check if either sender or receiver is an Admin / Support account
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@pairhaven.com';
+    const isReceiverAdmin = receiverUser.role === 'admin' || receiverUser.email === adminEmail;
+    const isSenderAdmin = currentUser.role === 'admin' || currentUser.email === adminEmail;
+
+    // 🔒 If neither user is Admin, enforce the match check
+    if (!isReceiverAdmin && !isSenderAdmin) {
+      const isMatched = currentUser.matches.some(id => id.toString() === receiverId.toString());
+      if (!isMatched) {
+        return res.status(403).json({ message: 'Can only message matched users' });
+      }
+    }
+
+    // 💬 Create and save message
     const message = new Message({
       sender: req.user.userId,
       receiver: receiverId,
@@ -30,11 +42,16 @@ router.post('/send', auth, async (req, res) => {
 
     await message.save();
 
-    // Populate sender info for immediate UI update (including verificationStatus)
-    const populatedMessage = await Message.findById(message._id)
-      .populate('sender', 'name photos verificationStatus');
+    // Auto-add admin to user's matches if not present for clean UI sync
+    if (isReceiverAdmin && !currentUser.matches.some(id => id.toString() === receiverId.toString())) {
+      currentUser.matches.push(receiverId);
+      await currentUser.save();
+    }
 
-    // ✅ Emit socket event to trigger real-time pop-up notification on recipient's screen
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'name photos verificationStatus role email');
+
+    // 🔔 Emit socket event for instant real-time delivery
     const io = req.app.get('io');
     if (io) {
       io.to(receiverId.toString()).emit('receive-message', populatedMessage);
