@@ -92,17 +92,41 @@ router.get('/conversation/:userId', auth, async (req, res) => {
   }
 });
 
-// GET ALL CONVERSATIONS (for Messages tab) - OPTIMIZED WITH PERMANENT ADMIN PIN
+// GET ALL CONVERSATIONS
 router.get('/conversations', auth, async (req, res) => {
   try {
-    const currentUser = await User.findById(req.user.userId)
-      .populate('matches', 'name photos age lastSeen verificationStatus role email');
+    const currentUser = await User.findById(req.user.userId);
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@pairhaven.com';
+    const isAdmin = currentUser.role === 'admin' || currentUser.email === adminEmail;
 
-    const matches = currentUser.matches || [];
+    let targetUserIds = [];
+
+    if (isAdmin) {
+      // 🛡️ Admin Mode: Find ALL unique user IDs who have exchanged messages with Admin
+      const adminMessages = await Message.find({
+        $or: [{ sender: currentUser._id }, { receiver: currentUser._id }]
+      }).select('sender receiver');
+
+      const idsSet = new Set();
+      adminMessages.forEach(msg => {
+        if (msg.sender.toString() !== currentUser._id.toString()) idsSet.add(msg.sender.toString());
+        if (msg.receiver.toString() !== currentUser._id.toString()) idsSet.add(msg.receiver.toString());
+      });
+
+      targetUserIds = Array.from(idsSet);
+    } else {
+      // 👤 Standard User Mode: Get matched users
+      const populatedUser = await User.findById(req.user.userId)
+        .populate('matches', 'name photos age lastSeen verificationStatus role email');
+      targetUserIds = (populatedUser.matches || []).map(m => m._id.toString());
+    }
+
     const conversations = [];
 
-    // 1. Fetch conversations for matched users
-    for (const match of matches) {
+    for (const userId of targetUserIds) {
+      const match = await User.findById(userId).select('name photos age lastSeen verificationStatus role email');
+      if (!match) continue;
+
       const lastMessage = await Message.findOne({
         $or: [
           { sender: req.user.userId, receiver: match._id },
@@ -123,44 +147,12 @@ router.get('/conversations', auth, async (req, res) => {
       });
     }
 
-    // 2. Sort existing conversations by last activity
+    // Sort by recent activity
     conversations.sort((a, b) => {
       const dateA = a.lastMessage?.createdAt || new Date(0);
       const dateB = b.lastMessage?.createdAt || new Date(0);
       return new Date(dateB) - new Date(dateA);
     });
-
-    // 3. 🛡️ ALWAYS ensure Admin/PairHaven Support is included at the top for ALL users
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@pairhaven.com';
-    const adminUser = await User.findOne({ 
-      $or: [{ role: 'admin' }, { email: adminEmail }] 
-    }).select('name photos age lastSeen verificationStatus role email');
-
-    if (adminUser && adminUser._id.toString() !== req.user.userId.toString()) {
-      const hasAdminInConvs = conversations.some(c => c.user._id.toString() === adminUser._id.toString());
-
-      if (!hasAdminInConvs) {
-        const lastAdminMsg = await Message.findOne({
-          $or: [
-            { sender: req.user.userId, receiver: adminUser._id },
-            { sender: adminUser._id, receiver: req.user.userId }
-          ]
-        }).sort({ createdAt: -1 }).lean();
-
-        const adminUnread = await Message.countDocuments({
-          sender: adminUser._id,
-          receiver: req.user.userId,
-          read: false
-        });
-
-        // Pin Admin Support at the top
-        conversations.unshift({
-          user: adminUser,
-          lastMessage: lastAdminMsg || { content: 'Need help? Chat with Support!' },
-          unreadCount: adminUnread || 0
-        });
-      }
-    }
 
     res.json(conversations);
   } catch (error) {
