@@ -455,7 +455,29 @@ router.post('/verify-selfie', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// GET /api/users/me (Fetch logged in user profile)
+router.get('/me', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
+    res.json({
+      id: user._id,
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      photos: user.photos,
+      verificationStatus: user.verificationStatus,
+      location: user.location,
+      role: user.role,
+      membershipTier: user.membershipTier || 'standard',
+      isVip: !!user.isVip
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 // DELETE CURRENT USER PROFILE
 router.delete('/profile/me', auth, async (req, res) => {
   try {
