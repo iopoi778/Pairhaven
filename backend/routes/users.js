@@ -268,7 +268,36 @@ router.delete('/posts/:postId', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// DELETE CURRENT USER PROFILE & CLEAN UP REFERENCES
+router.delete('/profile/me', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // 1. Delete user posts and notifications
+    await Post.deleteMany({ author: userId });
+    await Notification.deleteMany({ $or: [{ recipient: userId }, { sender: userId }] });
 
+    // 2. Remove this user from everyone else's matches, requests, and blocks
+    await User.updateMany(
+      {},
+      { 
+        $pull: { 
+          matches: userId, 
+          requestsSent: userId, 
+          requestsReceived: userId, 
+          blockedUsers: userId 
+        } 
+      }
+    );
+    
+    // 3. Finally, delete the user document itself
+    await User.findByIdAndDelete(userId);
+
+    res.status(200).json({ message: 'Account and references deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 // ⚠️ TEMPORARY CLEANUP - DELETE AFTER USE
 router.get('/cleanup-empty-posts', auth, async (req, res) => {
   try {
