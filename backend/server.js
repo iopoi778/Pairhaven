@@ -64,5 +64,45 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`PairHaven server running on port ${PORT}`);
 });
+const bcrypt = require('bcryptjs');
+const User = require('./models/User'); // Adjust path to your User model
 
+async function createDefaultAdmin() {
+  try {
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@pairhaven.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'AdminSecure123!';
+
+    const existingAdmin = await User.findOne({ email: adminEmail });
+    
+    if (!existingAdmin) {
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+      
+      await User.create({
+        name: 'PairHaven Support',
+        email: adminEmail,
+        password: hashedPassword,
+        phone: 'admin_support_001',
+        age: 30,
+        gender: 'other',
+        role: 'admin', // Sets them as an admin automatically
+        verificationStatus: 'verified',
+        membershipTier: 'unlimited',
+        isVip: true,
+        photos: [{ url: 'https://via.placeholder.com/150', isPrimary: true }],
+        location: { type: 'Point', coordinates: [0, 0] }
+      });
+      
+      console.log(`✅ Default Admin account created successfully! Email: ${adminEmail}`);
+    } else {
+      // Ensure existing account has admin role if it was a regular user before
+      if (existingAdmin.role !== 'admin') {
+        existingAdmin.role = 'admin';
+        await existingAdmin.save();
+        console.log(`✅ Updated existing account ${adminEmail} to admin role.`);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to create default admin account:', err);
+  }
+}
 module.exports = { app, io };
