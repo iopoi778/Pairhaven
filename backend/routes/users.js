@@ -52,12 +52,8 @@ router.post('/request-verification', auth, async (req, res) => {
       return res.status(400).json({ message: 'Your account is already verified!' });
     }
 
-    // ✅ AFTER (Update to include 'pending'):
-verificationStatus: { 
-  type: String, 
-  enum: ['not_verified', 'pending', 'verified'], 
-  default: 'not_verified' 
-}
+    user.verificationStatus = 'pending';
+    await user.save();
 
     res.status(200).json({
       message: 'Verification request submitted successfully. Admin will review your profile.',
@@ -81,7 +77,6 @@ router.get('/potential-matches', auth, async (req, res) => {
 
     const { minAge, maxAge, location } = req.query;
     
-    // Build filter query
     let query = { 
       _id: { 
         $ne: req.user.userId, 
@@ -419,6 +414,7 @@ router.get('/profile/:userId/posts', auth, async (req, res) => {
     res.status(500).json({ message: error.message }); 
   }
 });
+
 // ✅ SUBMIT LIVE SELFIE FOR ADMIN REVIEW
 router.post('/verify-selfie', auth, async (req, res) => {
   try {
@@ -440,7 +436,6 @@ router.post('/verify-selfie', auth, async (req, res) => {
     // Trigger Admin Notification
     const admins = await User.find({ role: 'admin' });
     if (admins.length > 0) {
-      const Notification = require('../models/Notification');
       const notifications = admins.map(admin => ({
         recipient: admin._id,
         sender: user._id,
@@ -457,6 +452,7 @@ router.post('/verify-selfie', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 // DELETE CURRENT USER PROFILE
 router.delete('/profile/me', auth, async (req, res) => {
   try {
