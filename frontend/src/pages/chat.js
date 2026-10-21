@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import VerifiedBadge from '../components/VerifiedBadge'; // ✅ Import your VerifiedBadge component
 import io from 'socket.io-client';
 import AgoraRTC, {
   AgoraRTCProvider,
