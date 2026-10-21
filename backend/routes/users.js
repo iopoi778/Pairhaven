@@ -19,8 +19,14 @@ router.get('/profile/:id', auth, async (req, res) => {
     const requestsReceived = Array.isArray(user.requestsReceived) ? user.requestsReceived : [];
 
     res.json({
-      _id: user._id, name: user.name, photos: user.photos, location: user.location,
-      age: user.age, bio: user.bio, isPrivate: user.isPrivate || false,
+      _id: user._id, 
+      name: user.name, 
+      photos: user.photos, 
+      location: user.location,
+      age: user.age, 
+      bio: user.bio, 
+      isPrivate: user.isPrivate || false,
+      verificationStatus: user.verificationStatus || 'not_verified', // ✅ Include this
       matches, requestsSent, requestsReceived, matchesCount: matches.length,
       followersCount: 0, followingCount: 0,
       isOwnProfile: targetId.toString() === req.user.userId.toString()
