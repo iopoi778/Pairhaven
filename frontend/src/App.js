@@ -108,6 +108,25 @@ function App() {
   );
 }
 
+// 🌆 Shared Animated Background Component
+function AnimatedBackground() {
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+      <style>{`
+        @keyframes fadeSlide { 0% { opacity: 0; } 10% { opacity: 1; } 33% { opacity: 1; } 43% { opacity: 0; } 100% { opacity: 0; } }
+        .bg-slide { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; animation: fadeSlide 18s infinite; }
+        .bg-1 { animation-delay: 0s; background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=1080&auto=format&fit=crop'); }
+        .bg-2 { animation-delay: 6s; background-image: url('https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?q=80&w=1080&auto=format&fit=crop'); }
+        .bg-3 { animation-delay: 12s; background-image: url('https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1080&auto=format&fit=crop'); }
+      `}</style>
+      <div className="bg-slide bg-1"></div>
+      <div className="bg-slide bg-2"></div>
+      <div className="bg-slide bg-3"></div>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}></div>
+    </div>
+  );
+}
+
 function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, navCounts, onUpdateCounts }) {
   const [activeTab, setActiveTab] = useState('home');
   const currentTab = activeTabOverride || activeTab;
@@ -342,19 +361,7 @@ function LoginPage() {
 
   return (
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
-      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        <style>{`
-          @keyframes fadeSlide { 0% { opacity: 0; } 10% { opacity: 1; } 33% { opacity: 1; } 43% { opacity: 0; } 100% { opacity: 0; } }
-          .bg-slide { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; animation: fadeSlide 18s infinite; }
-          .bg-1 { animation-delay: 0s; background-image: url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=1080&auto=format&fit=crop'); }
-          .bg-2 { animation-delay: 6s; background-image: url('https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?q=80&w=1080&auto=format&fit=crop'); }
-          .bg-3 { animation-delay: 12s; background-image: url('https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1080&auto=format&fit=crop'); }
-        `}</style>
-        <div className="bg-slide bg-1"></div>
-        <div className="bg-slide bg-2"></div>
-        <div className="bg-slide bg-3"></div>
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}></div>
-      </div>
+      <AnimatedBackground />
 
       <div style={{ position: 'relative', zIndex: 1, width: '90%', maxWidth: 400, background: '#fff', padding: '2rem 1.5rem', borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', margin: '1rem', maxHeight: '90vh', overflowY: 'auto' }}>
         <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '1.5rem', fontSize: '1.8rem' }}>Welcome Back</h2>
@@ -376,7 +383,7 @@ function LoginPage() {
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // ✅ Step 0 is the 18+ gate screen!
   const [formData, setFormData] = useState({ 
     name: '', 
     email: '', 
@@ -408,8 +415,8 @@ function RegisterPage() {
       city: data.get('city'),
       bio: data.get('bio')
     });
-    setStep(3);
-  }; // ✅ Fixed missing closing brace here
+    setStep(2); // Move to multi-photo upload step
+  };
 
   const handleFilesChange = (e) => {
     const files = Array.from(e.target.files);
@@ -478,85 +485,98 @@ function RegisterPage() {
   };
 
   return (
-    <div style={{ maxWidth: 420, margin: '2rem auto', background: '#fff', padding: '2rem', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)' }}>
-      {/* STEP 1: 18+ AGE GATE PROMPT */}
-      {step === 1 && (
-        <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚫</div>
-          <h2 style={{ color: '#5b72f2', marginBottom: '0.8rem' }}>Are you 18 or older?</h2>
-          <p style={{ color: '#666', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.4' }}>
-            PairHaven is strictly for adults. By continuing you confirm you are at least 18 and agree to our Community Guidelines and Terms.
-          </p>
-          <button onClick={() => setStep(2)} style={{ ...primaryButtonStyle, background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', marginBottom: '1rem', padding: '1rem' }}>
-            I'm 18 or older
-          </button>
-          <button onClick={() => alert("You must be 18 or older to join.")} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '0.9rem' }}>
-            I'm under 18
-          </button>
-        </div>
-      )}
+    <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
+      <AnimatedBackground />
 
-      {/* STEP 2: USER DETAILS */}
-      {step === 2 && (
-        <div>
-          <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '1.2rem' }}>Create Account</h2>
-          <form onSubmit={handleDetailsSubmit}>
-            <input name="name" placeholder="Full Name" required style={inputStyle} />
-            <input name="email" type="email" placeholder="Email" required style={inputStyle} />
-            <input name="phone" placeholder="Phone Number" required style={inputStyle} />
-            <input name="password" type="password" placeholder="Password" required style={inputStyle} />
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <input name="age" type="number" min="18" placeholder="Age" required style={{ ...inputStyle, flex: 1 }} />
-              <select name="gender" required style={{ ...inputStyle, flex: 1 }}>
-                <option value="">Gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
+      <div style={{ position: 'relative', zIndex: 1, width: '90%', maxWidth: 420, background: '#fff', padding: '2rem', borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', margin: '1rem', maxHeight: '90vh', overflowY: 'auto' }}>
+        
+        {/* STEP 0: 18+ AGE GATE PROMPT & LOGIN / SIGN-UP CHOICE */}
+        {step === 0 && (
+          <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔞</div>
+            <h2 style={{ color: '#5b72f2', marginBottom: '0.8rem' }}>Are you 18 or older?</h2>
+            <p style={{ color: '#666', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.4' }}>
+              PairHaven is strictly for adults. By continuing you confirm you are at least 18 and agree to our Community Guidelines and Terms.
+            </p>
+            
+            <button onClick={() => setStep(1)} style={{ ...primaryButtonStyle, background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', marginBottom: '1rem', padding: '1rem' }}>
+              I'm 18 or older
+            </button>
+            <button onClick={() => alert("You must be 18 or older to join.")} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '0.9rem', display: 'block', margin: '0 auto 2rem' }}>
+              I'm under 18
+            </button>
+
+            <div style={{ borderTop: '1px solid #dfe3ea', paddingTop: '1.5rem' }}>
+              <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>Already have an account?</p>
+              <button onClick={() => navigate('/login')} style={{ ...primaryButtonStyle, background: '#fff', color: '#5b72f2', border: '1px solid #5b72f2' }}>
+                Log In
+              </button>
             </div>
-            <input name="city" placeholder="City (e.g., New York, London)" required style={inputStyle} />
-            <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
-            <button type="submit" style={primaryButtonStyle}>Next: Add Pictures</button>
-          </form>
-          <p style={{ textAlign: 'center', marginTop: '1rem' }}>
-            Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
-          </p>
-        </div>
-      )}
-
-      {/* STEP 3: MULTI-PHOTO SELECTION */}
-      {step === 3 && (
-        <div style={{ textAlign: 'center' }}>
-          <h2 style={{ color: '#5b72f2', marginBottom: '0.5rem' }}>Upload Profile Pictures</h2>
-          <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>Please upload at least **2 photos** to continue.</p>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '1.5rem' }}>
-            {selectedPhotos.map((file, idx) => (
-              <div key={idx} style={{ aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', background: '#eee', position: 'relative' }}>
-                <img src={URL.createObjectURL(file)} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <button 
-                  type="button"
-                  onClick={() => handleRemovePhoto(idx)} 
-                  style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            {selectedPhotos.length < 6 && (
-              <label style={{ aspectRatio: '1', borderRadius: '8px', border: '2px dashed #5b72f2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#5b72f2', background: '#f8fafc' }}>
-                <span style={{ fontSize: '1.5rem' }}>+</span>
-                <span style={{ fontSize: '0.75rem' }}>Add Photo</span>
-                <input type="file" multiple accept="image/*" onChange={handleFilesChange} style={{ display: 'none' }} />
-              </label>
-            )}
           </div>
+        )}
 
-          <button onClick={handleFinalRegistration} disabled={loading || selectedPhotos.length < 2} style={{ ...primaryButtonStyle, opacity: (loading || selectedPhotos.length < 2) ? 0.6 : 1 }}>
-            {loading ? 'Finalizing...' : `Complete Sign Up (${selectedPhotos.length}/2+ photos)`}
-          </button>
-        </div>
-      )}
+        {/* STEP 1: USER DETAILS */}
+        {step === 1 && (
+          <div>
+            <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '1.2rem' }}>Create Account</h2>
+            <form onSubmit={handleDetailsSubmit}>
+              <input name="name" placeholder="Full Name" required style={inputStyle} />
+              <input name="email" type="email" placeholder="Email" required style={inputStyle} />
+              <input name="phone" placeholder="Phone Number" required style={inputStyle} />
+              <input name="password" type="password" placeholder="Password" required style={inputStyle} />
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <input name="age" type="number" min="18" placeholder="Age" required style={{ ...inputStyle, flex: 1 }} />
+                <select name="gender" required style={{ ...inputStyle, flex: 1 }}>
+                  <option value="">Gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <input name="city" placeholder="City (e.g., New York, London)" required style={inputStyle} />
+              <textarea name="bio" rows="3" placeholder="Bio" style={inputStyle} />
+              <button type="submit" style={primaryButtonStyle}>Next: Add Pictures</button>
+            </form>
+            <p style={{ textAlign: 'center', marginTop: '1rem' }}>
+              Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#5b72f2', cursor: 'pointer', textDecoration: 'underline' }}>Log In</span>
+            </p>
+          </div>
+        )}
+
+        {/* STEP 2: MULTI-PHOTO SELECTION */}
+        {step === 2 && (
+          <div style={{ textAlign: 'center' }}>
+            <h2 style={{ color: '#5b72f2', marginBottom: '0.5rem' }}>Upload Profile Pictures</h2>
+            <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>Please upload at least **2 photos** to continue.</p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '1.5rem' }}>
+              {selectedPhotos.map((file, idx) => (
+                <div key={idx} style={{ aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', background: '#eee', position: 'relative' }}>
+                  <img src={URL.createObjectURL(file)} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button 
+                    type="button"
+                    onClick={() => handleRemovePhoto(idx)} 
+                    style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {selectedPhotos.length < 6 && (
+                <label style={{ aspectRatio: '1', borderRadius: '8px', border: '2px dashed #5b72f2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#5b72f2', background: '#f8fafc' }}>
+                  <span style={{ fontSize: '1.5rem' }}>+</span>
+                  <span style={{ fontSize: '0.75rem' }}>Add Photo</span>
+                  <input type="file" multiple accept="image/*" onChange={handleFilesChange} style={{ display: 'none' }} />
+                </label>
+              )}
+            </div>
+
+            <button onClick={handleFinalRegistration} disabled={loading || selectedPhotos.length < 2} style={{ ...primaryButtonStyle, opacity: (loading || selectedPhotos.length < 2) ? 0.6 : 1 }}>
+              {loading ? 'Finalizing...' : `Complete Sign Up (${selectedPhotos.length}/2+ photos)`}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
