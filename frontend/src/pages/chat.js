@@ -370,6 +370,19 @@ function ChatScreen() {
   );
 }
 
+function CallModal({ appId, channelName, callType, onClose }) {
+  return (
+    <AgoraRTCProvider client={agoraClient}>
+      <div style={modalOverlayStyle}>
+        <div style={modalContentStyle}>
+          <h3>{callType === 'video' ? '📹 Video Call' : '📞 Voice Call'}</h3>
+          <CallRoom appId={appId} channelName={channelName} callType={callType} onClose={onClose} />
+        </div>
+      </div>
+    </AgoraRTCProvider>
+  );
+}
+
 function CallRoom({ appId, channelName, callType, onClose }) {
   const isVideo = callType === 'video';
 
@@ -379,21 +392,16 @@ function CallRoom({ appId, channelName, callType, onClose }) {
     token: AGORA_TEMP_TOKEN || null
   });
 
-  // ✅ Ensure both microphone and camera tracks are created
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(true);
   const { localCameraTrack } = useLocalCameraTrack(isVideo);
 
-  // ✅ CRITICAL FIX: Publish BOTH microphone and camera tracks together
   usePublish([localMicrophoneTrack, localCameraTrack].filter(Boolean));
-
-  // Get all remote users in this channel
   const remoteUsers = useRemoteUsers();
 
   return (
     <div style={{ textAlign: 'center' }}>
       {isVideo ? (
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          {/* Local User Preview */}
           <div style={videoBoxStyle}>
             <p style={labelStyle}>You</p>
             {localCameraTrack && (
@@ -405,7 +413,6 @@ function CallRoom({ appId, channelName, callType, onClose }) {
             )}
           </div>
 
-          {/* Remote User Stream */}
           {remoteUsers.length === 0 ? (
             <div style={{ ...videoBoxStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa', fontSize: '0.85rem' }}>
               Waiting for user to join...
@@ -426,7 +433,7 @@ function CallRoom({ appId, channelName, callType, onClose }) {
         </div>
       ) : (
         <div style={{ padding: '2rem 0', fontSize: '1.2rem', color: '#5b72f2' }}>
-          🎙️ Voice Call Active ({remoteUsers.length > 0 ? 'Connected & Speaking' : 'Waiting for user to join...'})
+          🎙️ Voice Call Active ({remoteUsers.length > 0 ? 'Connected' : 'Waiting for user...'})
         </div>
       )}
 
