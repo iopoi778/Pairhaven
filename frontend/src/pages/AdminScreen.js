@@ -132,6 +132,29 @@ function AdminScreen() {
     }
   };
 
+  // ✅ New Handler: Update Profile Picture URL directly
+  const handleUpdatePhoto = async (userId, currentPhotos) => {
+    const currentUrl = currentPhotos?.[0]?.url || currentPhotos?.[0] || '';
+    const newPhotoUrl = prompt("Enter new profile picture image URL:", currentUrl);
+    
+    if (!newPhotoUrl || !newPhotoUrl.trim()) return;
+
+    setActionLoading(userId);
+    try {
+      const updatedPhotos = [{ url: newPhotoUrl.trim(), isPrimary: true }];
+      await axios.patch(`${API_URL}/api/admin/users/${userId}/profile`, { photos: updatedPhotos }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      alert("Profile picture updated successfully!");
+      fetchUsers();
+    } catch (err) {
+      alert("Failed to update profile photo");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleDeleteUser = async (userId, userName) => {
     if (!window.confirm(`Are you sure you want to permanently delete user "${userName}"? This action cannot be undone.`)) {
       return;
@@ -240,11 +263,26 @@ function AdminScreen() {
                     
                     {/* User Profile Info */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <img 
-                        src={u.photos?.[0]?.url || u.photos?.[0] || 'https://via.placeholder.com/150'} 
-                        alt={u.name} 
-                        style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover' }}
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <img 
+                          src={u.photos?.[0]?.url || u.photos?.[0] || 'https://via.placeholder.com/150'} 
+                          alt={u.name} 
+                          style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover' }}
+                        />
+                        {/* 📷 Change Avatar Button */}
+                        <button
+                          onClick={() => handleUpdatePhoto(u._id, u.photos)}
+                          title="Change Profile Picture"
+                          style={{
+                            position: 'absolute', bottom: '-2px', right: '-2px', background: '#5b72f2',
+                            color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px',
+                            fontSize: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                          }}
+                        >
+                          📷
+                        </button>
+                      </div>
+
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>
                           {u.name} {u.role === 'admin' && <span style={{ background: '#fee2e2', color: '#dc2626', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '6px', marginLeft: '6px' }}>ADMIN</span>}
@@ -262,7 +300,7 @@ function AdminScreen() {
                         disabled={isLoading}
                         style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', borderRadius: '8px', padding: '0.5rem 0.8rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                       >
-                        ✏️ Edit Profile
+                        ✏️ Bio
                       </button>
 
                       {/* Tier Change Dropdown */}
