@@ -538,7 +538,22 @@ function ProfileScreen({ userId }) {
           </button>
         )}
       </div>
+<button 
+  onClick={() => setShowSelfieModal(true)} // ✅ Opens the live camera modal first!
+  style={{ background: '#5b72f2', color: '#fff', border: 'none', padding: '0.6rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}
+>
+  📸 Verify Account
+</button>
 
+{/* Render the Selfie Verification Modal when showSelfieModal is true */}
+{showSelfieModal && (
+  <SelfieVerificationModal 
+    onClose={() => setShowSelfieModal(false)} 
+    onSuccess={() => {
+      fetchUserProfile(); // Refresh profile after submission
+    }} 
+  />
+)}
       {/* MEMBERSHIP & COINS MANAGEMENT SECTION */}
       {isOwnProfile && (
         <div style={{ background: user.isVip ? 'linear-gradient(135deg, #f6d365, #fda085)' : '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem', textAlign: 'center' }}>
