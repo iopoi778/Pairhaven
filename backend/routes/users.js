@@ -42,7 +42,22 @@ router.get('/potential-matches', auth, async (req, res) => {
         $nin: currentUser.blockedUsers || [] 
       } 
     };
+router.get('/discover', auth, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.userId);
+    
+    // Find users excluding yourself and excluding any admin accounts
+    const potentialMatches = await User.find({
+      _id: { $ne: currentUser._id },
+      role: { $ne: 'admin' }, // ✅ This ensures users never see or match with admin in discovery
+      gender: currentUser.preferences?.gender || { $exists: true }
+    }).limit(20);
 
+    res.json(potentialMatches);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
     if (minAge || maxAge) {
       query.age = {};
       if (minAge) query.age.$gte = Number(minAge);
