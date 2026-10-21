@@ -419,7 +419,44 @@ router.get('/profile/:userId/posts', auth, async (req, res) => {
     res.status(500).json({ message: error.message }); 
   }
 });
+// ✅ SUBMIT LIVE SELFIE FOR ADMIN REVIEW
+router.post('/verify-selfie', auth, async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ message: 'No selfie snapshot provided' });
+    }
 
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Set status to pending and save live snapshot
+    user.verificationStatus = 'pending';
+    user.selfieSnap = image;
+    await user.save();
+
+    // Trigger Admin Notification
+    const admins = await User.find({ role: 'admin' });
+    if (admins.length > 0) {
+      const Notification = require('../models/Notification');
+      const notifications = admins.map(admin => ({
+        recipient: admin._id,
+        sender: user._id,
+        type: 'verification_request',
+        message: `📸 ${user.name} submitted a live selfie for badge verification!`,
+        read: false
+      }));
+      await Notification.insertMany(notifications);
+    }
+
+    res.json({ message: 'Live selfie submitted! Admin will review your verification.' });
+  } catch (error) {
+    console.error('Verify selfie error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 // DELETE CURRENT USER PROFILE
 router.delete('/profile/me', auth, async (req, res) => {
   try {
