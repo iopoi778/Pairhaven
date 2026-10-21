@@ -132,7 +132,6 @@ function AdminScreen() {
     }
   };
 
-  // ✅ New Handler: Update Profile Picture URL directly
   const handleUpdatePhoto = async (userId, currentPhotos) => {
     const currentUrl = currentPhotos?.[0]?.url || currentPhotos?.[0] || '';
     const newPhotoUrl = prompt("Enter new profile picture image URL:", currentUrl);
@@ -195,7 +194,6 @@ function AdminScreen() {
           <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>Manage users, review policy violations, or reply to customer support inquiries.</p>
         </div>
 
-        {/* 🔴 Logout Button */}
         <button 
           onClick={handleLogout}
           style={{
@@ -269,7 +267,6 @@ function AdminScreen() {
                           alt={u.name} 
                           style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover' }}
                         />
-                        {/* 📷 Change Avatar Button */}
                         <button
                           onClick={() => handleUpdatePhoto(u._id, u.photos)}
                           title="Change Profile Picture"
@@ -284,8 +281,13 @@ function AdminScreen() {
                       </div>
 
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>
-                          {u.name} {u.role === 'admin' && <span style={{ background: '#fee2e2', color: '#dc2626', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '6px', marginLeft: '6px' }}>ADMIN</span>}
+                        <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {u.name} 
+                          {/* 🟦★ Automatic Verified Badge */}
+                          <span title="Verified User" style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '6px', fontWeight: 700 }}>
+                            🟦★ Verified
+                          </span>
+                          {u.role === 'admin' && <span style={{ background: '#fee2e2', color: '#dc2626', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '6px' }}>ADMIN</span>}
                         </div>
                         <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{u.email}</div>
                         <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>Plan: <strong>{(u.membershipTier || 'standard').toUpperCase()}</strong></div>
@@ -294,7 +296,6 @@ function AdminScreen() {
 
                     {/* Actions Panel */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      {/* Edit Bio Button */}
                       <button
                         onClick={() => handleEditBio(u._id, u.bio)}
                         disabled={isLoading}
@@ -303,7 +304,6 @@ function AdminScreen() {
                         ✏️ Bio
                       </button>
 
-                      {/* Tier Change Dropdown */}
                       <select 
                         value={u.membershipTier || 'standard'} 
                         disabled={isLoading}
@@ -315,7 +315,6 @@ function AdminScreen() {
                         <option value="unlimited">Unlimited ($5)</option>
                       </select>
 
-                      {/* Delete / Ban Account Button */}
                       {u.role !== 'admin' && (
                         <button 
                           onClick={() => handleDeleteUser(u._id, u.name)}
@@ -339,7 +338,6 @@ function AdminScreen() {
       {activeTab === 'support' && (
         <div style={{ display: 'grid', gridTemplateColumns: selectedConversation ? '1fr 1.5fr' : '1fr', gap: '1rem' }}>
           
-          {/* Conversation List */}
           <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1rem' }}>
             <h4 style={{ margin: '0 0 1rem', color: '#334155' }}>User Complaints & Messages</h4>
             {conversations.length === 0 ? (
@@ -363,57 +361,13 @@ function AdminScreen() {
               ))
             )}
           </div>
-  {/* Inside the users map loop in AdminScreen.js */}
-<div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-  
-  {/* 🟦⭐ Toggle Blue Badge Button */}
-  <button
-    onClick={async () => {
-      const nextStatus = u.verificationStatus === 'verified' ? 'not_verified' : 'verified';
-      try {
-        await axios.patch(`${API_URL}/api/admin/users/${u._id}/verify`, 
-          { status: nextStatus }, 
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
 
-        // Optimistically update local React state
-        setUsers(prev => prev.map(userItem => 
-          userItem._id === u._id 
-            ? { ...userItem, verificationStatus: nextStatus } 
-            : userItem
-        ));
-
-        alert(`User is now ${nextStatus === 'verified' ? 'VERIFIED (🟦★)' : 'UNVERIFIED'}`);
-      } catch (err) {
-        alert("Failed to update verification status.");
-      }
-    }}
-    style={{
-      background: u.verificationStatus === 'verified' ? '#dbeafe' : '#f1f5f9',
-      color: u.verificationStatus === 'verified' ? '#1d4ed8' : '#64748b',
-      border: '1px solid #bfdbfe',
-      borderRadius: '8px',
-      padding: '0.5rem 0.8rem',
-      fontSize: '0.82rem',
-      fontWeight: 700,
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px'
-    }}
-  >
-    {u.verificationStatus === 'verified' ? '🟦★ Verified' : 'Grant 🟦★ Badge'}
-  </button>
-
-</div>
-          {/* Active Reply Pane */}
           {selectedConversation && (
             <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1rem', display: 'flex', flexDirection: 'column', height: '450px' }}>
               <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem', fontWeight: 700 }}>
                 Chatting with: {selectedConversation.user.name}
               </div>
 
-              {/* Messages Container */}
               <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
                 {chatMessages.map(m => {
                   const isSupport = m.sender === currentUser._id || m.sender?._id === currentUser._id;
@@ -433,7 +387,6 @@ function AdminScreen() {
                 })}
               </div>
 
-              {/* Reply Form */}
               <form onSubmit={handleSendReply} style={{ display: 'flex', gap: '8px', marginTop: '1rem' }}>
                 <input 
                   type="text" 
