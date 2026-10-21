@@ -25,6 +25,22 @@ function AdminScreen() {
   const token = localStorage.getItem('token');
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
+   useEffect(() => {
+  if (activeTab === 'support') {
+    fetchConversations();
+
+    // ⚡ Listen for incoming support messages in real-time
+    const socket = io(API_URL);
+    socket.emit('join', currentUser.id || currentUser._id);
+
+    socket.on('receive-message', () => {
+      fetchConversations(); // Automatically refresh inbox list
+    });
+
+    return () => socket.disconnect();
+  }
+}, [activeTab]);
+  
   useEffect(() => {
     if (currentUser.role !== 'admin') {
       alert("Access denied. Admins only.");
