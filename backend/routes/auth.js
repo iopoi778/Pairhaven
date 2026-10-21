@@ -28,10 +28,8 @@ router.delete('/profile/me', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     
-    // Delete user posts, notifications, or related data if necessary
+    // Delete user posts and the user
     await Post.deleteMany({ author: userId });
-    
-    // Delete the user
     await User.findByIdAndDelete(userId);
 
     res.status(200).json({ message: 'Account deleted successfully' });
@@ -40,7 +38,16 @@ router.delete('/profile/me', auth, async (req, res) => {
   }
 });
 
-router.post('/register', uploadPhotos.array('photos', 5), async (req, res) => {
+// REGISTER ROUTE WITH MULTER WRAPPER TO PREVENT HTTP/2 DROPS
+router.post('/register', (req, res, next) => {
+  uploadPhotos.array('photos', 5)(req, res, (err) => {
+    if (err) {
+      console.error('Multer/Cloudinary Upload Error:', err);
+      return res.status(400).json({ message: err.message || 'Image upload failed. Check your file size or credentials.' });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const { name, email, phone, password, age, gender, bio, interests } = req.body;
 
@@ -73,6 +80,15 @@ router.post('/register', uploadPhotos.array('photos', 5), async (req, res) => {
       address = parsedLocation.address || '';
     }
 
+    let parsedInterests = [];
+    if (interests) {
+      try {
+        parsedInterests = typeof interests === 'string' ? JSON.parse(interests) : interests;
+      } catch (e) {
+        parsedInterests = [];
+      }
+    }
+
     const user = new User({
       name,
       email,
@@ -81,9 +97,7 @@ router.post('/register', uploadPhotos.array('photos', 5), async (req, res) => {
       age: age ? parseInt(age, 10) : null,
       gender,
       bio,
-      interests: interests
-        ? (typeof interests === 'string' ? JSON.parse(interests) : interests)
-        : [],
+      interests: parsedInterests,
       photos: req.files.map((file, index) => ({
         url: file.path || file.secure_url || file.location || '',
         publicId: file.filename || file.public_id || null,
@@ -105,7 +119,7 @@ router.post('/register', uploadPhotos.array('photos', 5), async (req, res) => {
 
     await user.save();
 
-    // ✅ Trigger Welcome Notification
+    // Trigger Welcome Notification
     await createWelcomeNotification(user._id, user.name);
 
     // Nearby user notifications
@@ -154,8 +168,8 @@ router.post('/register', uploadPhotos.array('photos', 5), async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Register error', error);
-    return res.status(500).json({ message: error.message });
+    console.error('Register error:', error);
+    return res.status(500).json({ message: error.message || 'Server error during registration' });
   }
 });
 
@@ -197,15 +211,13 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// 🌐 Google Auth Route
+// Google Auth Route
 router.post('/google', async (req, res) => {
   try {
     const { email, name, googleId, photo, age, gender, phone } = req.body;
     
-    let isNewUser = false;
     let user = await User.findOne({ email });
     if (!user) {
-      isNewUser = true;
       user = new User({
         name,
         email,
@@ -218,7 +230,6 @@ router.post('/google', async (req, res) => {
         location: { type: 'Point', coordinates: [0, 0] }
       });
       await user.save();
-      // ✅ Trigger Welcome Notification for new social signup
       await createWelcomeNotification(user._id, user.name);
     }
 
@@ -241,7 +252,7 @@ router.post('/google', async (req, res) => {
   }
 });
 
-// 🍎 Apple Auth Route
+// Apple Auth Route
 router.post('/apple', async (req, res) => {
   try {
     const { email, name, appleId, age, gender, phone } = req.body;
@@ -260,7 +271,6 @@ router.post('/apple', async (req, res) => {
         location: { type: 'Point', coordinates: [0, 0] }
       });
       await user.save();
-      // ✅ Trigger Welcome Notification for new social signup
       await createWelcomeNotification(user._id, user.name);
     }
 
