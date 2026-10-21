@@ -11,26 +11,6 @@ import VerifiedBadge from './components/VerifiedBadge'; // ✅ Import VerifiedBa
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
-function App() {
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    
-    // 🔄 Sync current user profile on app load/refresh
-    if (token) {
-      axios.get(`${API_URL}/api/users/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then(res => {
-        if (res.data) {
-          // Update local storage so membership changes (Pro/Unlimited) reflect immediately
-          localStorage.setItem('user', JSON.stringify(res.data));
-        }
-      })
-      .catch(err => {
-        console.error("Failed to sync user profile:", err);
-      });
-    }
-  }, []);
 
 const initialToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 if (initialToken) {
@@ -45,7 +25,7 @@ function NotificationPopup({ notification, onClose }) {
     // ⏱️ Auto dismiss after 60,000ms (1 minute)
     const timer = setTimeout(() => {
       handleClose();
-    }, 60000);
+    }, 600);
 
     return () => clearTimeout(timer);
   }, [notification]);
@@ -872,6 +852,32 @@ function SocialAuthButtons() {
       <button type="button" onClick={handleAppleLogin} style={{ ...socialButtonStyle, background: '#000', color: '#fff' }}>
         Continue with Apple
       </button>
+    </div>
+  );
+}
+
+function App() {
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    
+    if (token) {
+      axios.get(`${API_URL}/api/users/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => {
+        if (res.data) {
+          localStorage.setItem('user', JSON.stringify(res.data));
+        }
+      })
+      .catch(err => {
+        console.error("Failed to sync user profile:", err);
+      });
+    }
+  }, []);
+
+  return (
+    <div>
+      {/* Your router components go here */}
     </div>
   );
 }
