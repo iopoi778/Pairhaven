@@ -39,17 +39,15 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'PairHaven API' });
 });
 
-// ✅ Automatic Default Admin Account Seed Function
 async function createDefaultAdmin() {
   try {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@pairhaven.com';
     const adminPassword = process.env.ADMIN_PASSWORD || 'AdminSecure123!';
 
     const existingAdmin = await User.findOne({ email: adminEmail });
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
     
     if (!existingAdmin) {
-      const hashedPassword = await bcrypt.hash(adminPassword, 10);
-      
       await User.create({
         name: 'PairHaven Support',
         email: adminEmail,
@@ -57,21 +55,21 @@ async function createDefaultAdmin() {
         phone: 'admin_support_001',
         age: 30,
         gender: 'other',
-        role: 'admin', // Automatically sets as admin
+        role: 'admin',
         verificationStatus: 'verified',
         membershipTier: 'unlimited',
         isVip: true,
         photos: [{ url: 'https://via.placeholder.com/150', isPrimary: true }],
         location: { type: 'Point', coordinates: [0, 0] }
       });
-      
-      console.log(`✅ Default Admin account created successfully! Email: ${adminEmail}`);
+      console.log(`✅ Default Admin account created successfully!`);
     } else {
-      if (existingAdmin.role !== 'admin') {
-        existingAdmin.role = 'admin';
-        await existingAdmin.save();
-        console.log(`✅ Updated existing account ${adminEmail} to admin role.`);
-      }
+      // Force update role and tier every time server boots
+      existingAdmin.role = 'admin';
+      existingAdmin.membershipTier = 'unlimited';
+      existingAdmin.isVip = true;
+      await existingAdmin.save();
+      console.log(`✅ Verified and updated ${adminEmail} to admin role.`);
     }
   } catch (err) {
     console.error('Failed to create default admin account:', err);
