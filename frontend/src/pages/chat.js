@@ -249,7 +249,7 @@ function ChatScreen() {
           );
         })}
       </div>
-
+      
       {/* Active Chat Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', position: 'relative' }}>
         {selectedMatch ? (
