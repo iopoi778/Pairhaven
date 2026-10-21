@@ -99,6 +99,62 @@ function ProfileScreen({ userId }) {
     }, 2000);
   };
 
+  // 💳 Pan-African Payment via Flutterwave (Supports Cards, Mobile Money, Bank Transfers & USSD)
+  const handleFlutterwavePayment = (plan, priceInUsd) => {
+    const FLUTTERWAVE_PUBLIC_KEY = process.env.REACT_APP_FLUTTERWAVE_PUBLIC_KEY || 'FLWPUBK_TEST-your_public_key_here';
+
+    if (!window.FlutterwaveCheckout) {
+      alert("Payment gateway script is still loading. Please try again in a moment.");
+      return;
+    }
+
+    window.FlutterwaveCheckout({
+      public_key: FLUTTERWAVE_PUBLIC_KEY,
+      tx_ref: "ph_tx_" + Date.now(),
+      amount: priceInUsd, // $2 for Pro, $5 for Unlimited
+      currency: "USD",    // Automatically converts to local currency (KES, NGN, GHS, ZAR, etc.) at checkout
+      payment_options: "card, mobilemoney, banktransfer, ussd",
+      customer: {
+        email: user.email,
+        name: user.name,
+        phone_number: user.phone || ""
+      },
+      customizations: {
+        title: "PairHaven VIP Upgrade",
+        description: `Upgrade to ${plan.toUpperCase()} plan`,
+        logo: "https://via.placeholder.com/150"
+      },
+      callback: function (response) {
+        if (response.status === "successful") {
+          verifyFlutterwavePayment(response.transaction_id, plan);
+        } else {
+          alert("Payment was not completed.");
+        }
+      },
+      onclose: function() {
+        console.log("Payment window closed.");
+      }
+    });
+  };
+
+  // Verify transaction on backend
+  const verifyFlutterwavePayment = async (transactionId, plan) => {
+    try {
+      const res = await axios.post(`${API_URL}/api/users/verify-flutterwave`, { transactionId, plan }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setUser(prev => ({ 
+        ...prev, 
+        isVip: true, 
+        membershipTier: plan 
+      }));
+      alert(res.data.message || `Successfully upgraded to ${plan.toUpperCase()} 🎉`);
+    } catch (err) {
+      alert(err.response?.data?.message || "Payment verification failed.");
+    }
+  };
+
   const handleAcceptRequest = async () => {
     setActionLoading(true);
     try {
@@ -446,34 +502,34 @@ function ProfileScreen({ userId }) {
         )}
       </div>
 
-      {/* VIP & PRO MEMBERSHIP MODAL / CARD */}
-<div style={{ background: user.isVip ? 'linear-gradient(135deg, #f6d365, #fda085)' : '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem', textAlign: 'center' }}>
-  <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: user.isVip ? '#fff' : '#333' }}>
-    {user.membershipTier === 'unlimited' ? '👑 Unlimited Member' : user.membershipTier === 'pro' ? '⭐ Pro Member' : 'Standard Member'}
-  </h4>
-  <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: user.isVip ? '#fff' : '#666' }}>
-    {user.membershipTier === 'unlimited' ? 'Unlimited daily matches & all features active!' : user.membershipTier === 'pro' ? 'Pro Member (50 matches/day)' : 'Daily limit: 20 matches'}
-  </p>
+      {/* VIP & PRO MEMBERSHIP MODAL / CARD ($2 PRO / $5 UNLIMITED) */}
+      <div style={{ background: user.isVip ? 'linear-gradient(135deg, #f6d365, #fda085)' : '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem', textAlign: 'center' }}>
+        <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: user.isVip ? '#fff' : '#333' }}>
+          {user.membershipTier === 'unlimited' ? '👑 Unlimited Member' : user.membershipTier === 'pro' ? '⭐ Pro Member' : 'Standard Member'}
+        </h4>
+        <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: user.isVip ? '#fff' : '#666' }}>
+          {user.membershipTier === 'unlimited' ? 'Unlimited daily matches & all features active!' : user.membershipTier === 'pro' ? 'Pro Member (50 matches/day)' : 'Daily limit: 20 matches'}
+        </p>
 
-  {isOwnProfile && user.membershipTier !== 'unlimited' && (
-    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-      {user.membershipTier !== 'pro' && (
-        <button 
-          onClick={() => handlePurchasePlan('pro', 2)}
-          style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
-        >
-          ⭐ Pro Plan ($5/mo)
-        </button>
-      )}
-      <button 
-        onClick={() => handlePurchasePlan('unlimited', 5)}
-        style={{ background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
-      >
-        👑 Unlimited Plan ($15/mo)
-      </button>
-    </div>
-  )}
-</div>
+        {isOwnProfile && user.membershipTier !== 'unlimited' && (
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            {user.membershipTier !== 'pro' && (
+              <button 
+                onClick={() => handleFlutterwavePayment('pro', 2)}
+                style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                ⭐ Pro Plan ($2)
+              </button>
+            )}
+            <button 
+              onClick={() => handleFlutterwavePayment('unlimited', 5)}
+              style={{ background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+            >
+              👑 Unlimited Plan ($5)
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* STATS ROW */}
       <div style={{ display: 'flex', justifyContent: 'space-around', background: '#fff', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem' }}>
