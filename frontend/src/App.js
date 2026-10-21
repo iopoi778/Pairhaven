@@ -111,7 +111,7 @@ function App() {
 // 🌆 Shared Animated Background Component
 function AnimatedBackground() {
   return (
-    <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+    <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
       <style>{`
         @keyframes fadeSlide { 0% { opacity: 0; } 10% { opacity: 1; } 33% { opacity: 1; } 43% { opacity: 0; } 100% { opacity: 0; } }
         .bg-slide { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; animation: fadeSlide 18s infinite; }
@@ -383,7 +383,7 @@ function LoginPage() {
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(0); // ✅ Step 0 is the 18+ gate screen!
+  const [step, setStep] = useState(0); // 0: Age Gate First, 1: Details, 2: Pictures
   const [formData, setFormData] = useState({ 
     name: '', 
     email: '', 
@@ -415,7 +415,7 @@ function RegisterPage() {
       city: data.get('city'),
       bio: data.get('bio')
     });
-    setStep(2); // Move to multi-photo upload step
+    setStep(2);
   };
 
   const handleFilesChange = (e) => {
@@ -490,7 +490,7 @@ function RegisterPage() {
 
       <div style={{ position: 'relative', zIndex: 1, width: '90%', maxWidth: 420, background: '#fff', padding: '2rem', borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', margin: '1rem', maxHeight: '90vh', overflowY: 'auto' }}>
         
-        {/* STEP 0: 18+ AGE GATE PROMPT & LOGIN / SIGN-UP CHOICE */}
+        {/* STEP 0: AGE GATE & AUTH OPTIONS FIRST */}
         {step === 0 && (
           <div style={{ textAlign: 'center', padding: '1rem 0' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔞</div>
@@ -498,11 +498,10 @@ function RegisterPage() {
             <p style={{ color: '#666', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.4' }}>
               PairHaven is strictly for adults. By continuing you confirm you are at least 18 and agree to our Community Guidelines and Terms.
             </p>
-            
             <button onClick={() => setStep(1)} style={{ ...primaryButtonStyle, background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', marginBottom: '1rem', padding: '1rem' }}>
               I'm 18 or older
             </button>
-            <button onClick={() => alert("You must be 18 or older to join.")} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '0.9rem', display: 'block', margin: '0 auto 2rem' }}>
+            <button onClick={() => alert("You must be 18 or older to join.")} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '0.9rem', display: 'block', margin: '0 auto 1.5rem' }}>
               I'm under 18
             </button>
 
