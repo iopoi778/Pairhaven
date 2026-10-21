@@ -856,32 +856,6 @@ function SocialAuthButtons() {
   );
 }
 
-function App() {
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    
-    if (token) {
-      axios.get(`${API_URL}/api/users/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then(res => {
-        if (res.data) {
-          localStorage.setItem('user', JSON.stringify(res.data));
-        }
-      })
-      .catch(err => {
-        console.error("Failed to sync user profile:", err);
-      });
-    }
-  }, []);
-
-  return (
-    <div>
-      {/* Your router components go here */}
-    </div>
-  );
-}
-
 const socialButtonStyle = { width: '100%', padding: '0.8rem', borderRadius: '8px', fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' };
 const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '0.8rem', borderRadius: '8px', border: '1px solid #dfe3ea', marginBottom: '1rem', fontSize: '1rem' };
 const primaryButtonStyle = { width: '100%', padding: '0.9rem', border: 'none', borderRadius: '8px', background: '#5b72f2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
