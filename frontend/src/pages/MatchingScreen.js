@@ -258,9 +258,9 @@ function MatchingScreen() {
       {showFilters && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
           <div style={{ background: '#fff', width: '100%', maxWidth: '400px', borderRadius: '24px', padding: '1.8rem', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', boxSizing: 'border-box' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#1e293b' }}>Discovery Filters</h3>
-              <button onClick={() => setShowFilters(false)} style={{ background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '1rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', position: 'relative' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#1e293b', flex: 1, textAlign: 'center', paddingLeft: '32px' }}>Discovery Filters</h3>
+              <button onClick={() => setShowFilters(false)} style={{ background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '1rem', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
 
             <div style={{ marginBottom: '1.2rem' }}>
