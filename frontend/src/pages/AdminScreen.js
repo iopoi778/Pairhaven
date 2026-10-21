@@ -92,19 +92,28 @@ function AdminScreen() {
   };
 
   const handleUpdateTier = async (userId, newTier) => {
-    setActionLoading(userId);
-    try {
-      await axios.patch(`${API_URL}/api/admin/users/${userId}/tier`, { tier: newTier }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      alert(`User tier updated to ${newTier.toUpperCase()} successfully!`);
-      fetchUsers();
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to update tier");
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  setActionLoading(userId);
+  try {
+    await axios.patch(`${API_URL}/api/admin/users/${userId}/tier`, { tier: newTier }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    // ✅ Immediately update local React state so the UI changes right away
+    setUsers(prevUsers =>
+      prevUsers.map(u =>
+        u._id === userId
+          ? { ...u, membershipTier: newTier, isVip: newTier !== 'standard' }
+          : u
+      )
+    );
+
+    alert(`User tier updated to ${newTier.toUpperCase()} successfully!`);
+  } catch (err) {
+    alert(err.response?.data?.message || "Failed to update tier");
+  } finally {
+    setActionLoading(null);
+  }
+};
 
   const handleEditBio = async (userId, currentBio) => {
     const newBio = prompt("Edit Bio for user (violating profiles can be cleared):", currentBio || "");
