@@ -5,19 +5,19 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true },
   phone: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  
+  // ✅ Consolidated Role & Permissions
+  role: { type: String, enum: ['user', 'support', 'admin'], default: 'user' },
+  
+  // ✅ Consolidated Verification Status (Includes 'pending' for live camera queue)
   verificationStatus: { 
     type: String, 
     enum: ['not_verified', 'pending', 'verified'], 
     default: 'not_verified' 
   },
-  selfieSnap: { type: String, default: null }, // ✅ Add this field to store the live camera snapshot
-  membershipTier: { type: String, default: 'standard' },
+  selfieSnap: { type: String, default: null }, // Stores live camera snapshot
   
-  // ✅ Role & Permissions (Admin / Support / Regular User)
-  role: { type: String, enum: ['user', 'support', 'admin'], default: 'user' },
-
-  // ✅ VIP & Match Limit Fields
+  // ✅ Consolidated Membership & VIP Fields
   isVip: { type: Boolean, default: false },
   membershipTier: { type: String, enum: ['standard', 'pro', 'unlimited'], default: 'standard' },
   matchesSentToday: { type: Number, default: 0 },
@@ -39,7 +39,6 @@ const userSchema = new mongoose.Schema({
   gender: { type: String, enum: ['male', 'female', 'other'], required: true },
   bio: { type: String, maxlength: 500 },
   interests: [{ type: String }],
-  verificationStatus: { type: String, enum: ['not_verified', 'verified'], default: 'not_verified' },
   isPrivate: { type: Boolean, default: false },
   
   // ✅ Match Request Fields
