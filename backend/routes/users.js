@@ -26,12 +26,47 @@ router.get('/profile/:id', auth, async (req, res) => {
       age: user.age, 
       bio: user.bio, 
       isPrivate: user.isPrivate || false,
-      verificationStatus: user.verificationStatus || 'not_verified', // ✅ Include this
-      matches, requestsSent, requestsReceived, matchesCount: matches.length,
-      followersCount: 0, followingCount: 0,
+      verificationStatus: user.verificationStatus || 'not_verified',
+      matches, 
+      requestsSent, 
+      requestsReceived, 
+      matchesCount: matches.length,
+      followersCount: 0, 
+      followingCount: 0,
       isOwnProfile: targetId.toString() === req.user.userId.toString()
     });
-  } catch (error) { res.status(500).json({ message: error.message }); }
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
+  }
+});
+
+// ✅ REQUEST ACCOUNT VERIFICATION ROUTE
+router.post('/request-verification', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.verificationStatus === 'verified') {
+      return res.status(400).json({ message: 'Your account is already verified!' });
+    }
+
+    user.verificationStatus = 'pending';
+    await user.save();
+
+    res.status(200).json({
+      message: 'Verification request submitted successfully. Admin will review your profile.',
+      user: {
+        _id: user._id,
+        name: user.name,
+        verificationStatus: user.verificationStatus
+      }
+    });
+  } catch (error) {
+    console.error('Error submitting verification request:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
 
 // POTENTIAL MATCHES (With query filters support: minAge, maxAge, location, maxDistance)
@@ -47,24 +82,10 @@ router.get('/potential-matches', auth, async (req, res) => {
       _id: { 
         $ne: req.user.userId, 
         $nin: currentUser.blockedUsers || [] 
-      } 
+      },
+      role: { $ne: 'admin' } // Exclude admin accounts from discovery
     };
-router.get('/discover', auth, async (req, res) => {
-  try {
-    const currentUser = await User.findById(req.user.userId);
-    
-    // Find users excluding yourself and excluding any admin accounts
-    const potentialMatches = await User.find({
-      _id: { $ne: currentUser._id },
-      role: { $ne: 'admin' }, // ✅ This ensures users never see or match with admin in discovery
-      gender: currentUser.preferences?.gender || { $exists: true }
-    }).limit(20);
 
-    res.json(potentialMatches);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
     if (minAge || maxAge) {
       query.age = {};
       if (minAge) query.age.$gte = Number(minAge);
@@ -78,7 +99,7 @@ router.get('/discover', auth, async (req, res) => {
       ];
     }
 
-    const users = await User.find(query).select('name photos age location bio');
+    const users = await User.find(query).select('name photos age location bio verificationStatus');
     
     const enriched = users.map(u => {
       const obj = u.toObject();
@@ -89,7 +110,9 @@ router.get('/discover', auth, async (req, res) => {
     });
     
     res.json(enriched);
-  } catch (error) { res.status(500).json({ message: error.message }); }
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
+  }
 });
 
 // LEGACY UPGRADE ROUTE (Manual / Direct Card & Bank)
@@ -112,11 +135,6 @@ router.post('/upgrade', auth, async (req, res) => {
       user.membershipTier = plan;
       await user.save();
       return res.status(200).json({ message: `Successfully upgraded to ${plan.toUpperCase()} plan!` });
-    } else if (paymentMethod === 'bank') {
-      user.isVip = true;
-      user.membershipTier = plan;
-      await user.save();
-      return res.status(200).json({ message: 'Bank transfer request registered. Upgrade applied!' });
     } else {
       user.isVip = true;
       user.membershipTier = plan;
@@ -128,7 +146,7 @@ router.post('/upgrade', auth, async (req, res) => {
   }
 });
 
-// ✅ FLUTTERWAVE PAYMENT VERIFICATION ROUTE (Supports All African Payment Methods)
+// FLUTTERWAVE PAYMENT VERIFICATION ROUTE
 router.post('/verify-flutterwave', auth, async (req, res) => {
   try {
     const { transactionId, plan } = req.body;
@@ -137,7 +155,6 @@ router.post('/verify-flutterwave', auth, async (req, res) => {
       return res.status(400).json({ message: 'Invalid subscription plan.' });
     }
 
-    // Verify transaction with Flutterwave API
     const response = await axios.get(`https://api.flutterwave.com/v3/transactions/${transactionId}/verify`, {
       headers: {
         Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`
@@ -150,7 +167,6 @@ router.post('/verify-flutterwave', auth, async (req, res) => {
       const user = await User.findById(req.user.userId);
       if (!user) return res.status(404).json({ message: 'User not found' });
 
-      // Apply VIP status & set membership tier ('pro' or 'unlimited')
       user.isVip = true;
       user.membershipTier = plan;
       await user.save();
@@ -175,7 +191,6 @@ router.post('/request/:userId', auth, async (req, res) => {
     
     if (!target || !current) return res.status(404).json({ message: 'User not found' });
 
-    // Check & Reset daily limit if 24 hours have passed
     const today = new Date().toDateString();
     const lastReset = new Date(current.lastMatchResetDate).toDateString();
     if (today !== lastReset) {
@@ -183,7 +198,6 @@ router.post('/request/:userId', auth, async (req, res) => {
       current.lastMatchResetDate = new Date();
     }
 
-    // Limit check: Non-VIP users capped at 20, Pro capped at 50, Unlimited has no cap
     if (!current.isVip && current.matchesSentToday >= 20) {
       return res.status(403).json({ 
         message: 'Daily match limit reached (20/20). Upgrade to Pro/Unlimited or watch an ad for 3 free matches!' 
@@ -226,7 +240,7 @@ router.post('/reward-ad-matches', auth, async (req, res) => {
   }
 });
 
-// ✅ ACCEPT REQUEST - WITH NOTIFICATION
+// ACCEPT REQUEST - WITH NOTIFICATION
 router.post('/accept-request/:userId', auth, async (req, res) => {
   try {
     const requester = await User.findById(req.params.userId);
@@ -252,7 +266,9 @@ router.post('/accept-request/:userId', auth, async (req, res) => {
     }
 
     res.json({ message: 'Match accepted' });
-  } catch (error) { res.status(500).json({ message: error.message }); }
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
+  }
 });
 
 // DECLINE REQUEST
@@ -269,7 +285,9 @@ router.delete('/request/:userId', auth, async (req, res) => {
     }
     await current.save();
     res.json({ message: 'Request removed' });
-  } catch (error) { res.status(500).json({ message: error.message }); }
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
+  }
 });
 
 // UNMATCH USER
@@ -334,9 +352,12 @@ router.patch('/profile/me', auth, async (req, res) => {
 
     const user = await User.findByIdAndUpdate(req.user.userId, updateFields, { new: true }).select('-password');
     res.json(user);
-  } catch (error) { res.status(500).json({ message: error.message }); }
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
+  }
 });
-// ✅ ADD THIS ROUTE: Handle photo updates for the logged-in user
+
+// HANDLE PHOTO UPDATES
 router.put('/profile/me/photo', auth, uploadPhotos.single('photo'), async (req, res) => {
   try {
     if (!req.file) {
@@ -353,10 +374,8 @@ router.put('/profile/me/photo', auth, uploadPhotos.single('photo'), async (req, 
     const photoUrl = req.file.path || req.file.secure_url || req.file.location;
     const publicId = req.file.filename || req.file.public_id || null;
 
-    // Set new primary photo or replace photos array
     const newPhoto = { url: photoUrl, publicId, isPrimary: true };
 
-    // Reset old primary status and add/replace photo
     user.photos = user.photos.map(p => ({ ...p, isPrimary: false }));
     user.photos.unshift(newPhoto);
 
@@ -372,6 +391,7 @@ router.put('/profile/me/photo', auth, uploadPhotos.single('photo'), async (req, 
     res.status(500).json({ message: error.message });
   }
 });
+
 // GET USER POSTS
 router.get('/profile/:userId/posts', auth, async (req, res) => {
   try {
@@ -391,53 +411,12 @@ router.get('/profile/:userId/posts', auth, async (req, res) => {
       mediaUrl: post.mediaUrl || null,
       mediaType: post.mediaType || null
     })));
-  } catch (error) { res.status(500).json({ message: error.message }); }
-});
-
-// STRICT POST CREATION
-router.post('/', auth, async (req, res) => {
-  try {
-    const { text, mediaUrl, mediaType } = req.body;
-    const hasText = text && typeof text === 'string' && text.trim().length > 0;
-    const hasMedia = mediaUrl && typeof mediaUrl === 'string' && mediaUrl.trim().length > 0;
-    
-    if (!hasText && !hasMedia) {
-      return res.status(400).json({ message: 'Post must contain text or media.' });
-    }
-
-    const newPost = new Post({
-      author: req.user.userId,
-      text: hasText ? text.trim() : '',
-      mediaUrl: hasMedia ? mediaUrl.trim() : null,
-      mediaType: hasMedia ? (mediaType || 'image') : null,
-      likes: [], loves: []
-    });
-    await newPost.save();
-    
-    const populated = await Post.findById(newPost._id).populate('author', 'name photos').lean();
-    res.status(201).json(populated);
-  } catch (error) { res.status(500).json({ message: error.message }); }
-});
-
-// DELETE POST
-router.delete('/posts/:postId', auth, async (req, res) => {
-  try {
-    const post = await Post.findById(req.params.postId);
-    if (!post) return res.status(404).json({ message: 'Post not found' });
-    
-    if (post.author.toString() !== req.user.userId) {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
-    
-    await Post.findByIdAndDelete(req.params.postId);
-    res.json({ message: 'Deleted successfully' });
-  } catch (error) {
-    console.error('Delete error:', error);
-    res.status(500).json({ message: error.message });
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
   }
 });
 
-// DELETE CURRENT USER PROFILE & DEEP REFERENCE CLEANUP
+// DELETE CURRENT USER PROFILE
 router.delete('/profile/me', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -460,22 +439,6 @@ router.delete('/profile/me', auth, async (req, res) => {
     await User.findByIdAndDelete(userId);
 
     res.status(200).json({ message: 'Account and references deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// TEMPORARY CLEANUP
-router.get('/cleanup-empty-posts', auth, async (req, res) => {
-  try {
-    const result = await Post.deleteMany({
-      author: req.user.userId,
-      $and: [
-        { $or: [{ text: {$exists: false } }, { text: '' }, { text: null }] },
-        { $or: [{ mediaUrl: {$exists: false } }, { mediaUrl: null }, { mediaUrl: '' }] }
-      ]
-    });
-    res.json({ deleted: result.deletedCount, message: 'Empty posts removed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
