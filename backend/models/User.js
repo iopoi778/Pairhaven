@@ -5,7 +5,10 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true },
   phone: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  
+  isVip: { type: Boolean, default: false },
+  matchesSentToday: { type: Number, default: 0 },
+  lastMatchResetDate: { type: Date, default: Date.now }
+});
   photos: [{
     url: { type: String, required: true },
     publicId: String,
@@ -35,7 +38,6 @@ const userSchema = new mongoose.Schema({
     distance: { type: Number, default: 50 },
     gender: { type: String }
   },
-  
   createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
