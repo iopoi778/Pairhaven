@@ -6,8 +6,12 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   
+  // ✅ Role & Permissions (Admin / Support / Regular User)
+  role: { type: String, enum: ['user', 'support', 'admin'], default: 'user' },
+
   // ✅ VIP & Match Limit Fields
   isVip: { type: Boolean, default: false },
+  membershipTier: { type: String, enum: ['standard', 'pro', 'unlimited'], default: 'standard' },
   matchesSentToday: { type: Number, default: 0 },
   lastMatchResetDate: { type: Date, default: Date.now },
 
@@ -34,6 +38,7 @@ const userSchema = new mongoose.Schema({
   matches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   requestsSent: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   requestsReceived: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   
   preferences: {
     ageRange: { min: Number, max: Number },
