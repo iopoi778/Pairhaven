@@ -41,7 +41,7 @@ async function autoConnectAndSendRules(newUser) {
         await adminUser.save();
       }
 
-      // 2. Auto-Send Rules & Community Guidelines Message
+      // 2. Auto-Send Rules & Community Guidelines Message (Using 'content' field)
       const welcomeRulesText = 
         `Welcome to PairHaven, ${newUser.name}! 👋\n\n` +
         `Please adhere to our Community Rules:\n` +
@@ -53,8 +53,8 @@ async function autoConnectAndSendRules(newUser) {
 
       await Message.create({
         sender: adminUser._id,
-        recipient: newUser._id,
-        text: welcomeRulesText,
+        receiver: newUser._id, // ✅ Schema uses 'receiver', not 'recipient'
+        content: welcomeRulesText, // ✅ Schema uses 'content', not 'text'
         read: false
       });
     }
@@ -179,7 +179,7 @@ router.post('/register', (req, res, next) => {
         location: user.location,
         role: user.role,                  // ✅ Returned role
         membershipTier: user.membershipTier, // ✅ Returned tier
-        isVip: user.isVip                 // ✅ Returned VIP status
+        isVip: user.isVip                  // ✅ Returned VIP status
       }
     });
   } catch (error) {
@@ -218,7 +218,7 @@ router.post('/login', async (req, res) => {
         location: user.location,
         role: user.role,                  // ✅ Returned role
         membershipTier: user.membershipTier, // ✅ Returned tier
-        isVip: user.isVip                 // ✅ Returned VIP status
+        isVip: user.isVip                  // ✅ Returned VIP status
       }
     });
   } catch (error) {
