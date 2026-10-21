@@ -5,6 +5,7 @@ import ProfileScreen from './pages/ProfileScreen';
 import MatchingScreen from './pages/MatchingScreen';
 import ChatScreen from './pages/chat';
 import NotificationsScreen from './pages/NotificationsScreen';
+import AdminScreen from './pages/AdminScreen'; // ✅ Import Admin Screen
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -16,6 +17,19 @@ if (initialToken) {
 const ProtectedRoute = ({ children }) => {
   const authToken = localStorage.getItem('token');
   if (!authToken) return <Navigate to="/login" replace />;
+  return children;
+};
+
+// ✅ Admin Protected Route Check
+const AdminRoute = ({ children }) => {
+  const authToken = localStorage.getItem('token');
+  let user = {};
+  try {
+    user = JSON.parse(localStorage.getItem('user')) || {};
+  } catch (e) {}
+
+  if (!authToken) return <Navigate to="/login" replace />;
+  if (user.role !== 'admin') return <Navigate to="/" replace />;
   return children;
 };
 
@@ -100,6 +114,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/admin" element={<AdminRoute><AdminScreen /></AdminRoute>} /> {/* ✅ Admin Route */}
           <Route path="/profile/*" element={<ProtectedRoute><ProfileRouteWrapper onUpdateCounts={fetchNavCounts} /></ProtectedRoute>} />
           <Route path="/*" element={<ProtectedRoute><DashboardLayout navCounts={navCounts} onUpdateCounts={fetchNavCounts} /></ProtectedRoute>} />
         </Routes>
@@ -130,6 +145,11 @@ function AnimatedBackground() {
 function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, navCounts, onUpdateCounts }) {
   const [activeTab, setActiveTab] = useState('home');
   const currentTab = activeTabOverride || activeTab;
+
+  let currentUser = {};
+  try {
+    currentUser = JSON.parse(localStorage.getItem('user')) || {};
+  } catch (e) {}
 
   useEffect(() => {
     if (onUpdateCounts) onUpdateCounts();
@@ -166,6 +186,19 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
     );
   };
 
+  // ✅ Build tab options dynamically (Admin tab added ONLY if user.role === 'admin')
+  const tabsList = [
+    { id: 'home', label: 'Home', icon: '🏠' },
+    { id: 'matching', label: 'Match', icon: '💖' },
+    { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
+    { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
+    { id: 'profile', label: 'Profile', icon: '👤' }
+  ];
+
+  if (currentUser.role === 'admin') {
+    tabsList.push({ id: 'admin', label: 'Admin', icon: '🛡️' });
+  }
+
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)', position: 'relative', paddingBottom: '90px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
@@ -189,24 +222,25 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         maxWidth: '600px', margin: '0 auto', zIndex: 1000, boxSizing: 'border-box',
         boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
       }}>
-        {[
-          { id: 'home', label: 'Home', icon: '🏠' },
-          { id: 'matching', label: 'Match', icon: '💖' },
-          { id: 'messages', label: 'Chat', icon: '💬', count: navCounts?.chat },
-          { id: 'notifications', label: 'Alerts', icon: '🔔', count: navCounts?.alerts },
-          { id: 'profile', label: 'Profile', icon: '👤' }
-        ].map(tab => (
+        {tabsList.map(tab => (
           <button 
             key={tab.id} 
-            onClick={() => { setActiveTab(tab.id); if (tab.id === 'profile') window.location.hash = '/'; }} 
+            onClick={() => { 
+              if (tab.id === 'admin') {
+                window.location.hash = '/admin';
+              } else {
+                setActiveTab(tab.id); 
+                if (tab.id === 'profile') window.location.hash = '/';
+              }
+            }} 
             style={{ 
-              border: currentTab === tab.id ? '1px solid #5b72f2' : '1px solid transparent', 
-              background: currentTab === tab.id ? '#eef2ff' : 'transparent', 
+              border: (currentTab === tab.id || (tab.id === 'admin' && window.location.hash.includes('/admin'))) ? '1px solid #5b72f2' : '1px solid transparent', 
+              background: (currentTab === tab.id || (tab.id === 'admin' && window.location.hash.includes('/admin'))) ? '#eef2ff' : 'transparent', 
               borderRadius: '10px', 
-              padding: '0.5rem 0.8rem', 
-              minWidth: '70px', 
+              padding: '0.5rem 0.6rem', 
+              minWidth: '60px', 
               textAlign: 'center', 
-              color: currentTab === tab.id ? '#5b72f2' : '#666', 
+              color: (currentTab === tab.id || (tab.id === 'admin' && window.location.hash.includes('/admin'))) ? '#5b72f2' : '#666', 
               cursor: 'pointer', 
               position: 'relative' 
             }}
@@ -358,7 +392,13 @@ function LoginPage() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-      navigate('/', { replace: true });
+      
+      // ✅ Redirect to admin panel if user role is admin, otherwise to home
+      if (data.user.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (err) { 
       alert('Server error.'); 
     } finally { 
@@ -390,7 +430,7 @@ function LoginPage() {
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(0); // 0: Age Gate First, 1: Details, 2: Pictures
+  const [step, setStep] = useState(0); 
   const [formData, setFormData] = useState({ 
     name: '', 
     email: '', 
@@ -497,7 +537,6 @@ function RegisterPage() {
 
       <div style={{ position: 'relative', zIndex: 1, width: '90%', maxWidth: 420, background: '#fff', padding: '2rem', borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', margin: '1rem', maxHeight: '90vh', overflowY: 'auto' }}>
         
-        {/* STEP 0: AGE GATE & AUTH OPTIONS FIRST */}
         {step === 0 && (
           <div style={{ textAlign: 'center', padding: '1rem 0' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔞</div>
@@ -521,7 +560,6 @@ function RegisterPage() {
           </div>
         )}
 
-        {/* STEP 1: USER DETAILS */}
         {step === 1 && (
           <div>
             <h2 style={{ textAlign: 'center', color: '#5b72f2', marginBottom: '1.2rem' }}>Create Account</h2>
@@ -549,7 +587,6 @@ function RegisterPage() {
           </div>
         )}
 
-        {/* STEP 2: MULTI-PHOTO SELECTION */}
         {step === 2 && (
           <div style={{ textAlign: 'center' }}>
             <h2 style={{ color: '#5b72f2', marginBottom: '0.5rem' }}>Upload Profile Pictures</h2>
