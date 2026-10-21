@@ -34,6 +34,12 @@ router.post('/send', auth, async (req, res) => {
     const populatedMessage = await Message.findById(message._id)
       .populate('sender', 'name photos verificationStatus');
 
+    // ✅ Emit socket event to trigger real-time pop-up notification on recipient's screen
+    const io = req.app.get('io');
+    if (io) {
+      io.to(receiverId.toString()).emit('receive-message', populatedMessage);
+    }
+
     res.status(201).json(populatedMessage);
   } catch (error) {
     console.error('Send message error:', error);
