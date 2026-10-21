@@ -167,7 +167,7 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
   };
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)' }}>
+    <div style={{ maxWidth: '600px', margin: '0 auto', background: '#f8f8f8', minHeight: '100vh', boxShadow: '0 0 18px rgba(0,0,0,0.08)', position: 'relative', paddingBottom: '90px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.2rem', borderBottom: '1px solid #dfe3ea', background: '#fff', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {showBackButton && (
@@ -177,11 +177,18 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         </div>
       </header>
 
-      <main style={{ padding: '1rem', minHeight: 'calc(100vh - 120px)', background: '#f6f6f6' }}>
+      <main style={{ padding: '1rem', background: '#f6f6f6' }}>
         {renderContent()}
       </main>
 
-      <nav style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', height: '78px', position: 'relative' }}>
+      {/* ✅ Fixed Permanent Bottom Navigation Bar */}
+      <nav style={{ 
+        display: 'flex', justifyContent: 'space-around', alignItems: 'center', 
+        padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', 
+        height: '78px', position: 'fixed', bottom: 0, left: 0, right: 0, 
+        maxWidth: '600px', margin: '0 auto', zIndex: 1000, boxSizing: 'border-box',
+        boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
+      }}>
         {[
           { id: 'home', label: 'Home', icon: '🏠' },
           { id: 'matching', label: 'Match', icon: '💖' },
