@@ -52,8 +52,12 @@ router.post('/request-verification', auth, async (req, res) => {
       return res.status(400).json({ message: 'Your account is already verified!' });
     }
 
-    user.verificationStatus = 'pending';
-    await user.save();
+    // ✅ AFTER (Update to include 'pending'):
+verificationStatus: { 
+  type: String, 
+  enum: ['not_verified', 'pending', 'verified'], 
+  default: 'not_verified' 
+}
 
     res.status(200).json({
       message: 'Verification request submitted successfully. Admin will review your profile.',
