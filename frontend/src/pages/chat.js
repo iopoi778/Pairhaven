@@ -53,6 +53,14 @@ function ChatScreen() {
     socketRef.current = io(API_URL);
     socketRef.current.emit('join', myId);
 
+    // 💬 Real-time message receiver inside active chat
+    socketRef.current.on('receive-message', (data) => {
+      if (selectedMatch && (data.sender?._id === selectedMatch._id || data.sender === selectedMatch._id)) {
+        setMessages(prev => [...prev, data]);
+      }
+      fetchConversations();
+    });
+
     socketRef.current.on('incoming-call', (data) => {
       setIncomingCall(data);
     });
@@ -65,17 +73,18 @@ function ChatScreen() {
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
     };
-  }, [myId]);
+  }, [myId, selectedMatch]);
+
+  const fetchConversations = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/messages/conversations`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setConversations(res.data || []);
+    } catch (err) { console.error("Conv fetch failed", err); }
+  };
 
   useEffect(() => {
-    const fetchConversations = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/messages/conversations`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setConversations(res.data || []);
-      } catch (err) { console.error("Conv fetch failed", err); }
-    };
     if (token) fetchConversations();
   }, [token]);
 
@@ -114,6 +123,7 @@ function ChatScreen() {
       
       setMessages(prev => [...prev, res.data]);
       setNewMessage('');
+      fetchConversations();
     } catch (err) { alert(err.response?.data?.message || "Send failed"); }
   };
 
@@ -128,6 +138,7 @@ function ChatScreen() {
       alert("User blocked successfully.");
       setSelectedMatch(null);
       setShowMenu(false);
+      fetchConversations();
     } catch (err) {
       alert("Failed to block user");
     }
@@ -136,7 +147,7 @@ function ChatScreen() {
   const handleSendGift = async (giftName) => {
     try {
       await axios.post(`${API_URL}/api/messages/send`, {
-        receiverId: selectedMatch._id, content: `🎁 Sent a virtual gift: ${giftName}`
+        receiverId: selectedMatch._id, content: `🎁 Sent: ${giftName}`
       }, { headers: { Authorization: `Bearer ${token}` } });
 
       setShowGiftModal(false);
@@ -183,22 +194,27 @@ function ChatScreen() {
     <div style={{ display: 'flex', height: 'calc(100vh - 78px)', background: '#fff', position: 'relative' }}>
       {/* Conversations Sidebar */}
       <div style={{ width: '320px', borderRight: '1px solid #eee', overflowY: 'auto', background: '#fff' }}>
-        <div style={{ padding: '1.2rem', borderBottom: '1px solid #eee', fontWeight: 700 }}>Messages</div>
+        <div style={{ padding: '1.2rem', borderBottom: '1px solid #eee', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Messages</span>
+          <span style={{ fontSize: '0.75rem', background: '#eef2ff', color: '#5b72f2', padding: '2px 8px', borderRadius: '10px' }}>24/7 Support</span>
+        </div>
+
         {conversations.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>No conversations</div>
         ) : conversations.map(conv => {
           const isActive = selectedMatch?._id === conv.user._id;
           const unreadCount = conv.unreadCount || 0;
+          const isAdmin = conv.user.role === 'admin' || conv.user.email === 'admin@pairhaven.com';
 
           return (
             <div key={conv.user._id} onClick={() => setSelectedMatch(conv.user)} style={{ 
               padding: '1rem 1.2rem', cursor: 'pointer',
-              background: isActive ? '#f0f7ff' : '#fff',
+              background: isActive ? '#f0f7ff' : (isAdmin ? '#fffdf5' : '#fff'),
               borderBottom: '1px solid #f5f5f5', display: 'flex', alignItems: 'center', gap: '12px',
               position: 'relative'
             }}>
               <div style={{ position: 'relative' }}>
-                <img src={getAvatarUrl(conv.user.photos)} alt="" style={{ width: 50, height: 50, borderRadius: '50%', objectFit: 'cover' }} />
+                <img src={getAvatarUrl(conv.user.photos)} alt="" style={{ width: 50, height: 50, borderRadius: '50%', objectFit: 'cover', border: isAdmin ? '2px solid #f59e0b' : 'none' }} />
                 {unreadCount > 0 && (
                   <span style={{ 
                     position: 'absolute', top: -2, right: -2, background: '#ff4b4b', color: '#fff', 
@@ -214,6 +230,7 @@ function ChatScreen() {
                 <div style={{ fontWeight: unreadCount > 0 ? 800 : 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                     {conv.user.name} 
+                    {isAdmin && <span style={{ fontSize: '0.7rem', background: '#fef3c7', color: '#b45309', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>🛡️ Support</span>}
                     <VerifiedBadge status={conv.user.verificationStatus} size="0.85rem" />
                   </div>
                   {unreadCount > 0 && (
@@ -239,9 +256,16 @@ function ChatScreen() {
                 <div>
                   <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     {selectedMatch.name}
+                    {(selectedMatch.role === 'admin' || selectedMatch.email === 'admin@pairhaven.com') && (
+                      <span style={{ fontSize: '0.75rem', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '8px', fontWeight: 700 }}>
+                        🛡️ Official Support
+                      </span>
+                    )}
                     <VerifiedBadge status={selectedMatch.verificationStatus} size="0.95rem" />
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#888' }}>{selectedMatch.age ? `${selectedMatch.age} yrs` : 'Online'}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                    {selectedMatch.role === 'admin' ? 'Always Online' : (selectedMatch.age ? `${selectedMatch.age} yrs` : 'Online')}
+                  </div>
                 </div>
               </div>
 
@@ -284,14 +308,14 @@ function ChatScreen() {
             </div>
 
             <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #eee', display: 'flex', gap: '10px' }}>
-              <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()} placeholder="Type a message..." style={{ flex: 1, padding: '0.8rem 1.2rem', borderRadius: '24px', border: '1px solid #e2e8f0', outline: 'none', background: '#f8f9fa' }} />
+              <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()} placeholder={`Message ${selectedMatch.name}...`} style={{ flex: 1, padding: '0.8rem 1.2rem', borderRadius: '24px', border: '1px solid #e2e8f0', outline: 'none', background: '#f8f9fa' }} />
               <button onClick={handleSend} disabled={!newMessage.trim()} style={{ background: newMessage.trim() ? '#5b72f2' : '#cbd5e1', color: '#fff', border: 'none', borderRadius: '24px', padding: '0.8rem 1.5rem', fontWeight: 600, cursor: newMessage.trim() ? 'pointer' : 'default' }}>Send</button>
             </div>
           </>
         ) : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
             <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>💬</div>
-            <p>Select a conversation</p>
+            <p>Select a conversation or tap PairHaven Support to start chatting</p>
           </div>
         )}
       </div>
