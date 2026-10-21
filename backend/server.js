@@ -102,6 +102,8 @@ app.use('/api/users', profileRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/swipes', swipesRoutes);
 app.use('/api/admin', adminRoutes); // ✅ Mounted Admin Endpoints
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 socketHandlers(io);
 
