@@ -34,7 +34,29 @@ function NotificationsScreen() {
   }, [token]);
 
   const handleNotificationClick = async (note) => {
-    // Mark notification as read
+    // Check if user is on Pro or Unlimited plan
+    const isPaidUser = currentUser?.isVip || ['pro', 'unlimited'].includes(currentUser?.membershipTier);
+    const isLockedType = ['like', 'match', 'match_request'].includes(note.type) && !isPaidUser;
+
+    if (isLockedType) {
+      const confirmAd = window.confirm(
+        "🔒 This notification is locked!\n\nUpgrade to Pro/Unlimited or watch a quick ad to blur-reveal who liked or matched with you."
+      );
+
+      if (confirmAd) {
+        alert("Playing reward ad... (Simulated)");
+        setTimeout(() => {
+          alert("Ad completed! Unlocking notification...");
+          const senderId = note.sender?._id || note.sender || note.metadata?.newUserId;
+          if (senderId) {
+            window.location.hash = `/profile/${senderId}`;
+          }
+        }, 2000);
+      }
+      return;
+    }
+
+    // Mark notification as read for normal/unlocked items
     try {
       await axios.put(`${API_URL}/api/notifications/${note._id}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
@@ -47,39 +69,16 @@ function NotificationsScreen() {
       console.error("Mark read failed", err); 
     }
 
-    // Direct routing for message or welcome types
+    // Direct routing
     if (note.type === 'message') {
       localStorage.setItem('activeTab', 'messages');
       window.location.hash = '/';
       return;
     }
 
-    // For Likes, Matches, Requests, and Accepts
-    if (['like', 'match', 'follow', 'match_request', 'match_accepted', 'new-user'].includes(note.type)) {
-      const senderId = note.sender?._id || note.sender || note.metadata?.newUserId;
-
-      if (!senderId) return;
-
-      // Check if user is on Pro or Unlimited plan
-      const isPaidUser = currentUser?.isVip || ['pro', 'unlimited'].includes(currentUser?.membershipTier);
-
-      if (isPaidUser) {
-        // Pro / Unlimited members see matches & likes directly
-        window.location.hash = `/profile/${senderId}`;
-      } else {
-        // Standard user: prompt to watch an ad to reveal
-        const confirmAd = window.confirm(
-          "🔒 Upgrade to Pro or watch a quick ad to reveal who liked/matched with you!\n\nClick 'OK' to watch ad now."
-        );
-
-        if (confirmAd) {
-          alert("Playing reward ad... (Simulated)");
-          setTimeout(() => {
-            alert("Ad completed! Opening profile...");
-            window.location.hash = `/profile/${senderId}`;
-          }, 2000);
-        }
-      }
+    const senderId = note.sender?._id || note.sender || note.metadata?.newUserId;
+    if (senderId) {
+      window.location.hash = `/profile/${senderId}`;
     }
   };
 
@@ -111,7 +110,8 @@ function NotificationsScreen() {
                 cursor: 'pointer',
                 borderLeft: isRead ? '4px solid transparent' : '4px solid #5b72f2',
                 transition: 'all 0.2s',
-                position: 'relative'
+                position: 'relative',
+                overflow: 'hidden'
               }}
             >
               <div style={{ fontWeight: 'bold', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -128,17 +128,45 @@ function NotificationsScreen() {
                   {!['like','follow','match','message','match_request','match_accepted','welcome','new-user'].includes(note.type) && '🔔 Notification'}
                 </div>
 
-                {/* Show lock badge for free users on like/match alerts */}
                 {isLockedType && (
                   <span style={{ fontSize: '0.75rem', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
-                    🔒 Watch Ad to view
+                    🔒 Locked
                   </span>
                 )}
               </div>
 
-              <div style={{ color: '#444', fontSize: '0.9rem' }}>{note.message}</div>
+              {/* Apply CSS filter blur effect for standard users on match/like notifications */}
+              <div style={{ 
+                color: '#444', 
+                fontSize: '0.9rem',
+                filter: isLockedType ? 'blur(5px)' : 'none',
+                userSelect: isLockedType ? 'none' : 'auto',
+                transition: 'filter 0.3s ease'
+              }}>
+                {note.message}
+              </div>
+
+              {isLockedType && (
+                <div style={{ 
+                  position: 'absolute', 
+                  top: 0, 
+                  left: 0, 
+                  right: 0, 
+                  bottom: 0, 
+                  background: 'rgba(255, 255, 255, 0.4)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  color: '#1e293b',
+                  backdropFilter: 'blur(2px)'
+                }}>
+                  🔒 Tap & watch ad to reveal
+                </div>
+              )}
               
-              <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem', position: 'relative', zIndex: 1 }}>
                 {new Date(note.createdAt).toLocaleString()}
               </div>
             </div>
