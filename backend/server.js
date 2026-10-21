@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
@@ -12,12 +13,13 @@ const postRoutes = require('./routes/posts');
 const commentRoutes = require('./routes/comments');
 const messageRoutes = require('./routes/messages');
 const notificationRoutes = require('./routes/notifications');
-
 const profileRoutes = require('./routes/profile');
 const uploadsRoutes = require('./routes/uploads');
 const swipesRoutes = require('./routes/swipes');
+const adminRoutes = require('./routes/admin'); // ✅ Admin & Support Routes
 
 const socketHandlers = require('./socketHandlers');
+const User = require('./models/User');
 
 const app = express();
 const server = http.createServer(app);
@@ -37,36 +39,7 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'PairHaven API' });
 });
 
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
-
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/matches', matchRoutes);
-app.use('/api/posts', postRoutes);
-app.use('/api/comments', commentRoutes);
-app.use('/api/messages', messageRoutes);
-app.use('/api/notifications', notificationRoutes);
-
-app.use('/api/users', profileRoutes);
-app.use('/api/uploads', uploadsRoutes);
-app.use('/api/swipes', swipesRoutes);
-
-socketHandlers(io);
-
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
-});
-
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`PairHaven server running on port ${PORT}`);
-});
-const bcrypt = require('bcryptjs');
-const User = require('./models/User'); // Adjust path to your User model
-
+// ✅ Automatic Default Admin Account Seed Function
 async function createDefaultAdmin() {
   try {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@pairhaven.com';
@@ -84,7 +57,7 @@ async function createDefaultAdmin() {
         phone: 'admin_support_001',
         age: 30,
         gender: 'other',
-        role: 'admin', // Sets them as an admin automatically
+        role: 'admin', // Automatically sets as admin
         verificationStatus: 'verified',
         membershipTier: 'unlimited',
         isVip: true,
@@ -94,7 +67,6 @@ async function createDefaultAdmin() {
       
       console.log(`✅ Default Admin account created successfully! Email: ${adminEmail}`);
     } else {
-      // Ensure existing account has admin role if it was a regular user before
       if (existingAdmin.role !== 'admin') {
         existingAdmin.role = 'admin';
         await existingAdmin.save();
@@ -105,4 +77,41 @@ async function createDefaultAdmin() {
     console.error('Failed to create default admin account:', err);
   }
 }
-module.exports = { app, io };
+
+// Connect to MongoDB and start server
+mongoose.connect(process.env.MONGODB_URI)
+  .then(async () => {
+    console.log('✅ Connected to MongoDB');
+    
+    // Seed the default admin/support account on boot
+    await createDefaultAdmin();
+
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => {
+      console.log(`PairHaven server running on port ${PORT}`);
+    });
+  })
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Register API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/matches', matchRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/users', profileRoutes);
+app.use('/api/uploads', uploadsRoutes);
+app.use('/api/swipes', swipesRoutes);
+app.use('/api/admin', adminRoutes); // ✅ Mounted Admin Endpoints
+
+socketHandlers(io);
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Something went wrong!' });
+});
+
+module.exports = { app, io, server };
