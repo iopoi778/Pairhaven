@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Post = require('../models/Post');
 const Notification = require('../models/Notification'); // ✅ Import Notification model
 const auth = require('../middleware/auth');
+const { uploadPhotos } = require('../middleware/upload');
 
 // GET USER PROFILE
 router.get('/profile/:id', auth, async (req, res) => {
@@ -329,7 +330,42 @@ router.patch('/profile/me', auth, async (req, res) => {
     res.json(user);
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
+// ✅ ADD THIS ROUTE: Handle photo updates for the logged-in user
+router.put('/profile/me/photo', auth, uploadPhotos.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image file uploaded' });
+    }
 
+    const userId = req.user.userId;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const photoUrl = req.file.path || req.file.secure_url || req.file.location;
+    const publicId = req.file.filename || req.file.public_id || null;
+
+    // Set new primary photo or replace photos array
+    const newPhoto = { url: photoUrl, publicId, isPrimary: true };
+
+    // Reset old primary status and add/replace photo
+    user.photos = user.photos.map(p => ({ ...p, isPrimary: false }));
+    user.photos.unshift(newPhoto);
+
+    await user.save();
+
+    res.json({
+      message: 'Photo updated successfully',
+      photos: user.photos,
+      user
+    });
+  } catch (error) {
+    console.error('Photo upload error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 // GET USER POSTS
 router.get('/profile/:userId/posts', auth, async (req, res) => {
   try {
