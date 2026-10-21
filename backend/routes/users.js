@@ -415,7 +415,6 @@ router.get('/profile/:userId/posts', auth, async (req, res) => {
   }
 });
 
-// ✅ SUBMIT LIVE SELFIE FOR ADMIN REVIEW
 router.post('/verify-selfie', auth, async (req, res) => {
   try {
     const { image } = req.body;
@@ -428,22 +427,26 @@ router.post('/verify-selfie', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Set status to pending and save live snapshot
+    // Save status and snapshot
     user.verificationStatus = 'pending';
     user.selfieSnap = image;
     await user.save();
 
-    // Trigger Admin Notification
-    const admins = await User.find({ role: 'admin' });
-    if (admins.length > 0) {
-      const notifications = admins.map(admin => ({
-        recipient: admin._id,
-        sender: user._id,
-        type: 'verification_request',
-        message: `📸 ${user.name} submitted a live selfie for badge verification!`,
-        read: false
-      }));
-      await Notification.insertMany(notifications);
+    // Safely attempt to notify admins
+    try {
+      const admins = await User.find({ role: 'admin' });
+      if (admins.length > 0) {
+        const notifications = admins.map(admin => ({
+          recipient: admin._id,
+          sender: user._id,
+          type: 'verification_request',
+          message: `📸 ${user.name} submitted a live selfie for badge verification!`,
+          read: false
+        }));
+        await Notification.insertMany(notifications);
+      }
+    } catch (notifErr) {
+      console.error('Non-blocking notification error:', notifErr);
     }
 
     res.json({ message: 'Live selfie submitted! Admin will review your verification.' });
