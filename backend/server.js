@@ -53,23 +53,22 @@ async function createDefaultAdmin() {
         email: adminEmail,
         password: hashedPassword,
         phone: 'admin_support_001',
-        age: 30,
+        age: ,
         gender: 'other',
         role: 'admin',
-        verificationStatus: 'verified',
+        verificationStatus: 'verified', // ✅ Permanent verified badge
         membershipTier: 'unlimited',
         isVip: true,
         photos: [{ url: 'https://via.placeholder.com/150', isPrimary: true }],
         location: { type: 'Point', coordinates: [0, 0] }
       });
-      console.log(`✅ Default Admin account created successfully!`);
+      console.log(`✅ Default Admin account created with verified badge!`);
     } else {
-      // Force update role and tier every time server boots
       existingAdmin.role = 'admin';
+      existingAdmin.verificationStatus = 'verified'; // ✅ Force verified badge on boot
       existingAdmin.membershipTier = 'unlimited';
       existingAdmin.isVip = true;
       await existingAdmin.save();
-      console.log(`✅ Verified and updated ${adminEmail} to admin role.`);
     }
   } catch (err) {
     console.error('Failed to create default admin account:', err);
