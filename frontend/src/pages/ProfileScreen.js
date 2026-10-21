@@ -567,7 +567,7 @@ function ProfileScreen({ userId }) {
               )}
               <button 
                 onClick={() => handleFlutterwavePayment('unlimited', 5)}
-                style={{ background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                style={{ background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
               >
                 👑 Unlimited Plan ($5) - Unlim. Coins & Chat
               </button>
