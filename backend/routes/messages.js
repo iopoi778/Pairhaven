@@ -75,31 +75,24 @@ router.get('/conversation/:userId', auth, async (req, res) => {
   }
 });
 
-// GET ALL CONVERSATIONS (for Messages tab) - OPTIMIZED
+// GET ALL CONVERSATIONS (for Messages tab) - OPTIMIZED WITH PERMANENT ADMIN PIN
 router.get('/conversations', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.userId)
-      .populate('matches', 'name photos age lastSeen verificationStatus'); // ✅ Includes verificationStatus
+      .populate('matches', 'name photos age lastSeen verificationStatus role email');
 
-    // Handle case where user has no matches yet
     const matches = currentUser.matches || [];
-    
-    if (matches.length === 0) {
-      return res.json([]);
-    }
-
     const conversations = [];
 
+    // 1. Fetch conversations for matched users
     for (const match of matches) {
-      // Get last message safely
       const lastMessage = await Message.findOne({
         $or: [
           { sender: req.user.userId, receiver: match._id },
           { sender: match._id, receiver: req.user.userId }
         ]
-      }).sort({ createdAt: -1 }).lean(); // .lean() improves performance
+      }).sort({ createdAt: -1 }).lean();
 
-      // Count unread messages FROM this match TO current user
       const unreadCount = await Message.countDocuments({
         sender: match._id,
         receiver: req.user.userId,
@@ -108,17 +101,49 @@ router.get('/conversations', auth, async (req, res) => {
 
       conversations.push({
         user: match,
-        lastMessage: lastMessage || null, // Ensure null not undefined
-        unreadCount: unreadCount || 0     // Ensure 0 not undefined
+        lastMessage: lastMessage || null,
+        unreadCount: unreadCount || 0
       });
     }
 
-    // Sort by most recent activity (messages without timestamps go to bottom)
+    // 2. Sort existing conversations by last activity
     conversations.sort((a, b) => {
       const dateA = a.lastMessage?.createdAt || new Date(0);
       const dateB = b.lastMessage?.createdAt || new Date(0);
       return new Date(dateB) - new Date(dateA);
     });
+
+    // 3. 🛡️ ALWAYS ensure Admin/PairHaven Support is included at the top for ALL users
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@pairhaven.com';
+    const adminUser = await User.findOne({ 
+      $or: [{ role: 'admin' }, { email: adminEmail }] 
+    }).select('name photos age lastSeen verificationStatus role email');
+
+    if (adminUser && adminUser._id.toString() !== req.user.userId.toString()) {
+      const hasAdminInConvs = conversations.some(c => c.user._id.toString() === adminUser._id.toString());
+
+      if (!hasAdminInConvs) {
+        const lastAdminMsg = await Message.findOne({
+          $or: [
+            { sender: req.user.userId, receiver: adminUser._id },
+            { sender: adminUser._id, receiver: req.user.userId }
+          ]
+        }).sort({ createdAt: -1 }).lean();
+
+        const adminUnread = await Message.countDocuments({
+          sender: adminUser._id,
+          receiver: req.user.userId,
+          read: false
+        });
+
+        // Pin Admin Support at the top
+        conversations.unshift({
+          user: adminUser,
+          lastMessage: lastAdminMsg || { content: 'Need help? Chat with Support!' },
+          unreadCount: adminUnread || 0
+        });
+      }
+    }
 
     res.json(conversations);
   } catch (error) {
