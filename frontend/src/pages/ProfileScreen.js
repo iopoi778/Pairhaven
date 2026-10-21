@@ -73,7 +73,7 @@ function ProfileScreen({ userId }) {
       alert("Match request sent!");
     } catch (err) {
       if (err.response && err.response.status === 403) {
-        const choice = window.confirm("You've run out of match/chat coins for today! \n\nClick 'OK' to watch an ad for +3 Match Coins & +3 Chat Coins, or 'Cancel' to upgrade.");
+        const choice = window.confirm("You've run out of match coins for today! \n\nClick 'OK' to watch an ad for +3 Match Coins & +3 Chat Coins, or 'Cancel' to upgrade.");
         if (choice) {
           handleWatchAd();
         } else {
@@ -340,7 +340,7 @@ function ProfileScreen({ userId }) {
 
   const photosList = Array.isArray(user.photos) ? user.photos : [];
 
-  // Calculate remaining coins for standard user (Assuming 10 daily base, or track usage via backend)
+  // Standard Plan Daily Coins Calculation
   const maxStandardMatches = 10;
   const maxStandardChats = 10;
   const matchesUsed = user.matchesSentToday || 0;
@@ -475,14 +475,14 @@ function ProfileScreen({ userId }) {
 
         <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.5rem', fontWeight: 700 }}>{user.name}</h2>
         
-        <p style={{ margin: '0 0 1rem', color: '#666', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+        <p style={{ margin: '0 0 0.6rem', color: '#666', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
           <span>{user.age ? `${user.age} yrs` : ''}</span>
           {user.age && renderLocation(user.location) ? ' • ' : ''}
           <span>📍 {renderLocation(user.location)}</span>
         </p>
 
-        {/* PUBLIC PLAN BADGE SHOWN TO EVERYONE */}
-        <div style={{ margin: '0.5rem 0', display: 'inline-block', padding: '4px 12px', borderRadius: '12px', background: user.membershipTier === 'unlimited' ? '#ff4b4b' : user.membershipTier === 'pro' ? '#5b72f2' : '#e2e8f0', color: user.membershipTier ? '#fff' : '#475569', fontSize: '0.8rem', fontWeight: 700 }}>
+        {/* PUBLIC MEMBERSHIP PLAN BADGE (VISIBLE TO EVERYONE) */}
+        <div style={{ margin: '0.2rem 0 1rem', display: 'inline-block', padding: '4px 14px', borderRadius: '12px', background: user.membershipTier === 'unlimited' ? 'linear-gradient(135deg, #ff4b4b, #dc2626)' : user.membershipTier === 'pro' ? '#5b72f2' : '#e2e8f0', color: user.membershipTier ? '#fff' : '#475569', fontSize: '0.8rem', fontWeight: 700 }}>
           {user.membershipTier === 'unlimited' ? '👑 Unlimited Plan' : user.membershipTier === 'pro' ? '⭐ Pro Plan' : 'Standard Member'}
         </div>
 
@@ -519,58 +519,62 @@ function ProfileScreen({ userId }) {
         )}
       </div>
 
-      {/* MEMBERSHIP & COINS SECTION */}
-      <div style={{ background: user.isVip ? 'linear-gradient(135deg, #f6d365, #fda085)' : '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem', textAlign: 'center' }}>
-        <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: user.isVip ? '#fff' : '#333' }}>
-          {user.membershipTier === 'unlimited' ? '👑 Unlimited Member' : user.membershipTier === 'pro' ? '⭐ Pro Member' : '⭐ Standard Plan'}
-        </h4>
+      {/* MEMBERSHIP & COINS MANAGEMENT SECTION (ONLY VISIBLE ON OWN PROFILE) */}
+      {isOwnProfile && (
+        <div style={{ background: user.isVip ? 'linear-gradient(135deg, #f6d365, #fda085)' : '#fff', borderRadius: '12px', padding: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem', textAlign: 'center' }}>
+          <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: user.isVip ? '#fff' : '#333' }}>
+            {user.membershipTier === 'unlimited' ? '👑 Unlimited Plan Active' : user.membershipTier === 'pro' ? '⭐ Pro Plan Active' : '⭐ Standard Plan Balances'}
+          </h4>
 
-        {/* ONLY SHOW COIN BALANCES IF USER IS STANDARD (Hide for Pro and Unlimited) */}
-        {(!user.membershipTier || user.membershipTier === 'standard') && (
-          <div style={{ display: 'flex', justifyContent: 'space-around', margin: '1rem 0', background: '#f8fafc', padding: '0.8rem', borderRadius: '8px' }}>
-            <div>
-              <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>{remainingMatchCoins} / 10</strong>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Match Coins</div>
+          {/* SHOW REMAINING COIN BALANCES ONLY IF OWNER IS ON STANDARD PLAN */}
+          {(!user.membershipTier || user.membershipTier === 'standard') && (
+            <div style={{ display: 'flex', justifyContent: 'space-around', margin: '1rem 0', background: '#f8fafc', padding: '0.8rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <div>
+                <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>{remainingMatchCoins} / 10</strong>
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Match Coins</div>
+              </div>
+              <div>
+                <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>{remainingChatCoins} / 10</strong>
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Chat Coins</div>
+              </div>
             </div>
-            <div>
-              <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>{remainingChatCoins} / 10</strong>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Chat Coins</div>
-            </div>
-          </div>
-        )}
+          )}
 
-        <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: user.isVip ? '#fff' : '#666' }}>
-          {user.membershipTier === 'unlimited' ? 'Unlimited daily matches & unlimited chat active!' : user.membershipTier === 'pro' ? 'Pro Plan: 50 Match Coins & Unlimited Chat' : 'Get more coins by watching ads or upgrading!'}
-        </p>
+          <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: user.isVip ? '#fff' : '#666' }}>
+            {user.membershipTier === 'unlimited' ? 'You have unlimited daily matches & unlimited chats!' : user.membershipTier === 'pro' ? 'Pro Plan: 50 Match Coins & Unlimited Chat Active!' : 'Get more coins by watching ads or upgrading your plan!'}
+          </p>
 
-        {isOwnProfile && (!user.membershipTier || user.membershipTier === 'standard') && (
-          <button 
-            onClick={handleWatchAd}
-            style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem', marginBottom: '1rem', display: 'block', margin: '0 auto 1rem' }}
-          >
-            📺 Watch Ad (+3 Match Coins & +3 Chats)
-          </button>
-        )}
-
-        {isOwnProfile && user.membershipTier !== 'unlimited' && (
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            {user.membershipTier !== 'pro' && (
-              <button 
-                onClick={() => handleFlutterwavePayment('pro', 2)}
-                style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
-              >
-                ⭐ Pro Plan ($2) - 50 Coins + Unlim. Chat
-              </button>
-            )}
+          {/* AD REWARD BUTTON FOR STANDARD USERS */}
+          {(!user.membershipTier || user.membershipTier === 'standard') && (
             <button 
-              onClick={() => handleFlutterwavePayment('unlimited', 5)}
-              style={{ background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+              onClick={handleWatchAd}
+              style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.55rem 1.2rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem', display: 'block', margin: '0 auto 1rem', boxShadow: '0 2px 6px rgba(16,185,129,0.2)' }}
             >
-              👑 Unlimited Plan ($5) - Unlim. Coins & Chat
+              📺 Watch Ad (+3 Match Coins & +3 Chats)
             </button>
-          </div>
-        )}
-      </div>
+          )}
+
+          {/* UPGRADE OPTIONS FOR PRO & UNLIMITED PLANS */}
+          {user.membershipTier !== 'unlimited' && (
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {user.membershipTier !== 'pro' && (
+                <button 
+                  onClick={() => handleFlutterwavePayment('pro', 2)}
+                  style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                >
+                  ⭐ Pro Plan ($2) - 50 Coins + Unlim. Chat
+                </button>
+              )}
+              <button 
+                onClick={() => handleFlutterwavePayment('unlimited', 5)}
+                style={{ background: 'linear-gradient(135deg, #ff4b4b, #5b72f2)', color: '#fff', border: 'none', borderRadius: '20px', padding: '0.6rem 1.2rem', fontWeight 700, cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                👑 Unlimited Plan ($5) - Unlim. Coins & Chat
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* STATS ROW */}
       <div style={{ display: 'flex', justifyContent: 'space-around', background: '#fff', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '1.5rem' }}>
