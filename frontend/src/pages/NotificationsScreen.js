@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -8,7 +7,6 @@ function NotificationsScreen() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const token = localStorage.getItem('token');
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -50,7 +48,6 @@ function NotificationsScreen() {
         window.location.hash = `/profile/${senderId}`;
       }
     }
-    // 'welcome' notifications keep the user right on the notifications screen or home feed
   };
 
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading alerts...</div>;
