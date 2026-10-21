@@ -82,7 +82,6 @@ function ChatScreen() {
       const convs = res.data || [];
       setConversations(convs);
 
-      // 🚀 Auto-select first conversation (Support or recent match) on load
       if (convs.length > 0 && !selectedMatch) {
         setSelectedMatch(convs[0].user);
       }
@@ -199,7 +198,13 @@ function ChatScreen() {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 78px)', background: '#fff', position: 'relative' }}>
       {/* Conversations Sidebar */}
-      <div style={{ width: '320px', borderRight: '1px solid #eee', overflowY: 'auto', background: '#fff' }}>
+      <div style={{ 
+        width: '320px', 
+        borderRight: '1px solid #eee', 
+        overflowY: 'auto', 
+        background: '#fff',
+        display: selectedMatch ? 'none' : 'block' // Responsive toggle
+      }}>
         <div style={{ padding: '1.2rem', borderBottom: '1px solid #eee', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Messages</span>
           <span style={{ fontSize: '0.75rem', background: '#eef2ff', color: '#5b72f2', padding: '2px 8px', borderRadius: '10px' }}>24/7 Support</span>
@@ -253,11 +258,34 @@ function ChatScreen() {
       </div>
       
       {/* Active Chat Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', position: 'relative' }}>
+      <div style={{ flex: 1, display: selectedMatch ? 'flex' : 'none', flexDirection: 'column', background: '#fff', position: 'relative' }}>
         {selectedMatch ? (
           <>
             <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                
+                {/* ⬅️ Back Button to return to Chat List */}
+                <button 
+                  onClick={() => setSelectedMatch(null)} 
+                  style={{
+                    background: '#f0f2f5',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    fontSize: '1.2rem',
+                    color: '#333',
+                    marginRight: '4px'
+                  }}
+                  title="Back to conversation list"
+                >
+                  ←
+                </button>
+
                 <img src={getAvatarUrl(selectedMatch.photos)} alt="" onClick={() => window.location.hash = `/profile/${selectedMatch._id}`} style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', cursor: 'pointer', border: '2px solid #f0f0f0' }} />
                 <div>
                   <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -276,7 +304,6 @@ function ChatScreen() {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
-                {/* 🚫 Hide Audio & Video Call buttons when chatting with Admin / Support */}
                 {!isAdminSelected && (
                   <>
                     <button onClick={() => startCall('audio')} title="Voice Call" style={callButtonStyle}>📞</button>
@@ -327,7 +354,7 @@ function ChatScreen() {
         ) : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
             <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>💬</div>
-            <p>Loading conversation...</p>
+            <p>Select a conversation to start chatting</p>
           </div>
         )}
       </div>
