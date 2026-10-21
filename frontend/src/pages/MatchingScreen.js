@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import VerifiedBadge from './components/VerifiedBadge';
+import VerifiedBadge from '../components/VerifiedBadge';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -10,17 +10,15 @@ function MatchingScreen() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   
-  // ✅ Filter State
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('swipe'); // 'swipe' or 'grid'
+  const [viewMode, setViewMode] = useState('swipe'); 
   const [filters, setFilters] = useState({
     minAge: 18,
     maxAge: 60,
     location: '',
-    maxDistance: 50 // in km
+    maxDistance: 50
   });
 
-  // ✅ Swipe Card State
   const [currentIndex, setCurrentIndex] = useState(0);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -30,7 +28,6 @@ function MatchingScreen() {
   const token = localStorage.getItem('token');
   const [freshUser, setFreshUser] = useState(null);
 
-  // Sync user data on mount
   useEffect(() => {
     const syncUserData = async () => {
       try {
@@ -49,7 +46,6 @@ function MatchingScreen() {
     if (token) syncUserData();
   }, [token]);
 
-  // Fetch potential matches with query filters
   const fetchPotentialMatches = async (currentFilters = filters) => {
     try {
       const params = new URLSearchParams();
@@ -161,7 +157,6 @@ function MatchingScreen() {
     return { label: '❤️ Request', style: { background: '#ff4b4b', color: '#fff' }, action: 'send_request' };
   };
 
-  // --- Touch & Mouse Drag Swipe Event Handlers ---
   const handleTouchStart = (e) => {
     setIsDragging(true);
     dragStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -232,7 +227,6 @@ function MatchingScreen() {
   return (
     <div style={{ padding: '1rem', paddingBottom: '100px', maxWidth: '420px', margin: '0 auto', position: 'relative', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       
-      {/* Header Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.5px' }}>Discover</h2>
@@ -255,7 +249,6 @@ function MatchingScreen() {
         </div>
       </div>
 
-      {/* Filter Modal - Centered */}
       {showFilters && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
           <div style={{ background: '#fff', width: '100%', maxWidth: '400px', borderRadius: '24px', padding: '1.8rem', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', boxSizing: 'border-box' }}>
@@ -294,7 +287,6 @@ function MatchingScreen() {
         </div>
       )}
 
-      {/* SWIPE DECK VIEW MODE */}
       {viewMode === 'swipe' && (
         <>
           {!currentUser || currentIndex >= users.length ? (
@@ -307,14 +299,12 @@ function MatchingScreen() {
           ) : (
             <div style={{ position: 'relative', height: '64vh', width: '100%' }}>
               
-              {/* Background Card Preview Stack */}
               {users[currentIndex + 1] && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: '#fff', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.04)', zIndex: 1, transform: 'scale(0.96) translateY(12px)', opacity: 0.6 }}>
                   <img src={users[currentIndex + 1].photos?.[0]?.url || users[currentIndex + 1].photos?.[0] || 'https://via.placeholder.com/400'} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               )}
 
-              {/* Active Foreground Card */}
               <div 
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -333,7 +323,6 @@ function MatchingScreen() {
                   display: 'flex', flexDirection: 'column', userSelect: 'none'
                 }}
               >
-                {/* Swipe Dynamic Indicator Stamps */}
                 {dragOffset.x > 50 && (
                   <div style={{ position: 'absolute', top: '2.5rem', left: '2rem', border: '3px solid #10b981', color: '#10b981', padding: '0.3rem 0.9rem', fontSize: '1.4rem', fontWeight: 900, borderRadius: '10px', transform: 'rotate(-12deg)', zIndex: 10, background: 'rgba(255,255,255,0.9)', letterSpacing: '1px' }}>
                     LIKE
@@ -345,7 +334,6 @@ function MatchingScreen() {
                   </div>
                 )}
 
-                {/* Immersive Img & Info Overlay */}
                 <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                   <img 
                     src={currentUser.photos?.[0]?.url || currentUser.photos?.[0] || 'https://via.placeholder.com/400'} 
@@ -353,17 +341,17 @@ function MatchingScreen() {
                     style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} 
                   />
                   
-                  {/* Subtle Top Indicator Bar */}
                   <div style={{ position: 'absolute', top: '1rem', left: '1rem', right: '1rem', height: '4px', background: 'rgba(255,255,255,0.4)', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ width: '30%', height: '100%', background: '#fff' }} />
                   </div>
 
-                  {/* Gradient Info Box */}
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(15,23,42,0.95) 15%, rgba(15,23,42,0.7) 60%, transparent 100%)', padding: '2.5rem 1.4rem 1.2rem', color: '#fff' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                       <div>
-                        <div style={{ fontSize: '1.7rem', fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                          {currentUser.name}, <span style={{ fontWeight: 400, opacity: 0.9 }}>{currentUser.age || ''}</span>
+                        <div style={{ fontSize: '1.7rem', fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {currentUser.name}
+                          {currentUser.verificationStatus === 'verified' && <VerifiedBadge />}
+                          <span style={{ fontWeight: 400, opacity: 0.9 }}>{currentUser.age || ''}</span>
                         </div>
                         <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           📍 {renderLocation(currentUser.location)}
@@ -390,10 +378,8 @@ function MatchingScreen() {
             </div>
           )}
 
-          {/* Modern Circular Swipe Actions Panel */}
           {currentUser && currentIndex < users.length && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1.2rem', marginTop: '1.5rem', alignItems: 'center' }}>
-              
               <button 
                 onClick={() => handleMatchAction(currentUser, 'decline')}
                 disabled={actionLoading === currentUser._id}
@@ -446,7 +432,6 @@ function MatchingScreen() {
         </>
       )}
 
-      {/* GRID DISCOVERY VIEW MODE */}
       {viewMode === 'grid' && (
         <div>
           {users.length === 0 ? (
@@ -462,7 +447,9 @@ function MatchingScreen() {
                     <div onClick={() => window.location.hash = `/profile/${user._id}`} style={{ aspectRatio: '3/4', cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
                       <img src={user.photos?.[0]?.url || user.photos?.[0] || 'https://via.placeholder.com/200'} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', padding: '1rem 0.8rem 0.5rem', color: '#fff' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.95rem', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{user.name}, {user.age || ''}</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem', textShadow: '0 1px 2px rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                          {user.name} {user.verificationStatus === 'verified' && <VerifiedBadge />}
+                        </div>
                         <div style={{ fontSize: '0.7rem', opacity: 0.9, marginTop: '2px' }}>📍 {renderLocation(user.location)}</div>
                       </div>
                     </div>
