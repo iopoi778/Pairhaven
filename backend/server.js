@@ -53,7 +53,7 @@ async function createDefaultAdmin() {
         email: adminEmail,
         password: hashedPassword,
         phone: 'admin_support_001',
-        age: ,
+        age: 1,
         gender: 'other',
         role: 'admin',
         verificationStatus: 'verified', // ✅ Permanent verified badge
