@@ -69,12 +69,9 @@ router.get('/potential-matches', auth, async (req, res) => {
     res.json(enriched);
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
-// backend/routes/users.js
-
-// POST /api/users/upgrade
 router.post('/upgrade', auth, async (req, res) => {
   try {
-    const { plan } = req.body; // 'pro' ($2) or 'unlimited' ($5)
+    const { plan, paymentMethod, cardDetails } = req.body;
     
     if (!['pro', 'unlimited'].includes(plan)) {
       return res.status(400).json({ message: 'Invalid subscription plan selected.' });
@@ -83,15 +80,25 @@ router.post('/upgrade', auth, async (req, res) => {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Set membership fields based on chosen plan
-    user.isVip = true;
-    user.membershipTier = plan; // 'pro' or 'unlimited'
-    await user.save();
-
-    res.status(200).json({ 
-      message: `Successfully upgraded to ${plan.toUpperCase()} plan!`, 
-      user: { isVip: user.isVip, membershipTier: user.membershipTier } 
-    });
+    if (paymentMethod === 'card') {
+      // Basic card field validation
+      if (!cardDetails || !cardDetails.number || !cardDetails.expiry || !cardDetails.cvc) {
+        return res.status(400).json({ message: 'Please provide valid card details.' });
+      }
+      // Instant upgrade for card payment
+      user.isVip = true;
+      user.membershipTier = plan;
+      await user.save();
+      return res.status(200).json({ message: `Successfully upgraded to ${plan.toUpperCase()} plan!` });
+    } else if (paymentMethod === 'bank') {
+      // Mark as upgraded or pending transfer confirmation
+      user.isVip = true;
+      user.membershipTier = plan;
+      await user.save();
+      return res.status(200).json({ message: 'Bank transfer request registered. Upgrade applied!' });
+    } else {
+      return res.status(400).json({ message: 'Invalid payment method.' });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
