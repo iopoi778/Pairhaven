@@ -6,7 +6,7 @@ import VerifiedBadge from '../components/VerifiedBadge';
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
 function AdminScreen() {
-  const [activeTab, setActiveTab] = useState('users'); // 'users', 'support', 'verification'
+  const [activeTab, setActiveTab] = useState('users'); // 'users', 'verification', 'support'
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -16,6 +16,10 @@ function AdminScreen() {
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [replyText, setReplyText] = useState('');
+
+  // 🚀 New state for Direct Message modal from User list
+  const [dmModalUser, setDmModalUser] = useState(null);
+  const [dmText, setDmText] = useState('');
 
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
@@ -63,7 +67,7 @@ function AdminScreen() {
   const openConversation = async (conv) => {
     setSelectedConversation(conv);
     try {
-      const res = await axios.get(`${API_URL}/api/messages/${conv.user._id}`, {
+      const res = await axios.get(`${API_URL}/api/messages/conversation/${conv.user._id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setChatMessages(res.data || []);
@@ -77,9 +81,9 @@ function AdminScreen() {
     if (!replyText.trim() || !selectedConversation) return;
 
     try {
-      const res = await axios.post(`${API_URL}/api/messages`, {
-        recipientId: selectedConversation.user._id,
-        text: replyText
+      const res = await axios.post(`${API_URL}/api/messages/send`, {
+        receiverId: selectedConversation.user._id,
+        content: replyText
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -88,6 +92,27 @@ function AdminScreen() {
       setReplyText('');
     } catch (err) {
       alert("Failed to send reply");
+    }
+  };
+
+  // 💬 Send Direct Message to any user from the management list
+  const handleSendDirectMessage = async (e) => {
+    e.preventDefault();
+    if (!dmText.trim() || !dmModalUser) return;
+
+    try {
+      await axios.post(`${API_URL}/api/messages/send`, {
+        receiverId: dmModalUser._id,
+        content: dmText
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      alert(`Message successfully sent to ${dmModalUser.name}!`);
+      setDmText('');
+      setDmModalUser(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to send message");
     }
   };
 
@@ -292,6 +317,14 @@ function AdminScreen() {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      {/* 💬 Send Direct Message Button */}
+                      <button
+                        onClick={() => setDmModalUser(u)}
+                        style={{ background: '#eef2ff', border: '1px solid #5b72f2', color: '#5b72f2', borderRadius: '8px', padding: '0.5rem 0.8rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        💬 Message
+                      </button>
+
                       <button
                         onClick={() => handleEditBio(u._id, u.bio)}
                         disabled={isLoading}
@@ -397,7 +430,7 @@ function AdminScreen() {
                 >
                   <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{c.user.name}</div>
                   <div style={{ fontSize: '0.8rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {c.lastMessage?.text || 'Sent an attachment'}
+                    {c.lastMessage?.content || c.lastMessage?.text || 'Sent an attachment'}
                   </div>
                 </div>
               ))
@@ -412,7 +445,8 @@ function AdminScreen() {
 
               <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
                 {chatMessages.map(m => {
-                  const isSupport = m.sender === currentUser._id || m.sender?._id === currentUser._id;
+                  const senderId = typeof m.sender === 'object' ? m.sender?._id?.toString() : m.sender?.toString();
+                  const isSupport = currentUser.id === senderId || currentUser._id === senderId;
                   return (
                     <div 
                       key={m._id || Math.random()}
@@ -420,10 +454,10 @@ function AdminScreen() {
                         alignSelf: isSupport ? 'flex-end' : 'flex-start',
                         background: isSupport ? '#5b72f2' : '#f1f5f9',
                         color: isSupport ? '#fff' : '#1e293b',
-                        padding: '0.6rem 0.9rem', borderRadius: '12px', maxWidth: '80%', fontSize: '0.9rem'
+                        padding: '0.6rem 0.9rem', borderRadius: '12px', maxWidth: '80%', fontSize: '0.9rem', wordBreak: 'break-word'
                       }}
                     >
-                      {m.text}
+                      {m.content || m.text}
                     </div>
                   );
                 })}
@@ -443,6 +477,42 @@ function AdminScreen() {
               </form>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 💬 Direct Message Modal Popup */}
+      {dmModalUser && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '14px', width: '90%', maxWidth: '400px' }}>
+            <h3 style={{ margin: '0 0 0.5rem', color: '#1e293b' }}>Send Message to {dmModalUser.name}</h3>
+            <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: '#64748b' }}>This will instantly deliver a direct chat message from PairHaven Support.</p>
+            
+            <form onSubmit={handleSendDirectMessage}>
+              <textarea 
+                rows="4"
+                placeholder="Type your message here..."
+                value={dmText}
+                onChange={(e) => setDmText(e.target.value)}
+                required
+                style={{ width: '100%', boxSizing: 'border-box', padding: '0.8rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1rem', outline: 'none', fontSize: '0.95rem' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setDmModalUser(null)}
+                  style={{ background: '#e2e8f0', color: '#334155', border: 'none', borderRadius: '8px', padding: '0.6rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  style={{ background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Send Message
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
