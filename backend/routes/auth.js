@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const Message = require('../models/Message'); // ✅ Import Message Model for Auto-Rules
 const { uploadPhotos } = require('../middleware/upload');
 const auth = require('../middleware/auth'); 
 
@@ -23,12 +24,50 @@ async function createWelcomeNotification(userId, name) {
   }
 }
 
+// 🤖 Helper function: Auto-Follow Admin & Send Automated Rules Message
+async function autoConnectAndSendRules(newUser) {
+  try {
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@pairhaven.com';
+    const adminUser = await User.findOne({ email: adminEmail });
+
+    if (adminUser) {
+      // 1. Auto-Follow / Pair user with Admin in matches array
+      if (!newUser.matches.some(id => id.toString() === adminUser._id.toString())) {
+        newUser.matches.push(adminUser._id);
+        await newUser.save();
+      }
+      if (!adminUser.matches.some(id => id.toString() === newUser._id.toString())) {
+        adminUser.matches.push(newUser._id);
+        await adminUser.save();
+      }
+
+      // 2. Auto-Send Rules & Community Guidelines Message
+      const welcomeRulesText = 
+        `Welcome to PairHaven, ${newUser.name}! 👋\n\n` +
+        `Please adhere to our Community Rules:\n` +
+        `1. Be respectful to all members.\n` +
+        `2. No harassment, hate speech, or explicit violations.\n` +
+        `3. You must be 18+ to use PairHaven.\n` +
+        `4. Do not post spam or financial solicitation links.\n\n` +
+        `If you have any issues or support requests, reply to this chat directly!`;
+
+      await Message.create({
+        sender: adminUser._id,
+        recipient: newUser._id,
+        text: welcomeRulesText,
+        read: false
+      });
+    }
+  } catch (err) {
+    console.error('Failed auto-follow or rules dispatch:', err);
+  }
+}
+
 // DELETE CURRENT USER PROFILE
 router.delete('/profile/me', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     
-    // Delete user posts and the user
     await Post.deleteMany({ author: userId });
     await User.findByIdAndDelete(userId);
 
@@ -38,12 +77,12 @@ router.delete('/profile/me', auth, async (req, res) => {
   }
 });
 
-// REGISTER ROUTE WITH MULTER WRAPPER TO PREVENT HTTP/2 DROPS
+// REGISTER ROUTE
 router.post('/register', (req, res, next) => {
   uploadPhotos.array('photos', 5)(req, res, (err) => {
     if (err) {
       console.error('Multer/Cloudinary Upload Error:', err);
-      return res.status(400).json({ message: err.message || 'Image upload failed. Check your file size or credentials.' });
+      return res.status(400).json({ message: err.message || 'Image upload failed.' });
     }
     next();
   });
@@ -122,35 +161,8 @@ router.post('/register', (req, res, next) => {
     // Trigger Welcome Notification
     await createWelcomeNotification(user._id, user.name);
 
-    // Nearby user notifications
-    try {
-      const notifyRadius = parseInt(process.env.NEW_USER_NOTIFY_RADIUS_METERS || '50000', 10);
-
-      if (user.location && Array.isArray(user.location.coordinates) && user.location.coordinates.length === 2) {
-        const nearby = await User.find({
-          _id: { $ne: user._id },
-          location: {
-            $near: {
-              $geometry: { type: 'Point', coordinates: user.location.coordinates },$maxDistance: notifyRadius
-            }
-          }
-        }).select('_id');
-
-        if (nearby.length) {
-          const notifications = nearby.map(u => ({
-            recipient: u._id,
-            sender: user._id,
-            type: 'new-user',
-            message: `${user.name} joined near you`,
-            metadata: { newUserId: user._id }
-          }));
-
-          await Notification.insertMany(notifications);
-        }
-      }
-    } catch (notifyErr) {
-      console.warn('Failed to create new-user notifications', notifyErr);
-    }
+    // 🤖 Auto-Follow Admin & Dispatch Welcome Rules
+    await autoConnectAndSendRules(user);
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
@@ -164,7 +176,10 @@ router.post('/register', (req, res, next) => {
         phone: user.phone,
         photos: user.photos,
         verificationStatus: user.verificationStatus,
-        location: user.location
+        location: user.location,
+        role: user.role,                  // ✅ Returned role
+        membershipTier: user.membershipTier, // ✅ Returned tier
+        isVip: user.isVip                 // ✅ Returned VIP status
       }
     });
   } catch (error) {
@@ -173,6 +188,7 @@ router.post('/register', (req, res, next) => {
   }
 });
 
+// LOGIN ROUTE
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -200,12 +216,9 @@ router.post('/login', async (req, res) => {
         photos: user.photos,
         verificationStatus: user.verificationStatus,
         location: user.location,
-        role: user.role,                  // ✅ Added role
-        membershipTier: user.membershipTier, // ✅ Added membership tier
-        isVip: user.isVip,                // ✅ Added VIP status
-        followersCount: (user.followers || []).length,
-        followingCount: (user.following || []).length,
-        likesReceivedCount: (user.likesReceived || []).length
+        role: user.role,                  // ✅ Returned role
+        membershipTier: user.membershipTier, // ✅ Returned tier
+        isVip: user.isVip                 // ✅ Returned VIP status
       }
     });
   } catch (error) {
@@ -234,6 +247,7 @@ router.post('/google', async (req, res) => {
       });
       await user.save();
       await createWelcomeNotification(user._id, user.name);
+      await autoConnectAndSendRules(user); // 🤖 Auto-follow & send rules
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -246,7 +260,10 @@ router.post('/google', async (req, res) => {
         email: user.email,
         photos: user.photos,
         verificationStatus: user.verificationStatus,
-        location: user.location
+        location: user.location,
+        role: user.role,
+        membershipTier: user.membershipTier,
+        isVip: user.isVip
       }
     });
   } catch (error) {
@@ -275,6 +292,7 @@ router.post('/apple', async (req, res) => {
       });
       await user.save();
       await createWelcomeNotification(user._id, user.name);
+      await autoConnectAndSendRules(user); // 🤖 Auto-follow & send rules
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -286,7 +304,10 @@ router.post('/apple', async (req, res) => {
         name: user.name,
         email: user.email,
         verificationStatus: user.verificationStatus,
-        location: user.location
+        location: user.location,
+        role: user.role,
+        membershipTier: user.membershipTier,
+        isVip: user.isVip
       }
     });
   } catch (error) {
