@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import io from 'socket.io-client';
 import ProfileScreen from './pages/ProfileScreen';
 import MatchingScreen from './pages/MatchingScreen';
 import ChatScreen from './pages/chat';
 import NotificationsScreen from './pages/NotificationsScreen';
-import AdminScreen from './pages/AdminScreen'; // ✅ Import Admin Screen
+import AdminScreen from './pages/AdminScreen';
+import VerifiedBadge from './components/VerifiedBadge'; // ✅ Import VerifiedBadge
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -14,13 +16,96 @@ if (initialToken) {
   axios.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
 }
 
+// 🔔 60-second Auto-dismiss Pop-up Notification Component
+function NotificationPopup({ notification, onClose }) {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    // ⏱️ Auto dismiss after 60,000ms (1 minute)
+    const timer = setTimeout(() => {
+      handleClose();
+    }, 60000);
+
+    return () => clearTimeout(timer);
+  }, [notification]);
+
+  const handleClose = () => {
+    setVisible(false);
+    setTimeout(() => {
+      if (onClose) onClose();
+    }, 300);
+  };
+
+  if (!notification || !visible) return null;
+
+  const senderObj = typeof notification.sender === 'object' ? notification.sender : null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      zIndex: 9999,
+      background: '#ffffff',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+      borderRadius: '16px',
+      padding: '1rem 1.2rem',
+      maxWidth: '340px',
+      width: '90%',
+      borderLeft: '5px solid #5b72f2',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '6px',
+      animation: 'slideIn 0.3s ease-out',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    }}>
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateY(-20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes shrinkBar {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `}</style>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#5b72f2', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          {notification.title || '🔔 New Notification'}
+        </span>
+        <button 
+          onClick={handleClose} 
+          style={{ background: 'none', border: 'none', fontSize: '1.1rem', cursor: 'pointer', color: '#94a3b8' }}
+        >
+          ✕
+        </button>
+      </div>
+
+      <div style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <span>{notification.message}</span>
+        {senderObj?.verificationStatus === 'verified' && <VerifiedBadge status="verified" size="0.85rem" />}
+      </div>
+
+      {/* 60-second animated timer bar */}
+      <div style={{ width: '100%', height: '3px', background: '#e2e8f0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
+        <div style={{
+          height: '100%',
+          background: '#5b72f2',
+          width: '100%',
+          animation: 'shrinkBar 60s linear forwards'
+        }} />
+      </div>
+    </div>
+  );
+}
+
 const ProtectedRoute = ({ children }) => {
   const authToken = localStorage.getItem('token');
   if (!authToken) return <Navigate to="/login" replace />;
   return children;
 };
 
-// ✅ Admin Protected Route Check
 const AdminRoute = ({ children }) => {
   const authToken = localStorage.getItem('token');
   let user = {};
@@ -39,9 +124,7 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
   const getStoredUser = () => {
     try {
       return JSON.parse(localStorage.getItem('user')) || {};
-    } catch (e) { 
-      return {}; 
-    }
+    } catch (e) { return {}; }
   };
   
   const storedUserData = getStoredUser();
@@ -73,6 +156,67 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
 
 function App() {
   const [navCounts, setNavCounts] = useState({ chat: 0, alerts: 0 });
+  const [activePopup, setActivePopup] = useState(null);
+  const socketRef = useRef(null);
+
+  const getMyId = () => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return null;
+      const u = JSON.parse(raw);
+      return (u._id || u.id || u.userId)?.toString();
+    } catch (e) { return null; }
+  };
+
+  const myId = getMyId();
+
+  // 📡 Real-time Socket Listeners for Pop-ups (Messages, Likes, Matches)
+  useEffect(() => {
+    if (!myId) return;
+
+    socketRef.current = io(API_URL);
+    socketRef.current.emit('join', myId);
+
+    // 💬 1. Incoming Message Pop-up
+    socketRef.current.on('receive-message', (message) => {
+      const senderId = message.sender?._id || message.sender;
+      if (senderId && senderId !== myId) {
+        setActivePopup({
+          title: '💬 New Message',
+          message: `${message.sender?.name || 'Someone'}: ${message.content}`,
+          sender: message.sender,
+          createdAt: new Date()
+        });
+        fetchNavCounts();
+      }
+    });
+
+    // ❤️ 2. Incoming Like Pop-up
+    socketRef.current.on('receive-like', (data) => {
+      setActivePopup({
+        title: '❤️ New Like',
+        message: `${data.senderName || 'Someone'} liked your profile!`,
+        sender: data.sender,
+        createdAt: new Date()
+      });
+      fetchNavCounts();
+    });
+
+    // 💖 3. New Match Pop-up
+    socketRef.current.on('new-match', (data) => {
+      setActivePopup({
+        title: "💖 It's a Match!",
+        message: `You and ${data.matchedUserName || 'a new user'} matched with each other!`,
+        sender: data.sender,
+        createdAt: new Date()
+      });
+      fetchNavCounts();
+    });
+
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect();
+    };
+  }, [myId]);
 
   const fetchNavCounts = async () => {
     const authToken = localStorage.getItem('token');
@@ -110,11 +254,20 @@ function App() {
 
   return (
     <Router>
-      <div style={{ fontFamily: 'Arial, sans-serif', minHeight: '100vh', background: '#f2f2f2' }}>
+      <div style={{ fontFamily: 'Arial, sans-serif', minHeight: '100vh', background: '#f2f2f2', position: 'relative' }}>
+        
+        {/* 🔔 Global Pop-up Notification Banner (Disappears after 1 min) */}
+        {activePopup && (
+          <NotificationPopup 
+            notification={activePopup} 
+            onClose={() => setActivePopup(null)} 
+          />
+        )}
+
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/admin" element={<AdminRoute><AdminScreen /></AdminRoute>} /> {/* ✅ Admin Route */}
+          <Route path="/admin" element={<AdminRoute><AdminScreen /></AdminRoute>} />
           <Route path="/profile/*" element={<ProtectedRoute><ProfileRouteWrapper onUpdateCounts={fetchNavCounts} /></ProtectedRoute>} />
           <Route path="/*" element={<ProtectedRoute><DashboardLayout navCounts={navCounts} onUpdateCounts={fetchNavCounts} /></ProtectedRoute>} />
         </Routes>
@@ -123,7 +276,6 @@ function App() {
   );
 }
 
-// 🌆 Shared Animated Background Component
 function AnimatedBackground() {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
@@ -186,7 +338,6 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
     );
   };
 
-  // ✅ Build tab options dynamically (Admin tab added ONLY if user.role === 'admin')
   const tabsList = [
     { id: 'home', label: 'Home', icon: '🏠' },
     { id: 'matching', label: 'Match', icon: '💖' },
@@ -214,7 +365,6 @@ function DashboardLayout({ activeTabOverride, children, showBackButton, onBack, 
         {renderContent()}
       </main>
 
-      {/* ✅ Fixed Permanent Bottom Navigation Bar */}
       <nav style={{ 
         display: 'flex', justifyContent: 'space-around', alignItems: 'center', 
         padding: '0.8rem 0', borderTop: '1px solid #dfe3ea', background: '#fff', 
@@ -338,7 +488,10 @@ function HomeFeed({ onNavigateToProfile }) {
               <div onClick={() => onNavigateToProfile && onNavigateToProfile(post.author?._id)} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
                 <img src={avatarSrc} alt={post.author?.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', background: '#eee' }} onError={(e) => { e.target.src = 'https://via.placeholder.com/36'; }} />
                 <div>
-                  <div style={{ fontWeight: 700 }}>{post.author?.name || 'User'}</div>
+                  <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {post.author?.name || 'User'}
+                    <VerifiedBadge status={post.author?.verificationStatus} size="0.85rem" />
+                  </div>
                   <div style={{ fontSize: 12, color: '#666' }}>{new Date(post.createdAt).toLocaleString()}</div>
                 </div>
               </div>
@@ -393,7 +546,6 @@ function LoginPage() {
       localStorage.setItem('user', JSON.stringify(data.user));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       
-      // ✅ Redirect to admin panel if user role is admin, otherwise to home
       if (data.user.role === 'admin') {
         navigate('/admin', { replace: true });
       } else {
@@ -432,14 +584,7 @@ function RegisterPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0); 
   const [formData, setFormData] = useState({ 
-    name: '', 
-    email: '', 
-    phone: '', 
-    password: '', 
-    age: '', 
-    gender: '', 
-    city: '', 
-    bio: '' 
+    name: '', email: '', phone: '', password: '', age: '', gender: '', city: '', bio: '' 
   });
   const [selectedPhotos, setSelectedPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
