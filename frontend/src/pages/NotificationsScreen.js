@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import VerifiedBadge from '../components/VerifiedBadge'; // ✅ Import your VerifiedBadge component
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -97,6 +98,10 @@ function NotificationsScreen() {
           const isPaidUser = currentUser?.isVip || ['pro', 'unlimited'].includes(currentUser?.membershipTier);
           const isLockedType = ['like', 'match', 'match_request'].includes(note.type) && !isPaidUser;
           
+          // Check if sender has a verified status attached
+          const senderObj = typeof note.sender === 'object' ? note.sender : null;
+          const isSenderVerified = senderObj?.verificationStatus === 'verified';
+
           return (
             <div 
               key={note._id} 
@@ -135,15 +140,20 @@ function NotificationsScreen() {
                 )}
               </div>
 
-              {/* Apply CSS filter blur effect for standard users on match/like notifications */}
+              {/* Notification Message with Verified Badge Integration */}
               <div style={{ 
                 color: '#444', 
                 fontSize: '0.9rem',
                 filter: isLockedType ? 'blur(5px)' : 'none',
                 userSelect: isLockedType ? 'none' : 'auto',
-                transition: 'filter 0.3s ease'
+                transition: 'filter 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                flexWrap: 'wrap'
               }}>
-                {note.message}
+                <span>{note.message}</span>
+                {isSenderVerified && <VerifiedBadge status="verified" size="0.85rem" />}
               </div>
 
               {isLockedType && (
