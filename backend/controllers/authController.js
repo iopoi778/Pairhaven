@@ -31,7 +31,24 @@ function Register() {
   const handlePhotoChange = (e) => {
     setPhotos(Array.from(e.target.files));
   };
+const Notification = require('../models/Notification'); // Adjust path as needed
 
+// Inside your register route handler:
+const newUser = await User.create({
+  name,
+  email,
+  password,
+  // ...other fields
+});
+
+// ✅ Automatically create a permanent welcome notification matching account creation time
+await Notification.create({
+  recipient: newUser._id,
+  sender: newUser._id, // or leave null if system notification
+  type: 'welcome',
+  message: `Welcome to PairHaven, ${newUser.name}! Start exploring profiles and finding matches today.`,
+  createdAt: newUser.createdAt // Matches exact account creation timestamp
+});
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
