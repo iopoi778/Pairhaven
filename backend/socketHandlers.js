@@ -1,16 +1,21 @@
 module.exports = function(io) {
-  const userSockets = new Map();
-
   io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+    console.log('⚡ Socket client connected:', socket.id);
 
+    // 👤 Join individual user room for private notifications/messages
     socket.on('join', (userId) => {
       if (userId) {
-        userSockets.set(userId.toString(), socket.id);
-        console.log(`✅ User ${userId} registered with socket ID ${socket.id}`);
+        socket.join(userId.toString());
+        console.log(`✅ User ${userId} joined socket room`);
       }
     });
 
+    socket.on('disconnect', () => {
+      console.log('🔌 Client disconnected:', socket.id);
+    });
+  });
+};    
+    
     socket.on('sendMessage', async (data) => {
       try {
         const Message = require('./models/Message');
