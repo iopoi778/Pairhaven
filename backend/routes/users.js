@@ -69,7 +69,45 @@ router.get('/potential-matches', auth, async (req, res) => {
     res.json(enriched);
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
+router.post('/request/:userId', auth, async (req, res) => {
+  try {
+    const current = await User.findById(req.user.userId);
+    const target = await User.findById(req.params.userId);
+    
+    if (!target || !current) return res.status(404).json({ message: 'User not found' });
 
+    // Check & Reset daily limit if 24 hours have passed
+    const today = new Date().toDateString();
+    const lastReset = new Date(current.lastMatchResetDate).toDateString();
+    if (today !== lastReset) {
+      current.matchesSentToday = 0;
+      current.lastMatchResetDate = new Date();
+    }
+
+    // Limit check: Non-VIP users are capped at 20 matches per day
+    const DAILY_LIMIT = 20;
+    if (!current.isVip && current.matchesSentToday >= DAILY_LIMIT) {
+      return res.status(403).json({ 
+        message: 'Daily match limit reached (20/20). Upgrade to VIP for unlimited matches or watch an ad to get 3 free matches!' 
+      });
+    }
+
+    if ((current.matches || []).includes(req.params.userId)) return res.status(400).json({ message: 'Already matched' });
+    if ((current.requestsSent || []).includes(req.params.userId)) return res.status(400).json({ message: 'Request already sent' });
+
+    // Increment count and save
+    current.matchesSentToday += 1;
+    current.requestsSent = [...(current.requestsSent || []), req.params.userId];
+    target.requestsReceived = [...(target.requestsReceived || []), req.user.userId];
+    
+    await current.save(); 
+    await target.save();
+    
+    res.json({ message: 'Request sent', matchesSentToday: current.matchesSentToday });
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
+  }
+});
 // SEND REQUEST
 router.post('/request/:userId', auth, async (req, res) => {
   try {
@@ -85,7 +123,20 @@ router.post('/request/:userId', auth, async (req, res) => {
     res.json({ message: 'Request sent' });
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
+router.post('/reward-ad-matches', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Grant 3 extra matches by subtracting 3 from today's count (minimum 0)
+    user.matchesSentToday = Math.max(0, user.matchesSentToday - 3);
+    await user.save();
+
+    res.json({ message: 'Added 3 free matches!', matchesSentToday: user.matchesSentToday });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 // ✅ ACCEPT REQUEST - WITH NOTIFICATION
 router.post('/accept-request/:userId', auth, async (req, res) => {
   try {
