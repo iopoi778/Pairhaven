@@ -194,6 +194,8 @@ function ChatScreen() {
     setActiveCall(type);
   };
 
+  const isAdminSelected = selectedMatch && (selectedMatch.role === 'admin' || selectedMatch.email === 'admin@pairhaven.com');
+
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 78px)', background: '#fff', position: 'relative' }}>
       {/* Conversations Sidebar */}
@@ -260,7 +262,7 @@ function ChatScreen() {
                 <div>
                   <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     {selectedMatch.name}
-                    {(selectedMatch.role === 'admin' || selectedMatch.email === 'admin@pairhaven.com') && (
+                    {isAdminSelected && (
                       <span style={{ fontSize: '0.75rem', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '8px', fontWeight: 700 }}>
                         🛡️ Official Support
                       </span>
@@ -268,14 +270,20 @@ function ChatScreen() {
                     <VerifiedBadge status={selectedMatch.verificationStatus} size="0.95rem" />
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                    {selectedMatch.role === 'admin' ? 'Always Online' : (selectedMatch.age ? `${selectedMatch.age} yrs` : 'Online')}
+                    {isAdminSelected ? 'Always Online' : (selectedMatch.age ? `${selectedMatch.age} yrs` : 'Online')}
                   </div>
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
-                <button onClick={() => startCall('audio')} title="Voice Call" style={callButtonStyle}>📞</button>
-                <button onClick={() => startCall('video')} title="Video Call" style={callButtonStyle}>📹</button>
+                {/* 🚫 Hide Audio & Video Call buttons when chatting with Admin / Support */}
+                {!isAdminSelected && (
+                  <>
+                    <button onClick={() => startCall('audio')} title="Voice Call" style={callButtonStyle}>📞</button>
+                    <button onClick={() => startCall('video')} title="Video Call" style={callButtonStyle}>📹</button>
+                  </>
+                )}
+
                 <button onClick={() => setShowMenu(!showMenu)} title="More Options" style={{ ...callButtonStyle, background: showMenu ? '#eef2ff' : '#fff', fontWeight: 900 }}>⋮</button>
 
                 {showMenu && (
