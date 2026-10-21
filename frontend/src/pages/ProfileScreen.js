@@ -489,7 +489,23 @@ function ProfileScreen({ userId }) {
         <div style={{ margin: '0.2rem 0 1rem', display: 'inline-block', padding: '4px 14px', borderRadius: '12px', background: user.membershipTier === 'unlimited' ? 'linear-gradient(135deg, #ff4b4b, #dc2626)' : user.membershipTier === 'pro' ? '#5b72f2' : '#e2e8f0', color: user.membershipTier ? '#fff' : '#475569', fontSize: '0.8rem', fontWeight: 700 }}>
           {user.membershipTier === 'unlimited' ? '👑 Unlimited Plan' : user.membershipTier === 'pro' ? '⭐ Pro Plan' : 'Standard Member'}
         </div>
-
+         {isOwnProfile && (
+  <button 
+    onClick={async () => {
+      try {
+        const res = await axios.post(`${API_URL}/api/users/request-verification`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        alert(res.data.message || "Verification request submitted!");
+      } catch (err) {
+        alert(err.response?.data?.message || "Failed to submit verification request");
+      }
+    }}
+    style={{ background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: '20px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, display: 'block', margin: '0.5rem auto 0' }}
+  >
+    {user.verificationStatus === 'verified' ? '🟦★ Verified Account' : '✨ Verify Account'}
+  </button>
+)}
         {/* MATCH ACTION BUTTONS */}
         {!isOwnProfile && (
           <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
