@@ -6,7 +6,7 @@ import VerifiedBadge from '../components/VerifiedBadge';
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
 function AdminScreen() {
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState('users'); // 'users', 'support', 'verification'
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -27,7 +27,7 @@ function AdminScreen() {
       navigate('/');
       return;
     }
-    if (activeTab === 'users') {
+    if (activeTab === 'users' || activeTab === 'verification') {
       fetchUsers();
     } else if (activeTab === 'support') {
       fetchConversations();
@@ -173,6 +173,26 @@ function AdminScreen() {
     }
   };
 
+  const handleVerifyDecision = async (userId, newStatus) => {
+    setActionLoading(userId);
+    try {
+      await axios.patch(`${API_URL}/api/admin/users/${userId}/verify`, 
+        { status: newStatus }, 
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setUsers(prev => prev.map(u => 
+        u._id === userId ? { ...u, verificationStatus: newStatus } : u
+      ));
+
+      alert(`User is now ${newStatus === 'verified' ? '🟦★ VERIFIED' : 'UNVERIFIED'}`);
+    } catch (err) {
+      alert("Failed to update verification status");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -184,12 +204,14 @@ function AdminScreen() {
     return <div style={{ padding: '3rem', textAlign: 'center', color: '#666' }}>Loading Admin Panel...</div>;
   }
 
+  const pendingVerifications = users.filter(u => u.verificationStatus === 'pending');
+
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '100px', fontFamily: 'sans-serif' }}>
+    <div style={{ padding: '1.5rem', maxWidth: '850px', margin: '0 auto', paddingBottom: '100px', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#1e293b' }}>🛡️ Admin & Support Center</h2>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>Manage users and reply to support inquiries.</p>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>Manage users, review verification snaps, and reply to support inquiries.</p>
         </div>
 
         <button 
@@ -200,12 +222,19 @@ function AdminScreen() {
         </button>
       </div>
 
+      {/* Tabs Navigation */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
         <button 
           onClick={() => setActiveTab('users')}
           style={{ flex: 1, padding: '0.75rem', borderRadius: '10px', border: 'none', background: activeTab === 'users' ? '#5b72f2' : '#e2e8f0', color: activeTab === 'users' ? '#fff' : '#475569', fontWeight: 700, cursor: 'pointer' }}
         >
           👥 User Management
+        </button>
+        <button 
+          onClick={() => setActiveTab('verification')}
+          style={{ flex: 1, padding: '0.75rem', borderRadius: '10px', border: 'none', background: activeTab === 'verification' ? '#5b72f2' : '#e2e8f0', color: activeTab === 'verification' ? '#fff' : '#475569', fontWeight: 700, cursor: 'pointer' }}
+        >
+          📸 Verification Queue ({pendingVerifications.length})
         </button>
         <button 
           onClick={() => setActiveTab('support')}
@@ -215,6 +244,7 @@ function AdminScreen() {
         </button>
       </div>
 
+      {/* USER MANAGEMENT TAB */}
       {activeTab === 'users' && (
         <>
           <div style={{ marginBottom: '1.5rem' }}>
@@ -254,7 +284,7 @@ function AdminScreen() {
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {u.name} 
-                          <VerifiedBadge />
+                          <VerifiedBadge status={u.verificationStatus} />
                           {u.role === 'admin' && <span style={{ background: '#fee2e2', color: '#dc2626', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '6px' }}>ADMIN</span>}
                         </div>
                         <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{u.email}</div>
@@ -299,6 +329,55 @@ function AdminScreen() {
         </>
       )}
 
+      {/* VERIFICATION QUEUE TAB */}
+      {activeTab === 'verification' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {pendingVerifications.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', background: '#fff', borderRadius: '12px', color: '#64748b' }}>
+              🎉 No pending live selfie verification requests right now.
+            </div>
+          ) : (
+            pendingVerifications.map(u => {
+              const isLoading = actionLoading === u._id;
+              return (
+                <div key={u._id} style={{ background: '#fff', borderRadius: '14px', padding: '1.2rem', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.8rem' }}>{u.name} ({u.email})</div>
+                  
+                  <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>Main Profile Picture:</div>
+                      <img src={u.photos?.[0]?.url || u.photos?.[0] || 'https://via.placeholder.com/150'} alt="Profile" style={{ width: '130px', height: '130px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #cbd5e1' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.8rem', color: '#2563eb', marginBottom: '4px', fontWeight: 600 }}>📸 Live Camera Selfie Snap:</div>
+                      <img src={u.selfieSnap || 'https://via.placeholder.com/150'} alt="Live Selfie" style={{ width: '130px', height: '130px', borderRadius: '10px', objectFit: 'cover', border: '2px solid #2563eb' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                      onClick={() => handleVerifyDecision(u._id, 'verified')}
+                      disabled={isLoading}
+                      style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      {isLoading ? '...' : '✅ Grant 🟦★ Blue Badge'}
+                    </button>
+                    <button 
+                      onClick={() => handleVerifyDecision(u._id, 'not_verified')}
+                      disabled={isLoading}
+                      style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', padding: '0.6rem 1.2rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      {isLoading ? '...' : '❌ Decline'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* SUPPORT INBOX TAB */}
       {activeTab === 'support' && (
         <div style={{ display: 'grid', gridTemplateColumns: selectedConversation ? '1fr 1.5fr' : '1fr', gap: '1rem' }}>
           <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1rem' }}>
