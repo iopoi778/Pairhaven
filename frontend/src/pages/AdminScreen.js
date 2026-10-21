@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import VerifiedBadge from '../components/VerifiedBadge';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
 function AdminScreen() {
-  const [activeTab, setActiveTab] = useState('users'); // 'users' or 'support'
+  const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
 
-  // Chat/Support State
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
@@ -115,7 +115,7 @@ function AdminScreen() {
   };
 
   const handleEditBio = async (userId, currentBio) => {
-    const newBio = prompt("Edit Bio for user (violating profiles can be cleared):", currentBio || "");
+    const newBio = prompt("Edit Bio for user:", currentBio || "");
     if (newBio === null) return;
 
     setActionLoading(userId);
@@ -155,7 +155,7 @@ function AdminScreen() {
   };
 
   const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(`Are you sure you want to permanently delete user "${userName}"? This action cannot be undone.`)) {
+    if (!window.confirm(`Are you sure you want to permanently delete user "${userName}"?`)) {
       return;
     }
 
@@ -186,58 +186,35 @@ function AdminScreen() {
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '100px', fontFamily: 'sans-serif' }}>
-      
-      {/* Header with Logout Button */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#1e293b' }}>🛡️ Admin & Support Center</h2>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>Manage users, review policy violations, or reply to customer support inquiries.</p>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>Manage users and reply to support inquiries.</p>
         </div>
 
         <button 
           onClick={handleLogout}
-          style={{
-            background: '#fee2e2',
-            color: '#dc2626',
-            border: '1px solid #fca5a5',
-            borderRadius: '10px',
-            padding: '0.6rem 1.1rem',
-            fontWeight: 700,
-            fontSize: '0.88rem',
-            cursor: 'pointer'
-          }}
+          style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '10px', padding: '0.6rem 1.1rem', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
         >
           🚪 Log Out
         </button>
       </div>
 
-      {/* Tabs Switcher */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
         <button 
           onClick={() => setActiveTab('users')}
-          style={{
-            flex: 1, padding: '0.75rem', borderRadius: '10px', border: 'none',
-            background: activeTab === 'users' ? '#5b72f2' : '#e2e8f0',
-            color: activeTab === 'users' ? '#fff' : '#475569',
-            fontWeight: 700, cursor: 'pointer'
-          }}
+          style={{ flex: 1, padding: '0.75rem', borderRadius: '10px', border: 'none', background: activeTab === 'users' ? '#5b72f2' : '#e2e8f0', color: activeTab === 'users' ? '#fff' : '#475569', fontWeight: 700, cursor: 'pointer' }}
         >
           👥 User Management
         </button>
         <button 
           onClick={() => setActiveTab('support')}
-          style={{
-            flex: 1, padding: '0.75rem', borderRadius: '10px', border: 'none',
-            background: activeTab === 'support' ? '#5b72f2' : '#e2e8f0',
-            color: activeTab === 'support' ? '#fff' : '#475569',
-            fontWeight: 700, cursor: 'pointer'
-          }}
+          style={{ flex: 1, padding: '0.75rem', borderRadius: '10px', border: 'none', background: activeTab === 'support' ? '#5b72f2' : '#e2e8f0', color: activeTab === 'support' ? '#fff' : '#475569', fontWeight: 700, cursor: 'pointer' }}
         >
           💬 Support Inbox ({conversations.length})
         </button>
       </div>
 
-      {/* ================= USER MANAGEMENT TAB ================= */}
       {activeTab === 'users' && (
         <>
           <div style={{ marginBottom: '1.5rem' }}>
@@ -258,8 +235,6 @@ function AdminScreen() {
                 const isLoading = actionLoading === u._id;
                 return (
                   <div key={u._id} style={{ background: '#fff', borderRadius: '14px', padding: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                    
-                    {/* User Profile Info */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                       <div style={{ position: 'relative' }}>
                         <img 
@@ -270,30 +245,22 @@ function AdminScreen() {
                         <button
                           onClick={() => handleUpdatePhoto(u._id, u.photos)}
                           title="Change Profile Picture"
-                          style={{
-                            position: 'absolute', bottom: '-2px', right: '-2px', background: '#5b72f2',
-                            color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px',
-                            fontSize: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-                          }}
+                          style={{ position: 'absolute', bottom: '-2px', right: '-2px', background: '#5b72f2', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', fontSize: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                         >
                           📷
                         </button>
                       </div>
 
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {u.name} 
-                          <span title="Verified User" style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                            🟦★ Verified
-                          </span>
+                          <VerifiedBadge />
                           {u.role === 'admin' && <span style={{ background: '#fee2e2', color: '#dc2626', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '6px' }}>ADMIN</span>}
                         </div>
                         <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{u.email}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>Plan: <strong>{(u.membershipTier || 'standard').toUpperCase()}</strong></div>
                       </div>
                     </div>
 
-                    {/* Actions Panel */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <button
                         onClick={() => handleEditBio(u._id, u.bio)}
@@ -324,7 +291,6 @@ function AdminScreen() {
                         </button>
                       )}
                     </div>
-
                   </div>
                 );
               })
@@ -333,10 +299,8 @@ function AdminScreen() {
         </>
       )}
 
-      {/* ================= SUPPORT INBOX TAB ================= */}
       {activeTab === 'support' && (
         <div style={{ display: 'grid', gridTemplateColumns: selectedConversation ? '1fr 1.5fr' : '1fr', gap: '1rem' }}>
-          
           <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1rem' }}>
             <h4 style={{ margin: '0 0 1rem', color: '#334155' }}>User Complaints & Messages</h4>
             {conversations.length === 0 ? (
@@ -400,10 +364,8 @@ function AdminScreen() {
               </form>
             </div>
           )}
-
         </div>
       )}
-
     </div>
   );
 }
