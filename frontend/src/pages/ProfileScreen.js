@@ -65,24 +65,43 @@ function ProfileScreen({ userId }) {
   };
 
   // Match Request Handlers
-  const handleSendRequest = async () => {
-    setActionLoading(true);
-    try {
-      await axios.post(`${API_URL}/api/users/request/${user._id}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setUser(prev => ({ 
-        ...prev, 
-        requestsSent: [...(prev.requestsSent || []), currentUser._id] 
-      }));
-      alert("Match request sent!");
-    } catch (err) { 
-      alert(err.response?.data?.message || "Failed to send request"); 
-    } finally {
-      setActionLoading(false);
+const handleSendRequest = async (targetUserId) => {
+  try {
+    await axios.post(`${API_URL}/api/users/request/${targetUserId}`, {}, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    alert("Match request sent!");
+  } catch (err) {
+    if (err.response && err.response.status === 403) {
+      // Limit reached modal trigger
+      const choice = window.confirm("You've reached your 20 match limit for today! \n\nClick 'OK' to watch an ad for +3 free matches, or 'Cancel' to learn about VIP.");
+      if (choice) {
+        handleWatchAd();
+      } else {
+        // Trigger VIP Upgrade screen or modal
+        alert("Redirecting to VIP Upgrade...");
+      }
+    } else {
+      alert(err.response?.data?.message || "Error sending request");
     }
-  };
+  }
+};
 
+// Simulated Ad Reward Function (integrate Google AdMob or an ad script here)
+const handleWatchAd = async () => {
+  // Simulate watching an ad for 3 seconds
+  alert("Playing reward ad... (Simulated)");
+  setTimeout(async () => {
+    try {
+      const res = await axios.post(`${API_URL}/api/users/reward-ad-matches`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      alert(res.data.message);
+    } catch (e) {
+      alert("Failed to claim ad reward.");
+    }
+  }, 2000);
+};
   const handleAcceptRequest = async () => {
     setActionLoading(true);
     try {
