@@ -25,7 +25,65 @@ router.get('/users', auth, adminAuth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// Helper to notify all admins
+async function notifyAdmins(type, message, metadata = {}) {
+  try {
+    const admins = await User.find({ role: 'admin' });
+    const notifications = admins.map(admin => ({
+      recipient: admin._id,
+      sender: metadata.userId || admin._id,
+      type,
+      message,
+      metadata,
+      read: false
+    }));
+    await Notification.insertMany(notifications);
+  } catch (err) {
+    console.error("Failed to notify admins:", err);
+  }
+}
 
+// 1. User submits live selfie verification
+router.post('/verify-selfie', auth, async (req, res) => {
+  try {
+    const { image } = req.body;
+    const user = await User.findById(req.user.userId);
+    user.verificationStatus = 'pending';
+    user.selfieSnap = image; // Base64 or uploaded URL
+    await user.save();
+
+    // Notify admins of new verification submission
+    await notifyAdmins('verification_request', `📸 ${user.name} submitted a live selfie for verification!`, { userId: user._id });
+
+    res.json({ message: 'Selfie submitted for verification.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// 2. Admin approves or revokes Blue Badge
+router.patch('/admin/users/:id/verify', auth, adminAuth, async (req, res) => {
+  try {
+    const { status } = req.body; // 'verified' or 'not_verified'
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) return res.status(404).json({ message: 'User not found' });
+
+    targetUser.verificationStatus = status;
+    await targetUser.save();
+
+    res.json({ message: `User verification updated to ${status}` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// 3. Trigger Admin Notifications on Payments / Ad Watches
+router.post('/reward-ad', auth, async (req, res) => {
+  // ... ad reward logic ...
+  const user = await User.findById(req.user.userId);
+  await notifyAdmins('ad_watched', `📺 ${user.name} watched an ad and claimed coin rewards!`, { userId: user._id });
+  res.json({ message: 'Ad reward granted' });
+});
 // 2. UPDATE USER TIER / GIVE PRO OR UNLIMITED
 router.patch('/users/:id/tier', auth, adminAuth, async (req, res) => {
   try {
