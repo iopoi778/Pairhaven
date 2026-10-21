@@ -68,7 +68,21 @@ router.get('/conversation/:userId', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
+// GET /api/messages/conversations
+router.get('/conversations', auth, async (req, res) => {
+  try {
+    const myId = req.user.userId;
+    // ...
+    // Make sure when populating the conversation user details you include verificationStatus:
+    const populatedConvs = await User.populate(conversations, {
+      path: 'user',
+      select: 'name photos verificationStatus age' // ✅ Added verificationStatus
+    });
+    res.json(populatedConvs);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 // GET ALL CONVERSATIONS (for Messages tab) - OPTIMIZED
 router.get('/conversations', auth, async (req, res) => {
   try {
