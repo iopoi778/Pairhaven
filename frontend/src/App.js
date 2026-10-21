@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
 import axios from 'axios';
 import io from 'socket.io-client';
 import ProfileScreen from './pages/ProfileScreen';
@@ -9,8 +10,28 @@ import NotificationsScreen from './pages/NotificationsScreen';
 import AdminScreen from './pages/AdminScreen';
 import VerifiedBadge from './components/VerifiedBadge'; // ✅ Import VerifiedBadge
 
+
+
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
+function App() {
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    
+    if (token) {
+      axios.get(`${API_URL}/api/users/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => {
+        if (res.data) {
+          localStorage.setItem('user', JSON.stringify(res.data));
+        }
+      })
+      .catch(err => {
+        console.error("Failed to sync user profile:", err);
+      });
+    }
+  }, []);
 
 const initialToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 if (initialToken) {
@@ -213,7 +234,7 @@ function App() {
       });
       fetchNavCounts();
     });
-
+    
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
     };
