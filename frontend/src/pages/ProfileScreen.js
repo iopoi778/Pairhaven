@@ -87,19 +87,43 @@ function ProfileScreen({ userId }) {
     }
   };
 
-  const handleWatchAd = async () => {
-    alert("Playing reward ad... (Simulated)");
-    setTimeout(async () => {
-      try {
-        const res = await axios.post(`${API_URL}/api/users/reward-ad-matches`, {}, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        alert(res.data.message);
-        fetchProfileData();
-      } catch (e) {
-        alert("Failed to claim ad reward.");
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
+  const [adCountdown, setAdCountdown] = useState(5); // 5-second simulated ad
+
+  const handleWatchAd = () => {
+    setIsWatchingAd(true);
+    setAdCountdown(5);
+
+    const timer = setInterval(() => {
+      setAdCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          grantAdReward();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const grantAdReward = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      // Call your backend route to credit coins/chats
+      const res = await axios.post(`${API_URL}/api/users/reward-ad`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data && res.data.user) {
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        alert("🎉 Ad finished! You earned +3 Match Coins & +3 Chats!");
+        window.location.reload(); // Refresh to update balances
       }
-    }, 2000);
+    } catch (err) {
+      alert("Failed to claim reward.");
+    } finally {
+      setIsWatchingAd(false);
+    }
   };
 // 💳 Flutterwave Checkout Handler for Pro / Unlimited Tiers
   const handleFlutterwavePayment = (planType, amount) => {
