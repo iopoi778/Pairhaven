@@ -127,29 +127,34 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
   const hashPath = window.location.hash.replace('#', '') || '/';
   const pathParts = hashPath.split('/').filter(Boolean);
 
-
-useEffect(() => {
+  useEffect(() => {
   const initAdMob = async () => {
-    try {
-      await AdMob.initialize({
-        requestTrackingAuthorization: true,
-      });
-      
-      // Display a banner ad
-      await AdMob.showBanner({
-        adId: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY', // Your AdMob Banner ID
-        position: BannerAdPosition.BOTTOM_CENTER,
-        size: BannerAdSize.BANNER,
-        margin: 0,
-        isTesting: true, // Set to false when publishing to production
-      });
-    } catch (e) {
-      console.error("AdMob initialization error:", e);
+    // 🚨 Only run AdMob if running inside native Android or iOS app container
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await AdMob.initialize({
+          requestTrackingAuthorization: true,
+        });
+        
+        // Display a banner ad
+        await AdMob.showBanner({
+          adId: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
+          position: BannerAdPosition.BOTTOM_CENTER,
+          size: BannerAdSize.BANNER,
+          margin: 0,
+          isTesting: true,
+        });
+      } catch (e) {
+        console.error("AdMob initialization error:", e);
+      }
+    } else {
+      console.log("Running on Web/Render: Skipping native AdMob initialization.");
     }
   };
 
   initAdMob();
 }, []);
+  
   useEffect(() => {
   const queryParams = new URLSearchParams(window.location.search);
   const paymentStatus = queryParams.get('payment');
