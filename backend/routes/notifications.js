@@ -3,16 +3,22 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const Notification = require('../models/Notification');
 
+// GET /api/notifications
 router.get('/', auth, async (req, res) => {
   try {
     const notifs = await Notification.find({ recipient: req.user.userId })
-      .sort({ createdAt: -1 }).limit(100)
+      .sort({ createdAt: -1 })
+      .limit(100)
       .populate('sender', 'name photos verificationStatus');
+      
     res.json(notifs);
-  } catch (error) { res.status(500).json({ message: error.message }); }
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
+  }
 });
+
 // POST /api/notifications
-router.post('/notifications', auth, async (req, res) => {
+router.post('/', auth, async (req, res) => {
   try {
     const { recipient, type, message } = req.body;
 
@@ -30,28 +36,38 @@ router.post('/notifications', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+// PUT /api/notifications/:id/read
 router.put('/:id/read', auth, async (req, res) => {
   try {
     const note = await Notification.findOneAndUpdate(
       { _id: req.params.id, recipient: req.user.userId },
-      { read: true }, { new: true }
+      { read: true },
+      { new: true }
     );
     res.json(note || { message: 'Not found' });
-  } catch (error) { res.status(500).json({ message: error.message }); }
+  } catch (error) { 
+    res.status(500).json({ message: error.message }); 
+  }
 });
-// Backend endpoint to trigger incoming call alert
+
+// POST /api/notifications/call/notify (Incoming call alert)
 router.post('/call/notify', auth, async (req, res) => {
-  const { targetUserId, callType, channelName } = req.body;
+  try {
+    const { targetUserId, callType, channelName } = req.body;
 
-  await Notification.create({
-    recipient: targetUserId,
-    sender: req.user.userId,
-    type: 'incoming_call',
-    message: `Incoming ${callType} call...`,
-    metadata: { channelName, callType }
-  });
+    const notification = await Notification.create({
+      recipient: targetUserId,
+      sender: req.user.userId,
+      type: 'incoming_call',
+      message: `Incoming ${callType} call...`,
+      metadata: { channelName, callType }
+    });
 
-  res.json({ success: true });
+    res.json({ success: true, notification });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 module.exports = router;
