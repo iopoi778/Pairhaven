@@ -111,7 +111,10 @@ function MatchingScreen() {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-    } catch (e) {}
+    } catch (e) {
+      // ✅ Silently handles 404/network issues so the app doesn't break
+      console.log("Notification endpoint not configured yet, pop-up shown locally.");
+    }
   };
 
   const handleMatchAction = async (targetUser, actionType) => {
