@@ -95,7 +95,7 @@ function MatchingScreen() {
       messageText = `Passed on ${targetUser.name}`;
       notifType = 'pass';
     } else if (actionType === 'chat') {
-      return; // No notification needed when opening chat
+      return; 
     } else {
       return;
     }
@@ -121,7 +121,6 @@ function MatchingScreen() {
   const handleMatchAction = async (targetUser, actionType) => {
     if (!targetUser) return;
     
-    // Handle Chat redirection smoothly
     if (actionType === 'chat') {
       localStorage.setItem('activeTab', 'messages');
       window.location.hash = '/messages';
@@ -131,7 +130,7 @@ function MatchingScreen() {
     setActionLoading(targetUser._id);
     triggerPopupAndAlert(targetUser, actionType);
 
-    // 1. Immediately move to the next card locally to keep UI snappy and predictable
+    // ✅ Immediately advance the local card stack to guarantee smooth progression
     setDragOffset({ x: 0, y: 0 });
     setCurrentIndex(prev => prev + 1);
 
@@ -155,29 +154,12 @@ function MatchingScreen() {
           headers: { Authorization: `Bearer ${token}` }
         });
       }
-      
-      // Silent background sync without resetting the currentIndex stack
-      await refreshDataSilent();
     } catch (err) {
-      if (err.response?.status === 400 && err.response?.data?.message === 'Already matched') {
-        await refreshDataSilent();
-      } else if (err.response?.status !== 400) {
-        alert(err.response?.data?.message || "Action failed");
+      if (err.response?.status !== 400) {
+        console.error("Action failed", err);
       }
     } finally {
       setActionLoading(null);
-    }
-  };
-
-  const refreshDataSilent = async () => {
-    try {
-      const [userRes] = await Promise.all([
-        axios.get(`${API_URL}/api/users/profile/me`, { headers: { Authorization: `Bearer ${token}` } })
-      ]);
-      setFreshUser(userRes.data);
-      localStorage.setItem('user', JSON.stringify(userRes.data));
-    } catch (err) {
-      console.error("Silent refresh failed", err);
     }
   };
 
@@ -227,7 +209,7 @@ function MatchingScreen() {
     if (!isDragging) return;
     const currentX = e.clientX;
     const currentY = e.clientY;
-    setDragOffset({ x: currentX - dragStartRef.current.x, y: dragStartRef.current.y });
+    setDragOffset({ x: currentX - dragStartRef.current.x, y: currentY - dragStartRef.current.y });
   };
 
   const handleMouseUp = () => {
