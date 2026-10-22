@@ -83,7 +83,7 @@ function MatchingScreen() {
 
   const triggerPopupAndAlert = async (targetUser, actionType) => {
     let messageText = '';
-    let notifType = 'like';
+    let notifType = 'system';
 
     if (actionType === 'send_request') {
       messageText = `You sent a match request to ${targetUser.name}! ❤️`;
@@ -94,6 +94,8 @@ function MatchingScreen() {
     } else if (actionType === 'decline') {
       messageText = `Passed on ${targetUser.name}`;
       notifType = 'pass';
+    } else if (actionType === 'chat') {
+      return; // No notification needed when opening chat
     } else {
       return;
     }
@@ -112,15 +114,21 @@ function MatchingScreen() {
         headers: { Authorization: `Bearer ${token}` }
       });
     } catch (e) {
-      // ✅ Silently handles 404/network issues so the app doesn't break
-      console.log("Notification endpoint not configured yet, pop-up shown locally.");
+      console.log("Notification could not be saved to server, pop-up shown locally.");
     }
   };
 
   const handleMatchAction = async (targetUser, actionType) => {
     if (!targetUser) return;
-    setActionLoading(targetUser._id);
     
+    // Handle Chat redirection smoothly without freezing state
+    if (actionType === 'chat') {
+      localStorage.setItem('activeTab', 'messages');
+      window.location.hash = '/messages';
+      return;
+    }
+
+    setActionLoading(targetUser._id);
     triggerPopupAndAlert(targetUser, actionType);
 
     try {
@@ -142,10 +150,6 @@ function MatchingScreen() {
         await axios.delete(`${API_URL}/api/users/match/${targetUser._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-      } else if (actionType === 'chat') {
-        localStorage.setItem('activeTab', 'messages');
-        window.location.hash = '/';
-        return;
       }
       
       await refreshDataSilent();
@@ -158,6 +162,7 @@ function MatchingScreen() {
     } finally {
       setActionLoading(null);
       setDragOffset({ x: 0, y: 0 });
+      // ✅ Always advance card index so next user displays properly
       setCurrentIndex(prev => prev + 1);
     }
   };
@@ -220,7 +225,7 @@ function MatchingScreen() {
     if (!isDragging) return;
     const currentX = e.clientX;
     const currentY = e.clientY;
-    setDragOffset({ x: currentX - dragStartRef.current.x, y: currentY - dragStartRef.current.y });
+    setDragOffset({ x: currentX - dragStartRef.current.x, y: dragStartRef.current.y });
   };
 
   const handleMouseUp = () => {
