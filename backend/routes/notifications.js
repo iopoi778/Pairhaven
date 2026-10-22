@@ -11,7 +11,25 @@ router.get('/', auth, async (req, res) => {
     res.json(notifs);
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
+// POST /api/notifications
+router.post('/notifications', auth, async (req, res) => {
+  try {
+    const { recipient, type, message } = req.body;
 
+    const notification = await Notification.create({
+      recipient: recipient || req.user.userId,
+      sender: req.user.userId,
+      type: type || 'system',
+      message,
+      read: false
+    });
+
+    res.status(201).json(notification);
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 router.put('/:id/read', auth, async (req, res) => {
   try {
     const note = await Notification.findOneAndUpdate(
