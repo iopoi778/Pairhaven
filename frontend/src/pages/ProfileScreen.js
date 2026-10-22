@@ -101,62 +101,55 @@ function ProfileScreen({ userId }) {
       }
     }, 2000);
   };
-
-  const handleFlutterwaveUpgrade = (planType, amount) => {
-  if (typeof window.FlutterwaveCheckout === 'undefined') {
-    alert("Payment gateway script is still loading. Please try again in a moment.");
-    return;
-  }
-
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-
-  window.FlutterwaveCheckout({
-    public_key: process.env.REACT_APP_FLUTTERWAVE_PUBLIC_KEY || 'FLWPUBK_TEST-your_public_key_here',
-    tx_ref: 'pairhaven_' + Date.now(),
-    amount: amount,
-    currency: 'USD', // Change to 'NGN' or your preferred currency if needed
-    payment_options: 'card,mobilemoney,ussd',
-    customer: {
-      email: currentUser.email || 'user@pairhaven.com',
-      name: currentUser.name || 'PairHaven User',
-      phone_number: currentUser.phone || '08000000000',
-    },
-    customizations: {
-      title: 'PairHaven Membership',
-      description: `Upgrade to ${planType.toUpperCase()} Plan`,
-      logo: 'https://pairhaven.onrender.com/logo.png',
-    },
-    callback: async function (response) {
-      // When payment is successful, call your verification function
-      await verifyFlutterwavePayment(response.transaction_id, planType);
-    },
-    onclose: function() {
-      console.log("Payment modal closed by user.");
+// 💳 Flutterwave Checkout Handler for Pro / Unlimited Tiers
+  const handleFlutterwavePayment = (planType, amount) => {
+    if (typeof window.FlutterwaveCheckout === 'undefined') {
+      alert("Payment gateway script is still loading. Please try again in a moment.");
+      return;
     }
-  });
-};
 
-// Your verification function
-const verifyFlutterwavePayment = async (transactionId, planType) => {
-  try {
-    const token = localStorage.getItem('token');
-    const res = await axios.post(`${API_URL}/api/payments/verify-flutterwave`, {
-      transactionId,
-      plan: planType
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+    window.FlutterwaveCheckout({
+      public_key: process.env.REACT_APP_FLUTTERWAVE_PUBLIC_KEY || 'FLWPUBK_TEST-your_public_key_here',
+      tx_ref: 'pairhaven_' + Date.now(),
+      amount: amount,
+      currency: 'USD',
+      payment_options: 'card,mobilemoney,ussd',
+      customer: {
+        email: currentUser.email || 'user@pairhaven.com',
+        name: currentUser.name || 'PairHaven User',
+        phone_number: currentUser.phone || '08000000000',
+      },
+      customizations: {
+        title: 'PairHaven Membership',
+        description: `Upgrade to ${planType.toUpperCase()} Plan`,
+        logo: 'https://pairhaven.onrender.com/logo.png',
+      },
+      callback: async function (response) {
+        try {
+          const token = localStorage.getItem('token');
+          const res = await axios.post(`${API_URL}/api/payments/verify-flutterwave`, {
+            transactionId: response.transaction_id,
+            plan: planType
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (res.data && res.data.user) {
+            localStorage.setItem('user', JSON.stringify(res.data.user));
+            alert(`🎉 Congratulations! You are now upgraded to ${planType.toUpperCase()}!`);
+            window.location.reload();
+          }
+        } catch (err) {
+          alert(err.response?.data?.message || "Payment verification failed.");
+        }
+      },
+      onclose: function() {
+        console.log("Payment modal closed by user.");
+      }
     });
-
-    if (res.data && res.data.user) {
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-      alert(`🎉 Congratulations! You are now upgraded to ${planType.toUpperCase()}!`);
-      window.location.reload();
-    }
-  } catch (err) {
-    alert(err.response?.data?.message || "Payment verification failed.");
-  }
-};
-
+  };
   const handleAcceptRequest = async () => {
     setActionLoading(true);
     try {
