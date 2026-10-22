@@ -13,6 +13,7 @@ router.get('/', auth, async (req, res) => {
       
     res.json(notifs);
   } catch (error) { 
+    console.error('Error fetching notifications:', error);
     res.status(500).json({ message: error.message }); 
   }
 });
@@ -22,17 +23,22 @@ router.post('/', auth, async (req, res) => {
   try {
     const { recipient, type, message } = req.body;
 
+    // Ensure we have a valid recipient and message
+    const targetRecipient = recipient && recipient.trim() !== '' ? recipient : req.user.userId;
+    const notificationMessage = message || 'You have a new update';
+
     const notification = await Notification.create({
-      recipient: recipient || req.user.userId,
+      recipient: targetRecipient,
       sender: req.user.userId,
       type: type || 'system',
-      message,
+      message: notificationMessage,
       read: false
     });
 
     res.status(201).json(notification);
   } catch (error) {
-    console.error('Error creating notification:', error);
+    // 🔍 This will print the exact Mongoose schema validation error to your Render logs
+    console.error('❌ Detailed Error creating notification:', error.errors || error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -66,6 +72,7 @@ router.post('/call/notify', auth, async (req, res) => {
 
     res.json({ success: true, notification });
   } catch (error) {
+    console.error('Error creating call notification:', error);
     res.status(500).json({ message: error.message });
   }
 });
