@@ -9,6 +9,7 @@ import NotificationsScreen from './pages/NotificationsScreen';
 import AdminScreen from './pages/AdminScreen';
 import VerifiedBadge from './components/VerifiedBadge';
 import { AdMob, BannerAdPosition, BannerAdSize } from '@capacitor-community/admob';
+import { Capacitor } from '@capacitor/core';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
