@@ -121,7 +121,7 @@ function MatchingScreen() {
   const handleMatchAction = async (targetUser, actionType) => {
     if (!targetUser) return;
     
-    // Handle Chat redirection smoothly without freezing state
+    // Handle Chat redirection smoothly
     if (actionType === 'chat') {
       localStorage.setItem('activeTab', 'messages');
       window.location.hash = '/messages';
@@ -130,6 +130,10 @@ function MatchingScreen() {
 
     setActionLoading(targetUser._id);
     triggerPopupAndAlert(targetUser, actionType);
+
+    // 1. Immediately move to the next card locally to keep UI snappy and predictable
+    setDragOffset({ x: 0, y: 0 });
+    setCurrentIndex(prev => prev + 1);
 
     try {
       if (actionType === 'send_request') {
@@ -152,6 +156,7 @@ function MatchingScreen() {
         });
       }
       
+      // Silent background sync without resetting the currentIndex stack
       await refreshDataSilent();
     } catch (err) {
       if (err.response?.status === 400 && err.response?.data?.message === 'Already matched') {
@@ -161,9 +166,6 @@ function MatchingScreen() {
       }
     } finally {
       setActionLoading(null);
-      setDragOffset({ x: 0, y: 0 });
-      // ✅ Always advance card index so next user displays properly
-      setCurrentIndex(prev => prev + 1);
     }
   };
 
