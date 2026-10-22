@@ -93,6 +93,7 @@ app.use('/api/users', profileRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/swipes', swipesRoutes);
 app.use('/api/admin', adminRoutes); // ✅ Mounted Admin Endpoints
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Global Error Handler
 app.use((err, req, res, next) => {
