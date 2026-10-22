@@ -7,35 +7,9 @@ import MatchingScreen from './pages/MatchingScreen';
 import ChatScreen from './pages/chat';
 import NotificationsScreen from './pages/NotificationsScreen';
 import AdminScreen from './pages/AdminScreen';
-import VerifiedBadge from './components/VerifiedBadge'; // ✅ Import VerifiedBadge
-
-
+import VerifiedBadge from './components/VerifiedBadge';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
-
-function App() {
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    
-    if (token) {
-      axios.get(`${API_URL}/api/users/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then(res => {
-        if (res.data) {
-          localStorage.setItem('user', JSON.stringify(res.data));
-        }
-      })
-      .catch(err => {
-        console.error("Failed to sync user profile:", err);
-      });
-    }
-  }, []);
-
-const initialToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-if (initialToken) {
-  axios.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
-}
 
 // 🔔 60-second Auto-dismiss Pop-up Notification Component
 function NotificationPopup({ notification, onClose }) {
@@ -45,7 +19,7 @@ function NotificationPopup({ notification, onClose }) {
     // ⏱️ Auto dismiss after 60,000ms (1 minute)
     const timer = setTimeout(() => {
       handleClose();
-    }, 600);
+    }, 60000);
 
     return () => clearTimeout(timer);
   }, [notification]);
@@ -179,6 +153,29 @@ function App() {
   const [navCounts, setNavCounts] = useState({ chat: 0, alerts: 0 });
   const [activePopup, setActivePopup] = useState(null);
   const socketRef = useRef(null);
+
+  // Sync profile on load / refresh
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.get(`${API_URL}/api/users/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => {
+        if (res.data) {
+          localStorage.setItem('user', JSON.stringify(res.data));
+        }
+      })
+      .catch(err => {
+        console.error("Failed to sync user profile:", err);
+      });
+    }
+  }, []);
+
+  const initialToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (initialToken) {
+    axios.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
+  }
 
   const getMyId = () => {
     try {
