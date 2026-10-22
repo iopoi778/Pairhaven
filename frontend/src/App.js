@@ -127,6 +127,26 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
   const pathParts = hashPath.split('/').filter(Boolean);
   
   useEffect(() => {
+  const queryParams = new URLSearchParams(window.location.search);
+  const paymentStatus = queryParams.get('payment');
+  const selectedPlan = queryParams.get('plan');
+
+  if (paymentStatus === 'success' && selectedPlan) {
+    const token = localStorage.getItem('token');
+    axios.post(`${API_URL}/api/payments/verify-success`, 
+      { plan: selectedPlan },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).then(res => {
+      if (res.data.user) {
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        alert(`🎉 Success! You are now upgraded to ${selectedPlan.toUpperCase()}!`);
+        window.location.href = '#/'; // Clear query params
+        window.location.reload();
+      }
+    }).catch(err => console.error("Verification error", err));
+  }
+}, []);
+  useEffect(() => {
     if (pathParts[0] === 'profile' && pathParts[1] && pathParts[1] !== storedUserData._id) {
       if (onUpdateCounts) onUpdateCounts();
     }
