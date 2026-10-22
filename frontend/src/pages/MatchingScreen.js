@@ -10,6 +10,9 @@ function MatchingScreen() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   
+  // Pop-up Alert State
+  const [popupNotification, setPopupNotification] = useState(null);
+
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('swipe'); 
   const [filters, setFilters] = useState({
@@ -78,13 +81,50 @@ function MatchingScreen() {
     return loc;
   };
 
+  // Trigger Popup & Notification
+  const triggerPopupAndAlert = async (targetUser, actionType) => {
+    let messageText = '';
+    let notifType = 'like';
+
+    if (actionType === 'send_request') {
+      messageText = `You sent a match request to ${targetUser.name}! ❤️`;
+      notifType = 'match_request';
+    } else if (actionType === 'accept') {
+      messageText = `You matched with ${targetUser.name}! 🎉`;
+      notifType = 'match';
+    } else if (actionType === 'decline') {
+      messageText = `Passed on ${targetUser.name}`;
+      notifType = 'pass';
+    } else {
+      return;
+    }
+
+    // Show visual pop-up on screen
+    setPopupNotification(messageText);
+    setTimeout(() => {
+      setPopupNotification(null);
+    }, 3000);
+
+    // Send notification data to backend Alerts tab if applicable
+    try {
+      await axios.post(`${API_URL}/api/notifications`, {
+        recipient: targetUser._id,
+        type: notifType,
+        message: messageText
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (e) {
+      // Silent catch if backend notification schema handles it automatically via route controllers
+    }
+  };
+
   const handleMatchAction = async (targetUser, actionType) => {
     if (!targetUser) return;
     setActionLoading(targetUser._id);
     
-    // Immediately move to the next card and reset drag position for instant feedback
-    setDragOffset({ x: 0, y: 0 });
-    setCurrentIndex(prev => prev + 1);
+    // Trigger popup notification alert
+    triggerPopupAndAlert(targetUser, actionType);
 
     try {
       if (actionType === 'send_request') {
@@ -120,6 +160,9 @@ function MatchingScreen() {
       }
     } finally {
       setActionLoading(null);
+      // Smoothly reset card position and advance index
+      setDragOffset({ x: 0, y: 0 });
+      setCurrentIndex(prev => prev + 1);
     }
   };
 
@@ -207,6 +250,7 @@ function MatchingScreen() {
     } else if (dragOffset.x < -threshold) {
       handleMatchAction(currentUser, 'decline');
     } else {
+      // 🔄 FIX: Explicitly snap back to center if threshold is not met
       setDragOffset({ x: 0, y: 0 });
     }
   };
@@ -224,6 +268,18 @@ function MatchingScreen() {
   return (
     <div style={{ padding: '1rem', paddingBottom: '100px', maxWidth: '420px', margin: '0 auto', position: 'relative', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       
+      {/* POP-UP NOTIFICATION BANNER */}
+      {popupNotification && (
+        <div style={{
+          position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
+          background: '#1e293b', color: '#fff', padding: '10px 20px', borderRadius: '30px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.2)', zIndex: 9999, fontWeight: 700, fontSize: '0.9rem',
+          display: 'flex', alignItems: 'center', gap: '8px', animation: 'fadeInOut 0.3s ease'
+        }}>
+          ✨ {popupNotification}
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.5px' }}>Discover</h2>
@@ -347,7 +403,7 @@ function MatchingScreen() {
                       <div>
                         <div style={{ fontSize: '1.7rem', fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {currentUser.name}
-                          <VerifiedBadge status={currentUser.verificationStatus} />
+                          {currentUser.verificationStatus === 'verified' && <VerifiedBadge />}
                           <span style={{ fontWeight: 400, opacity: 0.9 }}>{currentUser.age || ''}</span>
                         </div>
                         <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -445,7 +501,7 @@ function MatchingScreen() {
                       <img src={user.photos?.[0]?.url || user.photos?.[0] || 'https://via.placeholder.com/200'} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', padding: '1rem 0.8rem 0.5rem', color: '#fff' }}>
                         <div style={{ fontWeight: 700, fontSize: '0.95rem', textShadow: '0 1px 2px rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                          {user.name} <VerifiedBadge status={user.verificationStatus} />
+                          {user.name} {user.verificationStatus === 'verified' && <VerifiedBadge />}
                         </div>
                         <div style={{ fontSize: '0.7rem', opacity: 0.9, marginTop: '2px' }}>📍 {renderLocation(user.location)}</div>
                       </div>
@@ -460,7 +516,7 @@ function MatchingScreen() {
                       ) : btnConfig.dualButtons ? (
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button onClick={() => handleMatchAction(user, 'accept')} disabled={isLoading} style={{ flex: 1, background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem', fontWeight: 600, cursor: 'pointer' }}>✓ Accept</button>
-                          <button onClick={() => handleMatchAction(user, 'decline')} disabled={isLoading} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 0.8rem', cursor: 'pointer' }}>✕</button>
+                          <button onClick => handleMatchAction(user, 'decline')} disabled={isLoading} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 0.8rem', cursor: 'pointer' }}>✕</button>
                         </div>
                       ) : (
                         <button 
