@@ -81,7 +81,6 @@ function MatchingScreen() {
     return loc;
   };
 
-  // Trigger Popup & Notification
   const triggerPopupAndAlert = async (targetUser, actionType) => {
     let messageText = '';
     let notifType = 'like';
@@ -99,13 +98,11 @@ function MatchingScreen() {
       return;
     }
 
-    // Show visual pop-up on screen
     setPopupNotification(messageText);
     setTimeout(() => {
       setPopupNotification(null);
     }, 3000);
 
-    // Send notification data to backend Alerts tab if applicable
     try {
       await axios.post(`${API_URL}/api/notifications`, {
         recipient: targetUser._id,
@@ -114,16 +111,13 @@ function MatchingScreen() {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-    } catch (e) {
-      // Silent catch if backend notification schema handles it automatically via route controllers
-    }
+    } catch (e) {}
   };
 
   const handleMatchAction = async (targetUser, actionType) => {
     if (!targetUser) return;
     setActionLoading(targetUser._id);
     
-    // Trigger popup notification alert
     triggerPopupAndAlert(targetUser, actionType);
 
     try {
@@ -160,7 +154,6 @@ function MatchingScreen() {
       }
     } finally {
       setActionLoading(null);
-      // Smoothly reset card position and advance index
       setDragOffset({ x: 0, y: 0 });
       setCurrentIndex(prev => prev + 1);
     }
@@ -250,7 +243,6 @@ function MatchingScreen() {
     } else if (dragOffset.x < -threshold) {
       handleMatchAction(currentUser, 'decline');
     } else {
-      // 🔄 FIX: Explicitly snap back to center if threshold is not met
       setDragOffset({ x: 0, y: 0 });
     }
   };
@@ -268,13 +260,12 @@ function MatchingScreen() {
   return (
     <div style={{ padding: '1rem', paddingBottom: '100px', maxWidth: '420px', margin: '0 auto', position: 'relative', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       
-      {/* POP-UP NOTIFICATION BANNER */}
       {popupNotification && (
         <div style={{
           position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
           background: '#1e293b', color: '#fff', padding: '10px 20px', borderRadius: '30px',
           boxShadow: '0 10px 25px rgba(0,0,0,0.2)', zIndex: 9999, fontWeight: 700, fontSize: '0.9rem',
-          display: 'flex', alignItems: 'center', gap: '8px', animation: 'fadeInOut 0.3s ease'
+          display: 'flex', alignItems: 'center', gap: '8px'
         }}>
           ✨ {popupNotification}
         </div>
@@ -516,7 +507,7 @@ function MatchingScreen() {
                       ) : btnConfig.dualButtons ? (
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button onClick={() => handleMatchAction(user, 'accept')} disabled={isLoading} style={{ flex: 1, background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem', fontWeight: 600, cursor: 'pointer' }}>✓ Accept</button>
-                          <button onClick => handleMatchAction(user, 'decline')} disabled={isLoading} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 0.8rem', cursor: 'pointer' }}>✕</button>
+                          <button onClick={() => handleMatchAction(user, 'decline')} disabled={isLoading} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 0.8rem', cursor: 'pointer' }}>✕</button>
                         </div>
                       ) : (
                         <button 
