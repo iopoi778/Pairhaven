@@ -114,6 +114,20 @@ router.get('/potential-matches', auth, async (req, res) => {
   }
 });
 
+router.post('/reward-ad', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Increment chat coins or balances (adjust field names based on your User schema)
+    user.chatCoins = (user.chatCoins || 10) + 3;
+    await user.save();
+
+    res.json({ message: 'Reward granted successfully', user });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 // LEGACY UPGRADE ROUTE (Manual / Direct Card & Bank)
 router.post('/upgrade', auth, async (req, res) => {
   try {
