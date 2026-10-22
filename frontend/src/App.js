@@ -8,6 +8,7 @@ import ChatScreen from './pages/chat';
 import NotificationsScreen from './pages/NotificationsScreen';
 import AdminScreen from './pages/AdminScreen';
 import VerifiedBadge from './components/VerifiedBadge';
+import { AdMob, BannerAdPosition, BannerAdSize } from '@capacitor-community/admob';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://pairhaven.onrender.com';
 
@@ -125,7 +126,30 @@ function ProfileRouteWrapper({ onUpdateCounts }) {
   const storedUserData = getStoredUser();
   const hashPath = window.location.hash.replace('#', '') || '/';
   const pathParts = hashPath.split('/').filter(Boolean);
-  
+
+
+useEffect(() => {
+  const initAdMob = async () => {
+    try {
+      await AdMob.initialize({
+        requestTrackingAuthorization: true,
+      });
+      
+      // Display a banner ad
+      await AdMob.showBanner({
+        adId: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY', // Your AdMob Banner ID
+        position: BannerAdPosition.BOTTOM_CENTER,
+        size: BannerAdSize.BANNER,
+        margin: 0,
+        isTesting: true, // Set to false when publishing to production
+      });
+    } catch (e) {
+      console.error("AdMob initialization error:", e);
+    }
+  };
+
+  initAdMob();
+}, []);
   useEffect(() => {
   const queryParams = new URLSearchParams(window.location.search);
   const paymentStatus = queryParams.get('payment');
